@@ -10,6 +10,17 @@ by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
 `MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
 hand.
 
+## [0.0.4] - established: real calibration-freshness enforcement, fail-safe by default
+### Added
+- `calibration.py` - real `ZoneCalibration` (version, source, `calibrated_at`, `max_age_days`) and `parse_calibration()`, raising `CalibrationError` on any missing/malformed field. `calibration_age_days()`/`is_calibration_expired()` treat a calibration older than its own `max_age_days`, or dated in the future (clock skew/bad data), as invalid - `max_age_days` itself is inclusive (a calibration exactly that many days old is still trusted, one day older is not).
+- `zones.py` - new `ZoneSet` (zones + an optional `ZoneCalibration`); `calibration=None` represents a zones file that never declared one at all, treated identically to an expired one downstream.
+- `config.py` - new `load_zone_set()`, parsing the same file `load_zones()` does plus an optional top-level `"calibration"` object. A missing `"calibration"` key loads successfully with `calibration=None` - deliberately not a load error, since the point of `ZoneSet` is to let the caller fail safe on missing calibration, not fail to load at all.
+- `safety_state.py` - new `SafetyState` (READY/WARNING/DANGER/INHIBITED) and `evaluate_safety()`: the single real fail-safe decision this project's E-STOP orchestration depends on. Calibration is checked FIRST, before any breach logic runs - a missing or expired calibration always resolves to INHIBITED with a human-readable reason, even when the (untrusted) geometry would otherwise report a real-looking Danger breach.
+- `main.py`'s `check` subcommand now loads a `ZoneSet` and reports the real `SafetyState`; new exit code 3 for INHIBITED, distinct from 0 (Ready)/1 (Warning)/2 (Danger).
+- 23 new real tests: calibration parsing (valid, every missing/empty required field, bad date, bad `max_age_days`), the exact boundary of `max_age_days` (valid at exactly N days, expired at N+1), a future-dated calibration, `evaluate_safety()` for all four states including "expired calibration wins over a real danger breach", `load_zone_set()` with and without a `"calibration"` key, and 2 new CLI end-to-end cases proving a missing/expired calibration inhibits regardless of object position - 44/44 passing.
+- Real verification beyond the test suite: ran `check` against a real zones file with no calibration key and an object nowhere near any zone - confirmed `SAFETY STATE: INHIBITED`, exit 3, not the `READY` a position-only check would have reported. Ran it again with a valid same-day calibration and an object inside the danger zone - confirmed `SAFETY STATE: DANGER`, real E-STOP request printed, exit 2, matching pre-existing behavior unchanged.
+- Manifest maturity promoted `functional` -> `established` per `SONNET/AUDITORIA_PROMOCION_FUNCIONAL_A_ESTABLECIDO_2026-08-27.txt`'s vital-improvement gate for this project ("geometria versionada, prueba de limites y fallo seguro cuando la calibracion no es valida").
+
 ## [0.0.3] - Real v0 zone-breach checking and E-STOP requesting
 ### Added
 - `geometry.py` - real `Point3D`/`AABB` primitives, inclusive-boundary containment check, hardware-independent by design.

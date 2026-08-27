@@ -27,6 +27,7 @@ This is one of the 4 children of **[HYDRA-UMC-VISION-NODE](https://github.com/Ju
 
 * 🚦 **Multi-Level Zones (v0):** real `Zone`/`ZoneLevel` (Warning/Danger) definitions over axis-aligned 3D volumes, and real breach checking (`check_breaches`) between a zone set and a set of detected object positions.
 * 🛑 **E-STOP requesting (v0, not asserting):** every object whose worst breach is Danger produces a real `EStopRequest`, handed to an `EStopRequester` - see the design boundary below for why nothing here ever asserts the physical stop itself.
+* 🔒 **Calibration-freshness enforcement (v0):** every zone set carries an optional `calibration` (version, source, calibrated-on date, max age in days). `evaluate_safety()` checks it **before** running any breach logic - a zone set with no calibration at all, one older than its own declared `max_age_days`, or one dated in the future, always resolves to `INHIBITED`, never falls through to a silent `READY` just because no detected object happens to be near a zone.
 * 📐 **Dynamic Occlusion (planned):** automatically masking the robot's own structure out of safety triggers, so the robot does not "detect itself" as an intrusion.
 * 🔍 **Foreign Object Detection (planned):** identifying tools or debris left in the workspace.
 * 🎥 **Real 3D occupancy mapping from Hailo-8 (planned):** v0's `check` subcommand takes detected-object positions from a JSON file precisely because the real Hailo-8 spatial segmentation pipeline that would produce them doesn't exist yet in this environment - see "Honesty check" below.
@@ -34,19 +35,21 @@ This is one of the 4 children of **[HYDRA-UMC-VISION-NODE](https://github.com/Ju
 
 **A critical design boundary, already decided and now enforced in code:** this project only ever **detects and requests** an E-STOP - it never asserts the physical stop signal itself. `estop.py`'s only real requester implementation, `NullEStopRequester`, records what it would have sent without transmitting anything anywhere - there is no real CAN transport in this repository yet, on purpose. Actually cutting motor power over CAN is [HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)'s (the firmware's) responsibility, on hardware built for that role. Keeping the boundary there means a bug in this Python service can fail to *request* a stop, but can never *prevent* the firmware from enforcing one independently.
 
-**Honesty check - what actually runs today:** the real entry point (`src/hydra_umc_safety_zones/main.py`) still prints identity/version/role on a bare call, but now also has a real `check --zones PATH --detections PATH` subcommand: it loads zones and detected-object positions from JSON, runs real breach checking, requests E-STOPs for every Danger breach, and exits 0/1/2 depending on the worst outcome found. What is genuinely not real yet: the Hailo-8 spatial segmentation that would produce those detected-object positions on real hardware, self-occlusion masking, and any real CAN transport for the E-STOP request. See [`CHANGELOG.md`](CHANGELOG.md) for exactly what has shipped so far, and "Current Status & Next Steps" below for what remains open.
+**Honesty check - what actually runs today:** the real entry point (`src/hydra_umc_safety_zones/main.py`) still prints identity/version/role on a bare call, but now also has a real `check --zones PATH --detections PATH` subcommand: it loads a zone set (zones + optional calibration metadata) and detected-object positions from JSON, checks calibration freshness first, then runs real breach checking, requests E-STOPs for every Danger breach, and exits 0 (Ready) / 1 (Warning) / 2 (Danger, E-STOP requested) / 3 (Inhibited - calibration missing or expired) depending on the outcome. What is genuinely not real yet: the Hailo-8 spatial segmentation that would produce those detected-object positions on real hardware, self-occlusion masking, and any real CAN transport for the E-STOP request. See [`CHANGELOG.md`](CHANGELOG.md) for exactly what has shipped so far, and "Current Status & Next Steps" below for what remains open.
 
 ---
 
 ## 2. 🔄 INTENDED SAFETY LOGIC FLOW
 
-The diagram below is the target data flow this project is being built towards. `ZONE` (Zone Check) and the Warning/Danger split after it are real today, driven by `check_breaches()`/`request_estop_for()`, given detected-object positions from a JSON file. Everything upstream of `ZONE` (the real Hailo-8 pipeline) and downstream of `STOP` (the real CAN transport) is still future work.
+The diagram below is the target data flow this project is being built towards. `CAL` (calibration check), `ZONE` (Zone Check) and the Warning/Danger split after it are real today, driven by `evaluate_safety()` (which wraps `check_breaches()`/`request_estop_for()`), given detected-object positions from a JSON file. Everything upstream of `CAL`/`ZONE` (the real Hailo-8 pipeline) and downstream of `STOP` (the real CAN transport) is still future work.
 
 ```mermaid
 flowchart TB
     DET["Object Detection (Hailo-8) - planned"] --> SEG["Spatial Segmentation - planned"]
     SEG --> MAP["3D Occupancy Map - planned"]
-    MAP --> ZONE{"Zone Check - real v0"}
+    MAP --> CAL{"Calibration Fresh? - real v0"}
+    CAL -- No --> INHIBIT["INHIBITED - real v0 (fail-safe)"]
+    CAL -- Yes --> ZONE{"Zone Check - real v0"}
     ZONE -- Warning --> SLOW["Velocity Scaling Command - planned"]
     ZONE -- Danger --> STOP["CAN E-STOP Request - real v0 (request only)"]
     SLOW --> CAN["HYDRA CAN Bus - planned"]
@@ -73,6 +76,8 @@ CM5 + Hailo-8 is off-the-shelf hardware with no board of its own to design, so -
 * **Zone-boundary containment is inclusive, not exclusive** - `AABB.contains()` treats a point exactly on the edge as inside. For a safety perimeter, that is the conservative direction to be wrong in: it can only cause an earlier breach report, never a missed one.
 * **`NullEStopRequester` is the only requester in this repository** - not a placeholder waiting to be swapped out casually, but the honest embodiment of the detect-vs-enforce boundary itself: there is no real CAN transport here, and there should not be one bolted on carelessly later either (see "A critical design boundary" above and `estop.py`'s own module docstring).
 * **Zones and detections are plain JSON, not YAML** - `pyproject.toml`'s dependency list is still `[]`; `json` is stdlib, `pyyaml` is real future work once there is an actual zone-authoring tool worth serializing for.
+* **Calibration is checked before any breach logic runs, never after** - `evaluate_safety()` returns `INHIBITED` the moment calibration is missing or expired, before `check_breaches()` is even called. This is deliberate: a stale calibration means the zone geometry itself cannot be trusted, so the outcome of running breach checks against it would be meaningless either way - checking calibration first also means an expired calibration always wins over what would otherwise look like a real Danger breach, not the other way around.
+* **A missing `"calibration"` key loads successfully, it just means `INHIBITED`** - `load_zone_set()` never raises just because a zones file predates this feature or was hand-written without calibration metadata; it fails safe by design at evaluation time instead of failing to load at all.
 
 ---
 
@@ -82,8 +87,10 @@ CM5 + Hailo-8 is off-the-shelf hardware with no board of its own to design, so -
 HYDRA-UMC-SAFETY-ZONES/
 ├── src/hydra_umc_safety_zones/
 │   ├── geometry.py       # Real Point3D/AABB primitives
-│   ├── zones.py          # Real ZoneLevel/Zone definitions
+│   ├── zones.py          # Real ZoneLevel/Zone/ZoneSet definitions
 │   ├── breach.py         # Real zone-breach checking
+│   ├── calibration.py    # Real calibration-freshness tracking
+│   ├── safety_state.py   # Real fail-safe decision: READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py          # Real E-STOP requesting (never asserting)
 │   ├── config.py         # Real JSON loading for zones/detections
 │   └── main.py            # Entry point + real `check` subcommand
@@ -95,6 +102,8 @@ HYDRA-UMC-SAFETY-ZONES/
 ├── pyproject.toml       # Package metadata, dependencies, odometer version
 ├── bump_version.py      # Odometer-style version bump (run by build.sh/.bat)
 ├── build.sh / build.bat # venv + editable install (dev extras) + compile-check + tests
+├── build-test.sh / .bat # Non-versioning build check (never touches version or CHANGELOG)
+├── tools/build_test.py  # Shared engine both build-test launchers delegate to
 ├── run.sh / run.bat     # Runs the entry point from the local venv (forwards args)
 └── CHANGELOG.md         # Version-by-version history (odometer scheme, no dates)
 ```
@@ -135,18 +144,21 @@ Locates the interpreter inside `.venv` (handling both the POSIX and Windows `.ve
 Bare invocation prints name + version + role:
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.0.3
+HYDRA-UMC-SAFETY-ZONES v0.0.4
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
-The real `check` subcommand needs a zones file and a detections file, both plain JSON:
+The real `check` subcommand needs a zones file and a detections file, both plain JSON. `calibration` is optional in the zones file - see below for what happens without it:
 
 ```json
 // zones.json
-{"zones": [
-  {"id": "warn1", "level": "warning", "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 5, "y": 5, "z": 5}},
-  {"id": "danger1", "level": "danger", "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 1, "y": 1, "z": 1}}
-]}
+{
+  "calibration": {"version": "cal-1", "source": "manual", "calibrated_at": "2026-08-27", "max_age_days": 30},
+  "zones": [
+    {"id": "warn1", "level": "warning", "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 5, "y": 5, "z": 5}},
+    {"id": "danger1", "level": "danger", "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 1, "y": 1, "z": 1}}
+  ]
+}
 ```
 
 ```json
@@ -159,12 +171,23 @@ The real `check` subcommand needs a zones file and a detections file, both plain
 ```
 
 ```text
+SAFETY STATE: DANGER - object(s) ['op1'] breached a danger zone
 BREACH: object 'op1' inside warning zone 'warn1'
 BREACH: object 'op1' inside danger zone 'danger1'
 E-STOP REQUESTED: object 'op1' breached danger zone 'danger1' (not asserted - see estop.py)
 ```
 
-Exits `2` (Danger, E-STOP requested), `1` (Warning-only breach), or `0` (no breach).
+Exits `2` (Danger, E-STOP requested), `1` (Warning-only breach), `0` (no breach, calibration valid), or `3` (**Inhibited** - calibration missing or expired, checked before any breach logic runs). Real example of the fail-safe path - the same `detections.json` above, but `zones.json` with no `"calibration"` key at all:
+
+```bash
+./run.sh check --zones zones_no_calibration.json --detections detections.json
+```
+
+```text
+SAFETY STATE: INHIBITED - no calibration metadata present - zone geometry cannot be trusted
+```
+
+Exit `3` - note there is no `BREACH`/`E-STOP` output at all, even though `op1` is inside both zones: an untrusted zone set never reaches the breach-checking step.
 
 ```bat
 :: Windows - identical steps, batch syntax
@@ -179,13 +202,13 @@ run.bat check --zones zones.json --detections detections.json
 * **`compileall` fails** - a real syntax error was introduced under `src/`; the build stops without touching the install, on purpose.
 * **"No `.venv` found" from `run.sh`/`run.bat`** - run `build.sh`/`build.bat` at least once first.
 * **Stale editable install** - delete `.venv/` and rebuild; rarely needed.
-* **`check` exits non-zero** - that is real, working behavior, not a failure: `1` means a Warning-only breach was found, `2` means a Danger breach requested an E-STOP. Only a Python traceback or a malformed-JSON error is an actual bug.
+* **`check` exits non-zero** - that is real, working behavior, not a failure: `1` means a Warning-only breach was found, `2` means a Danger breach requested an E-STOP, `3` means the zone set's calibration is missing or expired (fail-safe, checked before breach logic ever runs). Only a Python traceback or a malformed-JSON error is an actual bug.
 
 ---
 
 ## 🚀 Current Status & Next Steps
 
-**What works today:** real Warning/Danger zone definitions and breach checking (`geometry.py`/`zones.py`/`breach.py`), a real E-STOP *requesting* pipeline that respects the detect-vs-enforce boundary by construction (`estop.py`), a real `check` CLI subcommand over JSON zone/detection files, and 21 passing tests - see [`CHANGELOG.md`](CHANGELOG.md) for the full real build/run output.
+**What works today:** real Warning/Danger zone definitions and breach checking (`geometry.py`/`zones.py`/`breach.py`), real calibration-freshness enforcement that fails safe to `INHIBITED` before any breach logic runs (`calibration.py`/`safety_state.py`), a real E-STOP *requesting* pipeline that respects the detect-vs-enforce boundary by construction (`estop.py`), a real `check` CLI subcommand over JSON zone/detection files, and 44 passing tests - see [`CHANGELOG.md`](CHANGELOG.md) for the full real build/run output.
 
 **What is still open, in no particular order and with no committed timeline:**
 

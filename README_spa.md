@@ -27,6 +27,7 @@ Este es uno de los 4 hijos de **[HYDRA-UMC-VISION-NODE](https://github.com/Juane
 
 * 🚦 **Zonas Multinivel (v0):** definiciones reales de `Zone`/`ZoneLevel` (Warning/Danger) sobre volúmenes 3D alineados con los ejes, y comprobación real de brechas (`check_breaches`) entre un conjunto de zonas y un conjunto de posiciones de objetos detectados.
 * 🛑 **Solicitud de E-STOP (v0, no lo dispara):** todo objeto cuya peor brecha sea Danger produce un `EStopRequest` real, entregado a un `EStopRequester` - ver el límite de diseño abajo para el porqué de que nada aquí dispare jamás la parada física por sí mismo.
+* 🔒 **Aplicación de frescura de calibración (v0):** todo conjunto de zonas lleva una `calibration` opcional (versión, fuente, fecha de calibración, edad máxima en días). `evaluate_safety()` la comprueba **antes** de ejecutar cualquier lógica de brechas - un conjunto de zonas sin ninguna calibración, uno más viejo que su propio `max_age_days` declarado, o uno fechado en el futuro, siempre resuelve a `INHIBITED`, nunca cae en un `READY` silencioso solo porque ningún objeto detectado está cerca de una zona.
 * 📐 **Oclusión Dinámica (previsto):** enmascarar automáticamente la propia estructura del robot de los disparos de seguridad, para que el robot no se "detecte a sí mismo" como intrusión.
 * 🔍 **Detección de Objetos Extraños (previsto):** identificar herramientas o residuos dejados en el espacio de trabajo.
 * 🎥 **Mapeo real de ocupación 3D desde Hailo-8 (previsto):** el subcomando `check` de v0 toma posiciones de objetos detectados desde un fichero JSON precisamente porque el pipeline real de segmentación espacial de Hailo-8 que las produciría todavía no existe en este entorno - ver "Comprobación de honestidad" abajo.
@@ -34,19 +35,21 @@ Este es uno de los 4 hijos de **[HYDRA-UMC-VISION-NODE](https://github.com/Juane
 
 **Un límite de diseño crítico, ya decidido y ahora reforzado en código:** este proyecto solo **detecta y solicita** un E-STOP - nunca dispara la señal física de parada él mismo. El único requester real de `estop.py`, `NullEStopRequester`, registra lo que habría enviado sin transmitir nada a ningún sitio - no hay ningún transporte CAN real en este repositorio todavía, a propósito. Cortar la energía real del motor por CAN es responsabilidad de [HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC) (el firmware), en hardware construido para ese rol. Mantener el límite ahí significa que un fallo en este servicio Python puede fallar en *solicitar* una parada, pero nunca puede *impedir* que el firmware la aplique de forma independiente.
 
-**Comprobación de honestidad - qué funciona hoy de verdad:** el entry point real (`src/hydra_umc_safety_zones/main.py`) sigue imprimiendo identidad/versión/rol en una llamada sin argumentos, pero ahora también tiene un subcomando real `check --zones RUTA --detections RUTA`: carga zonas y posiciones de objetos detectados desde JSON, ejecuta comprobación real de brechas, solicita E-STOPs para cada brecha Danger, y sale con 0/1/2 según el peor resultado encontrado. Lo que de verdad todavía no es real: la segmentación espacial de Hailo-8 que produciría esas posiciones de objetos detectados en hardware real, el enmascarado de auto-oclusión, y cualquier transporte CAN real para la solicitud de E-STOP. Ver [`CHANGELOG.md`](CHANGELOG.md) para lo entregado exactamente hasta ahora, y "Estado Actual y Próximos Pasos" más abajo para lo que sigue abierto.
+**Comprobación de honestidad - qué funciona hoy de verdad:** el entry point real (`src/hydra_umc_safety_zones/main.py`) sigue imprimiendo identidad/versión/rol en una llamada sin argumentos, pero ahora también tiene un subcomando real `check --zones RUTA --detections RUTA`: carga un conjunto de zonas (zonas + metadatos de calibración opcionales) y posiciones de objetos detectados desde JSON, comprueba primero la frescura de la calibración, luego ejecuta comprobación real de brechas, solicita E-STOPs para cada brecha Danger, y sale con 0 (Ready) / 1 (Warning) / 2 (Danger, E-STOP solicitado) / 3 (Inhibited - calibración ausente o caducada) según el resultado. Lo que de verdad todavía no es real: la segmentación espacial de Hailo-8 que produciría esas posiciones de objetos detectados en hardware real, el enmascarado de auto-oclusión, y cualquier transporte CAN real para la solicitud de E-STOP. Ver [`CHANGELOG.md`](CHANGELOG.md) para lo entregado exactamente hasta ahora, y "Estado Actual y Próximos Pasos" más abajo para lo que sigue abierto.
 
 ---
 
 ## 2. 🔄 FLUJO DE LÓGICA DE SEGURIDAD PREVISTO
 
-El diagrama de abajo es el flujo de datos objetivo hacia el que se construye este proyecto. `ZONE` (Comprobación de Zona) y el reparto Warning/Danger que sigue son reales hoy, impulsados por `check_breaches()`/`request_estop_for()`, dadas posiciones de objetos detectados desde un fichero JSON. Todo lo anterior a `ZONE` (el pipeline real de Hailo-8) y posterior a `STOP` (el transporte CAN real) sigue siendo trabajo futuro.
+El diagrama de abajo es el flujo de datos objetivo hacia el que se construye este proyecto. `CAL` (comprobación de calibración), `ZONE` (Comprobación de Zona) y el reparto Warning/Danger que sigue son reales hoy, impulsados por `evaluate_safety()` (que envuelve a `check_breaches()`/`request_estop_for()`), dadas posiciones de objetos detectados desde un fichero JSON. Todo lo anterior a `CAL`/`ZONE` (el pipeline real de Hailo-8) y posterior a `STOP` (el transporte CAN real) sigue siendo trabajo futuro.
 
 ```mermaid
 flowchart TB
     DET["Detección de Objetos (Hailo-8) - previsto"] --> SEG["Segmentación Espacial - previsto"]
     SEG --> MAP["Mapa de Ocupación 3D - previsto"]
-    MAP --> ZONE{"Comprobación de Zona - real v0"}
+    MAP --> CAL{"¿Calibración Fresca? - real v0"}
+    CAL -- No --> INHIBIT["INHIBITED - real v0 (fallo seguro)"]
+    CAL -- Sí --> ZONE{"Comprobación de Zona - real v0"}
     ZONE -- Warning --> SLOW["Comando de Reducción de Velocidad - previsto"]
     ZONE -- Danger --> STOP["Solicitud CAN de E-STOP - real v0 (solo solicitud)"]
     SLOW --> CAN["Bus CAN de HYDRA - previsto"]
@@ -73,6 +76,8 @@ CM5 + Hailo-8 es hardware ya existente sin placa propia que diseñar, así que -
 * **El contenedor de la frontera de zona es inclusivo, no exclusivo** - `AABB.contains()` trata un punto exactamente en el borde como dentro. Para un perímetro de seguridad, esa es la dirección conservadora en la que equivocarse: solo puede causar un reporte de brecha más temprano, nunca uno perdido.
 * **`NullEStopRequester` es el único requester en este repositorio** - no un placeholder esperando a ser sustituido a la ligera, sino la encarnación honesta del propio límite detectar-vs-aplicar: no hay transporte CAN real aquí, y tampoco debería añadirse uno de forma descuidada más adelante (ver "Un límite de diseño crítico" arriba y el propio docstring del módulo `estop.py`).
 * **Zonas y detecciones son JSON plano, no YAML** - la lista de dependencias de `pyproject.toml` sigue siendo `[]`; `json` es de la librería estándar, `pyyaml` es trabajo futuro real una vez exista una herramienta de autoría de zonas que merezca la pena serializar.
+* **La calibración se comprueba antes de ejecutar cualquier lógica de brechas, nunca después** - `evaluate_safety()` devuelve `INHIBITED` en el momento en que la calibración está ausente o caducada, antes de siquiera llamar a `check_breaches()`. Esto es deliberado: una calibración caducada significa que la propia geometría de zona no es de fiar, así que el resultado de ejecutar comprobaciones de brecha contra ella sería igualmente sin sentido - comprobar la calibración primero también significa que una calibración caducada siempre gana sobre lo que de otro modo parecería una brecha Danger real, no al revés.
+* **Una clave `"calibration"` ausente carga con éxito, solo significa `INHIBITED`** - `load_zone_set()` nunca lanza un error solo porque un fichero de zonas sea anterior a esta funcionalidad o se haya escrito a mano sin metadatos de calibración; falla de forma segura por diseño en el momento de evaluar, no al cargar.
 
 ---
 
@@ -82,8 +87,10 @@ CM5 + Hailo-8 es hardware ya existente sin placa propia que diseñar, así que -
 HYDRA-UMC-SAFETY-ZONES/
 ├── src/hydra_umc_safety_zones/
 │   ├── geometry.py       # Primitivas reales Point3D/AABB
-│   ├── zones.py          # Definiciones reales ZoneLevel/Zone
+│   ├── zones.py          # Definiciones reales ZoneLevel/Zone/ZoneSet
 │   ├── breach.py         # Comprobación real de brechas de zona
+│   ├── calibration.py    # Seguimiento real de frescura de calibración
+│   ├── safety_state.py   # Decisión real de fallo seguro: READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py          # Solicitud real de E-STOP (nunca lo dispara)
 │   ├── config.py         # Carga real de JSON para zonas/detecciones
 │   └── main.py            # Entry point + subcomando real `check`
@@ -95,6 +102,8 @@ HYDRA-UMC-SAFETY-ZONES/
 ├── pyproject.toml       # Metadatos del paquete, dependencias, versión cuentakilómetros
 ├── bump_version.py      # Bump de versión tipo cuentakilómetros (build.sh/.bat)
 ├── build.sh / build.bat # venv + instalación editable (extras dev) + compile-check + tests
+├── build-test.sh / .bat # Comprobación de build sin versionar (nunca toca version ni CHANGELOG)
+├── tools/build_test.py  # Motor compartido en el que delegan ambos lanzadores de build-test
 ├── run.sh / run.bat     # Ejecuta el entry point desde el venv local (reenvía argumentos)
 └── CHANGELOG.md         # Historial versión a versión (esquema cuentakilómetros, sin fechas)
 ```
@@ -135,18 +144,21 @@ Localiza el intérprete dentro de `.venv` y ejecuta `python -m hydra_umc_safety_
 La invocación sin argumentos imprime nombre + versión + rol:
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.0.3
+HYDRA-UMC-SAFETY-ZONES v0.0.4
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
-El subcomando real `check` necesita un fichero de zonas y uno de detecciones, ambos JSON plano:
+El subcomando real `check` necesita un fichero de zonas y uno de detecciones, ambos JSON plano. `calibration` es opcional en el fichero de zonas - ver abajo qué pasa sin ella:
 
 ```json
 // zones.json
-{"zones": [
-  {"id": "warn1", "level": "warning", "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 5, "y": 5, "z": 5}},
-  {"id": "danger1", "level": "danger", "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 1, "y": 1, "z": 1}}
-]}
+{
+  "calibration": {"version": "cal-1", "source": "manual", "calibrated_at": "2026-08-27", "max_age_days": 30},
+  "zones": [
+    {"id": "warn1", "level": "warning", "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 5, "y": 5, "z": 5}},
+    {"id": "danger1", "level": "danger", "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 1, "y": 1, "z": 1}}
+  ]
+}
 ```
 
 ```json
@@ -159,12 +171,23 @@ El subcomando real `check` necesita un fichero de zonas y uno de detecciones, am
 ```
 
 ```text
+SAFETY STATE: DANGER - object(s) ['op1'] breached a danger zone
 BREACH: object 'op1' inside warning zone 'warn1'
 BREACH: object 'op1' inside danger zone 'danger1'
 E-STOP REQUESTED: object 'op1' breached danger zone 'danger1' (not asserted - see estop.py)
 ```
 
-Sale con `2` (Danger, E-STOP solicitado), `1` (brecha solo Warning), o `0` (sin brecha).
+Sale con `2` (Danger, E-STOP solicitado), `1` (brecha solo Warning), `0` (sin brecha, calibración válida), o `3` (**Inhibited** - calibración ausente o caducada, comprobado antes de cualquier lógica de brechas). Ejemplo real del camino de fallo seguro - las mismas `detections.json` de arriba, pero `zones.json` sin ninguna clave `"calibration"`:
+
+```bash
+./run.sh check --zones zones_no_calibration.json --detections detections.json
+```
+
+```text
+SAFETY STATE: INHIBITED - no calibration metadata present - zone geometry cannot be trusted
+```
+
+Sale con `3` - fíjate en que no hay salida `BREACH`/`E-STOP` en absoluto, aunque `op1` esté dentro de ambas zonas: un conjunto de zonas no fiable nunca llega al paso de comprobación de brechas.
 
 ```bat
 :: Windows - mismos pasos, sintaxis batch
@@ -179,13 +202,13 @@ run.bat check --zones zones.json --detections detections.json
 * **`compileall` falla** - se introdujo un error de sintaxis real bajo `src/`; el build se detiene sin tocar la instalación, a propósito.
 * **"No `.venv` found" en `run.sh`/`run.bat`** - ejecuta `build.sh`/`build.bat` al menos una vez antes.
 * **Instalación editable desactualizada** - borra `.venv/` y reconstruye; rara vez hace falta.
-* **`check` sale con código distinto de cero** - eso es comportamiento real y correcto, no un fallo: `1` significa que se encontró una brecha solo Warning, `2` significa que una brecha Danger solicitó un E-STOP. Solo un traceback de Python o un error de JSON malformado es un fallo de verdad.
+* **`check` sale con código distinto de cero** - eso es comportamiento real y correcto, no un fallo: `1` significa que se encontró una brecha solo Warning, `2` significa que una brecha Danger solicitó un E-STOP, `3` significa que la calibración del conjunto de zonas está ausente o caducada (fallo seguro, comprobado antes de que se ejecute cualquier lógica de brechas). Solo un traceback de Python o un error de JSON malformado es un fallo de verdad.
 
 ---
 
 ## 🚀 Estado Actual y Próximos Pasos
 
-**Qué funciona hoy:** definiciones reales de zonas Warning/Danger y comprobación de brechas (`geometry.py`/`zones.py`/`breach.py`), un pipeline real de *solicitud* de E-STOP que respeta el límite detectar-vs-aplicar por construcción (`estop.py`), un subcomando CLI real `check` sobre ficheros JSON de zonas/detecciones, y 21 tests pasando - ver [`CHANGELOG.md`](CHANGELOG.md) para la salida completa real de build/run.
+**Qué funciona hoy:** definiciones reales de zonas Warning/Danger y comprobación de brechas (`geometry.py`/`zones.py`/`breach.py`), aplicación real de frescura de calibración que falla de forma segura a `INHIBITED` antes de ejecutar cualquier lógica de brechas (`calibration.py`/`safety_state.py`), un pipeline real de *solicitud* de E-STOP que respeta el límite detectar-vs-aplicar por construcción (`estop.py`), un subcomando CLI real `check` sobre ficheros JSON de zonas/detecciones, y 44 tests pasando - ver [`CHANGELOG.md`](CHANGELOG.md) para la salida completa real de build/run.
 
 **Qué sigue abierto, sin orden particular y sin calendario comprometido:**
 

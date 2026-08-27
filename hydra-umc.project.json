@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "ecosystem": "HYDRA-UMC",
   "name": "HYDRA-UMC-SAFETY-ZONES",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "role": "service",
   "stack": "python",
   "technologies": [
@@ -11,11 +11,11 @@
     "Hailo-8"
   ],
   "deployment_target": "cm5",
-  "maturity": "functional",
+  "maturity": "established",
   "family": "Vision AI Node",
   "parent": "HYDRA-UMC-VISION-NODE",
   "build": "",
-  "notes": "Real v0 zone-breach checking and E-STOP requesting (`check` subcommand): real AABB zone geometry, real Warning/Danger breach detection, and a real EStopRequester interface that only ever requests a stop, never asserts one - honest for a safety service whose enforcement boundary is deliberately outside this repo. Real 3D occupancy mapping from Hailo-8 and the real CAN transport stay future work, both genuinely blocked on hardware this environment does not have.",
+  "notes": "Real v0 zone-breach checking and E-STOP requesting (`check` subcommand): real AABB zone geometry, real Warning/Danger breach detection, and a real EStopRequester interface that only ever requests a stop, never asserts one - honest for a safety service whose enforcement boundary is deliberately outside this repo. Real calibration-freshness enforcement (calibration.py/safety_state.py): a zone set with no calibration metadata, or one older than its own declared max_age_days, forces SafetyState.INHIBITED before any breach logic runs, never falls through to a silent READY. Real 3D occupancy mapping from Hailo-8 and the real CAN transport stay future work, both genuinely blocked on hardware this environment does not have.",
   "native_version": {
     "file": "pyproject.toml",
     "pattern": "^version\\s*=\\s*\"(\\d+)\\.(\\d+)\\.(\\d+)\""

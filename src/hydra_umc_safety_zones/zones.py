@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
+from hydra_umc_safety_zones.calibration import ZoneCalibration
 from hydra_umc_safety_zones.geometry import AABB
 
 
@@ -28,3 +29,14 @@ class Zone:
     zone_id: str
     level: ZoneLevel
     volume: AABB
+
+
+@dataclass(frozen=True)
+class ZoneSet:
+    """A zone list bound to the calibration that produced it. `calibration`
+    is `None` only for a zones file that never declared one at all (see
+    config.py) - `safety_state.py` treats that exactly like an expired
+    calibration, never like "no calibration needed"."""
+
+    zones: tuple[Zone, ...]
+    calibration: ZoneCalibration | None

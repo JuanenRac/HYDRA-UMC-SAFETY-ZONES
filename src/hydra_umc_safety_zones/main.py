@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 
 from hydra_umc_safety_zones.breach import check_breaches
-from hydra_umc_safety_zones.config import load_detections, load_zones
+from hydra_umc_safety_zones.config import load_detections, load_zone_set
 from hydra_umc_safety_zones.estop import NullEStopRequester, request_estop_for
+from hydra_umc_safety_zones.safety_state import SafetyState, evaluate_safety
 
 PROJECT_NAME = "HYDRA-UMC-SAFETY-ZONES"
 DIST_NAME = "hydra-umc-safety-zones"
@@ -48,25 +50,34 @@ def get_version() -> str:
 
 
 def _run_check(zones_path: str, detections_path: str) -> int:
-    zones = load_zones(zones_path)
+    zone_set = load_zone_set(zones_path)
     objects = load_detections(detections_path)
-    breaches = check_breaches(zones, objects)
+    today = datetime.now(timezone.utc).date()
 
-    if not breaches:
-        print("No zone breaches.")
+    evaluation = evaluate_safety(zone_set, objects, today)
+    print(f"SAFETY STATE: {evaluation.state.value.upper()} - {evaluation.reason}")
+
+    if evaluation.state is SafetyState.INHIBITED:
+        # Fail-safe: geometry cannot be trusted, so no breach logic below
+        # runs at all - a stale/missing calibration must never be silently
+        # treated as "no breach".
+        return 3
+
+    if evaluation.state is SafetyState.READY:
         return 0
 
+    breaches = check_breaches(zone_set.zones, objects)
     for b in breaches:
         print(f"BREACH: object '{b.object_id}' inside {b.level.value} zone '{b.zone_id}'")
+
+    if evaluation.state is SafetyState.WARNING:
+        return 1
 
     requester = NullEStopRequester()
     requests = request_estop_for(breaches, requester)
     for r in requests:
         print(f"E-STOP REQUESTED: {r.reason} (not asserted - see estop.py)")
-
-    if requests:
-        return 2
-    return 1
+    return 2
 
 
 def build_parser() -> argparse.ArgumentParser:

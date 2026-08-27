@@ -31,6 +31,7 @@
 
 * 🚦 **多级区域（v0）：** 真实的 `Zone`/`ZoneLevel`（警告/危险）定义，作用于轴对齐的 3D 体积，以及区域集合与检测对象位置集合之间的真实越界检查（`check_breaches`）。
 * 🛑 **E-STOP 请求（v0，不执行）：** 任何最严重越界为"危险"级别的对象都会生成一个真实的 `EStopRequest`，交给 `EStopRequester`——具体为何本项目中的任何部分都从不自行执行物理停止，见下方的设计边界。
+* 🔒 **校准新鲜度强制检查（v0）：** 每个区域集合都携带一个可选的 `calibration`（版本、来源、校准日期、最大有效天数）。`evaluate_safety()` 会在执行任何越界逻辑**之前**先检查它——完全没有校准信息的区域集合、比自身声明的 `max_age_days` 更旧的校准、或日期在未来的校准，始终会解析为 `INHIBITED`，绝不会仅因为没有检测对象靠近某个区域就悄悄退回到 `READY`。
 * 📐 **动态遮挡（计划中）：** 自动将机器人自身结构从安全触发中屏蔽，使机器人不会将"自身"检测为入侵。
 * 🔍 **异物检测（计划中）：** 识别遗留在工作空间中的工具或碎屑。
 * 🎥 **基于 Hailo-8 的真实 3D 占用地图（计划中）：** v0 的 `check` 子命令从 JSON 文件读取检测对象位置，正是因为真正会产生这些位置的 Hailo-8 空间分割流水线在本环境中尚不存在——详见下方"诚实说明"。
@@ -46,8 +47,10 @@ Python 服务中的一个漏洞可能导致*未能请求*停止，但绝不可�
 **诚实说明——今天实际运行的内容：** 无参数调用时，真正的入口点
 （`src/hydra_umc_safety_zones/main.py`）仍会打印项目名称、已安装的版本号
 及角色说明，但现在还新增了一个真实的 `check --zones 路径 --detections 路径`
-子命令：从 JSON 加载区域与检测对象位置，执行真实的越界检查，为每个"危险"
-越界请求 E-STOP，并根据发现的最严重结果以 0/1/2 退出。真正尚未实现的内容：
+子命令：从 JSON 加载区域集合（区域 + 可选的校准元数据）与检测对象位置，
+先检查校准新鲜度，再执行真实的越界检查，为每个"危险"越界请求 E-STOP，
+并根据结果以 0（Ready）/ 1（Warning）/ 2（Danger，已请求 E-STOP）/
+3（Inhibited——校准缺失或已过期）退出。真正尚未实现的内容：
 在真实硬件上产生这些检测对象位置的 Hailo-8 空间分割、自身遮挡屏蔽，以及
 用于 E-STOP 请求的任何真实 CAN 传输。具体已交付内容请
 参见 [`CHANGELOG.md`](CHANGELOG.md)，尚待完成的内容请参见下方"当前状态
@@ -58,15 +61,18 @@ Python 服务中的一个漏洞可能导致*未能请求*停止，但绝不可�
 ## 2. 🔄 目标安全逻辑流程
 
 下图是本项目正朝其构建的目标数据流。给定从 JSON 文件读取的检测对象位置，
-图中的 `ZONE`（区域检查）及其后的警告/危险分流，由 `check_breaches()`/
-`request_estop_for()` 驱动，今天已是真实的。`ZONE` 之前的一切（真实的
-Hailo-8 流水线）和 `STOP` 之后的一切（真实的 CAN 传输）仍是未来工作。
+图中的 `CAL`（校准检查）、`ZONE`（区域检查）及其后的警告/危险分流，由
+`evaluate_safety()`（包装了 `check_breaches()`/`request_estop_for()`）驱动，
+今天已是真实的。`CAL`/`ZONE` 之前的一切（真实的 Hailo-8 流水线）和 `STOP`
+之后的一切（真实的 CAN 传输）仍是未来工作。
 
 ```mermaid
 flowchart TB
     DET["Object Detection (Hailo-8) - 计划中"] --> SEG["Spatial Segmentation - 计划中"]
     SEG --> MAP["3D Occupancy Map - 计划中"]
-    MAP --> ZONE{"Zone Check - 真实 v0"}
+    MAP --> CAL{"Calibration Fresh? - 真实 v0"}
+    CAL -- No --> INHIBIT["INHIBITED - 真实 v0（故障安全）"]
+    CAL -- Yes --> ZONE{"Zone Check - 真实 v0"}
     ZONE -- Warning --> SLOW["Velocity Scaling Command - 计划中"]
     ZONE -- Danger --> STOP["CAN E-STOP Request - 真实 v0（仅请求）"]
     SLOW --> CAN["HYDRA CAN Bus - 计划中"]
@@ -101,6 +107,8 @@ Node 系列的其他项目一样——这里不存在 `hardware/`/`firmware/` �
 * **区域边界的包含判定是包含式而非排除式的** —— `AABB.contains()` 将恰好位于边界上的点视为区域内部。对于安全边界而言，这是应当出错的保守方向：它只会导致越界报告更早出现，而绝不会漏报。
 * **`NullEStopRequester` 是本仓库中唯一的请求者** —— 它不是一个等待被随意替换的占位实现，而是检测与执行边界本身的诚实体现：这里没有真实的 CAN 传输，将来也不应该草率地加入一个（详见上方"一项已确定的关键设计边界"以及 `estop.py` 模块自身的文档说明）。
 * **区域与检测数据使用纯 JSON，而非 YAML** —— `pyproject.toml` 的依赖列表仍为 `[]`；`json` 属于标准库，`pyyaml` 是真正的未来工作，等到出现值得为其序列化的真实区域编辑工具时再引入。
+* **校准检查在任何越界逻辑之前执行，绝不在之后** —— `evaluate_safety()` 会在校准缺失或过期的那一刻立即返回 `INHIBITED`，甚至在调用 `check_breaches()` 之前。这是刻意为之：过期的校准意味着区域几何本身已不可信，因此针对它运行越界检查的结果同样毫无意义——先检查校准也意味着过期的校准始终会胜过看起来像真实"危险"越界的结果，而不是反过来。
+* **缺少 `"calibration"` 键仍可成功加载，只是意味着 `INHIBITED`** —— `load_zone_set()` 绝不会仅因为某个区域文件早于此功能存在、或是手写而没有校准元数据就抛出错误；它按设计在评估阶段安全失败，而不是在加载阶段失败。
 
 ---
 
@@ -110,8 +118,10 @@ Node 系列的其他项目一样——这里不存在 `hardware/`/`firmware/` �
 HYDRA-UMC-SAFETY-ZONES/
 ├── src/hydra_umc_safety_zones/
 │   ├── geometry.py       # 真实的 Point3D/AABB 基础类型
-│   ├── zones.py          # 真实的 ZoneLevel/Zone 定义
+│   ├── zones.py          # 真实的 ZoneLevel/Zone/ZoneSet 定义
 │   ├── breach.py         # 真实的区域越界检查
+│   ├── calibration.py    # 真实的校准新鲜度跟踪
+│   ├── safety_state.py   # 真实的故障安全决策：READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py          # 真实的 E-STOP 请求（从不执行）
 │   ├── config.py         # 真实的区域/检测 JSON 加载
 │   └── main.py            # 入口点 + 真实的 `check` 子命令
@@ -123,6 +133,8 @@ HYDRA-UMC-SAFETY-ZONES/
 ├── pyproject.toml       # 包元数据、依赖项、里程表版本号
 ├── bump_version.py      # 里程表式版本递增（由 build.sh/.bat 运行）
 ├── build.sh / build.bat # venv + 可编辑安装（含 dev 附加依赖） + 编译检查 + 测试
+├── build-test.sh / .bat # 不涉及版本递增的构建检查（从不修改 version 或 CHANGELOG）
+├── tools/build_test.py  # 两个 build-test 启动脚本共同委托的引擎
 ├── run.sh / run.bat     # 从本地 venv 运行入口点（转发参数）
 └── CHANGELOG.md         # 逐版本历史（里程表方案，无日期）
 ```
@@ -167,18 +179,22 @@ HYDRA-UMC-SAFETY-ZONES/
 无参数调用会打印名称 + 版本 + 角色：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.0.3
+HYDRA-UMC-SAFETY-ZONES v0.0.4
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
-真实的 `check` 子命令需要一个区域文件和一个检测文件，均为纯 JSON：
+真实的 `check` 子命令需要一个区域文件和一个检测文件，均为纯 JSON。`calibration`
+在区域文件中是可选的——没有它会发生什么见下文：
 
 ```json
 // zones.json
-{"zones": [
-  {"id": "warn1", "level": "warning", "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 5, "y": 5, "z": 5}},
-  {"id": "danger1", "level": "danger", "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 1, "y": 1, "z": 1}}
-]}
+{
+  "calibration": {"version": "cal-1", "source": "manual", "calibrated_at": "2026-08-27", "max_age_days": 30},
+  "zones": [
+    {"id": "warn1", "level": "warning", "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 5, "y": 5, "z": 5}},
+    {"id": "danger1", "level": "danger", "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 1, "y": 1, "z": 1}}
+  ]
+}
 ```
 
 ```json
@@ -191,12 +207,27 @@ Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-worki
 ```
 
 ```text
+SAFETY STATE: DANGER - object(s) ['op1'] breached a danger zone
 BREACH: object 'op1' inside warning zone 'warn1'
 BREACH: object 'op1' inside danger zone 'danger1'
 E-STOP REQUESTED: object 'op1' breached danger zone 'danger1' (not asserted - see estop.py)
 ```
 
-退出码为 `2`（危险，已请求 E-STOP）、`1`（仅警告级越界）或 `0`（无越界）。
+退出码为 `2`（危险，已请求 E-STOP）、`1`（仅警告级越界）、`0`（无越界，校准
+有效）或 `3`（**Inhibited**——校准缺失或已过期，在任何越界逻辑之前检查）。
+以下是故障安全路径的真实示例——使用上面同样的 `detections.json`，但
+`zones.json` 完全没有 `"calibration"` 键：
+
+```bash
+./run.sh check --zones zones_no_calibration.json --detections detections.json
+```
+
+```text
+SAFETY STATE: INHIBITED - no calibration metadata present - zone geometry cannot be trusted
+```
+
+退出码为 `3`——注意完全没有 `BREACH`/`E-STOP` 输出，即使 `op1` 同时位于两个
+区域内：不可信的区域集合永远不会到达越界检查这一步。
 
 ```bat
 :: Windows - 步骤相同，批处理语法
@@ -211,17 +242,18 @@ run.bat check --zones zones.json --detections detections.json
 * **`compileall` 失败** —— 意味着 `src/` 下确实引入了语法错误；构建会故意在不触及安装的情况下停止。
 * **`run.sh`/`run.bat` 提示"未找到 `.venv`"** —— 先至少运行一次 `build.sh`/`build.bat`。
 * **可编辑安装过期** —— 删除 `.venv/` 并重新构建；很少需要这样做。
-* **`check` 以非零退出码结束** —— 这是真实且正确的行为，而非失败：`1` 表示发现了仅警告级越界，`2` 表示发现了危险级越界并已请求 E-STOP。只有 Python 回溯或 JSON 格式错误才是真正的 bug。
+* **`check` 以非零退出码结束** —— 这是真实且正确的行为，而非失败：`1` 表示发现了仅警告级越界，`2` 表示发现了危险级越界并已请求 E-STOP，`3` 表示区域集合的校准缺失或已过期（故障安全，在任何越界逻辑执行之前检查）。只有 Python 回溯或 JSON 格式错误才是真正的 bug。
 
 ---
 
 ## 🚀 当前状态与后续步骤
 
 **今天已实现的内容：** 真实的警告/危险区域定义与真实的越界检查
-（`geometry.py`/`zones.py`/`breach.py`）、一个在设计上就恪守检测与执行边界
-的真实 E-STOP*请求*流水线（`estop.py`）、一个基于区域/检测 JSON 文件的
-真实 `check` CLI 子命令，以及 21 个通过的测试——完整的真实构建/运行输出见
-[`CHANGELOG.md`](CHANGELOG.md)。
+（`geometry.py`/`zones.py`/`breach.py`）、在任何越界逻辑之前就安全故障切换
+到 `INHIBITED` 的真实校准新鲜度强制检查（`calibration.py`/`safety_state.py`）、
+一个在设计上就恪守检测与执行边界的真实 E-STOP*请求*流水线（`estop.py`）、
+一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 44 个通过的
+测试——完整的真实构建/运行输出见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 **仍待完成的内容（顺序不分先后，无既定时间表）：**
 
