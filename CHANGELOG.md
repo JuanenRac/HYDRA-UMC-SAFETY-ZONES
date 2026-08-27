@@ -1,0 +1,54 @@
+# Changelog
+
+All notable changes to HYDRA-UMC-SAFETY-ZONES are documented in this file.
+
+Versioning follows the ecosystem-wide `MAJOR.MINOR.PATCH` "odometer" scheme,
+applied automatically on every real build by `bump_version.py` (invoked
+from build.sh/build.bat right before the compile-check): `PATCH` goes up by
+1 per build; once `PATCH` would exceed 9 it resets to 0 and `MINOR` goes up
+by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
+`MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
+hand.
+
+## [0.0.3] - Real v0 zone-breach checking and E-STOP requesting
+### Added
+- `geometry.py` - real `Point3D`/`AABB` primitives, inclusive-boundary containment check, hardware-independent by design.
+- `zones.py` - real `ZoneLevel` (WARNING/DANGER) and `Zone` definitions.
+- `breach.py` - `check_breaches()`: real breach detection between detected objects and zones; `worst_level_per_object()` collapses multi-zone breaches to the single worst outcome per object.
+- `estop.py` - the code-level enforcement of the detect-vs-enforce boundary: `EStopRequest`/`EStopRequester` (a `Protocol`) plus `NullEStopRequester`, a real, honest requester that records requests without transmitting anything - there is no real CAN transport in this repository yet, and this module exists specifically to keep that boundary sharp rather than blur it. `request_estop_for()` requests a stop for every object whose worst breach is DANGER; WARNING-only breaches never reach the request path.
+- `config.py` - real JSON loading for zones and detected-object positions.
+- `main.py` - new `check --zones PATH --detections PATH` subcommand: exit 0 (no breach), 1 (Warning-only), 2 (Danger, E-STOP requested). Bare invocation is unchanged.
+- 21 new real tests (`tests/`) - AABB containment (including boundary and corner-order normalization), breach detection across single/multiple zones and objects, E-STOP requesting for every level combination, JSON config round-trips, and a real end-to-end CLI round-trip for all three exit-code paths.
+- Real verification beyond the test suite: ran `check` against real JSON fixtures for the no-breach, Warning-only and Danger cases, confirming the printed report and exit code for each.
+
+### Fixed
+- `build.sh` called `bump_manifest_version.py` (no `--sync`) as its very first line, before also calling `bump_version.py` later - the same double-bump pattern found in HYDRA-UMC-SYNTHETIC-DATA-GEN's build.sh. Rewritten to bump the native version first, then sync the manifest, matching the rest of the ecosystem's build scripts.
+
+## [0.0.2]
+
+Polish pass: copyright headers normalized across `main.py`, `__init__.py`,
+`bump_version.py` and `build.sh`/`build.bat`/`run.sh`/`run.bat`; "why"
+comments added, including the detect-vs-enforce boundary between this
+service and the firmware's own E-STOP hardware; this `CHANGELOG.md`
+added; README (5 languages) expanded with an Advanced Technical
+Information section, a detailed Build & Run walkthrough with
+troubleshooting, a dateless "Current Status & Next Steps" section
+replacing the previous dated roadmap, and a full Related Projects
+section. No behavior change - the bump is this verification build.
+
+## [0.0.1]
+
+Real build verification. `build.sh`/`build.bat` run end-to-end for real:
+odometer bump, `.venv` creation, editable install, `python -m compileall`
+clean across `src/`. `run.sh`/`run.bat` executed the entry point for real,
+printing name + version + role. No business-logic change - the bump is the
+recorded event.
+
+## [0.0.0]
+
+Initial skeleton: `pyproject.toml` (package metadata, no runtime
+dependencies yet), `src/hydra_umc_safety_zones/` (`__init__.py` +
+`main.py` entry point reading its version from installed package
+metadata), `bump_version.py` (odometer-style version bump),
+`build.sh`/`build.bat` (venv + editable install + compile-check) and
+`run.sh`/`run.bat`.

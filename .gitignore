@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+# HYDRA-UMC shared secret protection
+.env
+.env.*
+!.env.example

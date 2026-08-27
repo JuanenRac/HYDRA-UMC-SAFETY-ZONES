@@ -1,0 +1,26 @@
+[project]
+name = "hydra-umc-safety-zones"
+version = "0.0.3"
+description = "Real-time 3D intrusion detection and E-STOP orchestration system for robotic safe-working areas, driven by Hailo-8 spatial segmentation on HYDRA-UMC-VISION-NODE."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "GPL-3.0-only" }
+authors = [{ name = "JuanenRac", email = "electrohobby3d@gmail.com" }]
+# No runtime dependencies yet - v0's zone/breach/E-STOP-request logic is
+# stdlib-only (dataclasses, json, argparse). Planned once real perception
+# lands: numpy (occupancy-map math), python-can (real CAN E-STOP
+# transport), pyyaml (richer zone-authoring format).
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+hydra-umc-safety-zones = "hydra_umc_safety_zones.main:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
