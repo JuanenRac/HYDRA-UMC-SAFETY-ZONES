@@ -19,7 +19,7 @@ hand.
 - `main.py`'s `check` subcommand now loads a `ZoneSet` and reports the real `SafetyState`; new exit code 3 for INHIBITED, distinct from 0 (Ready)/1 (Warning)/2 (Danger).
 - 23 new real tests: calibration parsing (valid, every missing/empty required field, bad date, bad `max_age_days`), the exact boundary of `max_age_days` (valid at exactly N days, expired at N+1), a future-dated calibration, `evaluate_safety()` for all four states including "expired calibration wins over a real danger breach", `load_zone_set()` with and without a `"calibration"` key, and 2 new CLI end-to-end cases proving a missing/expired calibration inhibits regardless of object position - 44/44 passing.
 - Real verification beyond the test suite: ran `check` against a real zones file with no calibration key and an object nowhere near any zone - confirmed `SAFETY STATE: INHIBITED`, exit 3, not the `READY` a position-only check would have reported. Ran it again with a valid same-day calibration and an object inside the danger zone - confirmed `SAFETY STATE: DANGER`, real E-STOP request printed, exit 2, matching pre-existing behavior unchanged.
-- Manifest maturity promoted `functional` -> `established` per `SONNET/AUDITORIA_PROMOCION_FUNCIONAL_A_ESTABLECIDO_2026-08-27.txt`'s vital-improvement gate for this project ("geometria versionada, prueba de limites y fallo seguro cuando la calibracion no es valida").
+- Manifest maturity promoted `functional` -> `established` after the project's vital-improvement gate: versioned geometry, boundary validation, and fail-safe inhibition whenever calibration is missing, malformed, future-dated, or expired.
 
 ## [0.0.3] - Real v0 zone-breach checking and E-STOP requesting
 ### Added
