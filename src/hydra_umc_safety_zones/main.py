@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 
 from hydra_umc_safety_zones.breach import check_breaches
-from hydra_umc_safety_zones.config import load_detections, load_zone_set
+from hydra_umc_safety_zones.config import ConfigError, load_detections, load_zone_set
 from hydra_umc_safety_zones.estop import NullEStopRequester, request_estop_for
 from hydra_umc_safety_zones.safety_state import SafetyState, evaluate_safety
 
@@ -50,8 +50,14 @@ def get_version() -> str:
 
 
 def _run_check(zones_path: str, detections_path: str) -> int:
-    zone_set = load_zone_set(zones_path)
-    objects = load_detections(detections_path)
+    try:
+        zone_set = load_zone_set(zones_path)
+        objects = load_detections(detections_path)
+    except ConfigError as exc:
+        # Invalid spatial data is as untrustworthy as stale calibration: never
+        # fall through to READY or evaluate a boundary with NaN coordinates.
+        print(f"SAFETY STATE: INHIBITED - invalid safety configuration: {exc}")
+        return 3
     today = datetime.now(timezone.utc).date()
 
     evaluation = evaluate_safety(zone_set, objects, today)

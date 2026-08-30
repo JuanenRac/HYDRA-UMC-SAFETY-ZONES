@@ -10,6 +10,14 @@ by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
 `MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
 hand.
 
+## [Unreleased] - finite spatial-config fail-safe gate
+
+- **`config.py` / `main.py`** - zone and detection coordinates now require
+  finite numeric `x`, `y` and `z` values. A malformed `NaN`/infinite point
+  causes the command to report `INHIBITED` (exit 3), rather than evaluating
+  an untrustworthy boundary and risking a false ready state.
+- Added configuration and CLI regression tests for this fail-safe path.
+
 ## [0.0.4] - established: real calibration-freshness enforcement, fail-safe by default
 ### Added
 - `calibration.py` - real `ZoneCalibration` (version, source, `calibrated_at`, `max_age_days`) and `parse_calibration()`, raising `CalibrationError` on any missing/malformed field. `calibration_age_days()`/`is_calibration_expired()` treat a calibration older than its own `max_age_days`, or dated in the future (clock skew/bad data), as invalid - `max_age_days` itself is inclusive (a calibration exactly that many days old is still trusted, one day older is not).

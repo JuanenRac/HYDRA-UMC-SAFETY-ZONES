@@ -17,8 +17,8 @@ repository by design, not by omission.
 records what would have been sent. That is honest for this stage - there
 is no real CAN bus code in this repository yet, and pretending otherwise
 would blur exactly the boundary this module exists to keep sharp. A real
-`CanEStopRequester` (python-can, see mejoras_futuras.txt) is future work,
-and it should only ever be *additive* here: something that implements the
+`CanEStopRequester` (python-can) is future work, and it should only ever
+be *additive* here: something that implements the
 same `EStopRequester` protocol, never a change to how `request_estop_for`
 decides when a stop is warranted.
 """

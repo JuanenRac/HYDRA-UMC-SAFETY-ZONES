@@ -125,3 +125,13 @@ def test_check_expired_calibration_inhibits_even_inside_danger_zone(tmp_path, ca
     assert "cal-0" in out
     assert "BREACH" not in out
     assert "E-STOP" not in out
+
+
+def test_check_invalid_coordinate_inhibits_instead_of_evaluating_geometry(tmp_path, capsys):
+    zones = _write_zones(tmp_path)
+    detections = _write_detections(tmp_path, "NaN", 1, 1)
+    exit_code = main(["check", "--zones", str(zones), "--detections", str(detections)])
+    out = capsys.readouterr().out
+    assert exit_code == 3
+    assert "SAFETY STATE: INHIBITED" in out
+    assert "point.x must be finite" in out

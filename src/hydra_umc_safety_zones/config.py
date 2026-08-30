@@ -5,13 +5,14 @@
 # =============================================================================
 """Loading zones and detected objects from plain JSON files.
 
-JSON, not YAML: `pyproject.toml`'s dependency list is still `[]` (see
-mejoras_futuras.txt) - `json` is stdlib, `pyyaml` is real future work once
-there is an actual zone-authoring tool worth serializing for.
+JSON, not YAML: `pyproject.toml`'s dependency list is still `[]` - `json`
+is stdlib, `pyyaml` is real future work once there is an actual
+zone-authoring tool worth serializing for.
 """
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 
 from hydra_umc_safety_zones.breach import DetectedObject
@@ -20,8 +21,23 @@ from hydra_umc_safety_zones.geometry import AABB, Point3D
 from hydra_umc_safety_zones.zones import Zone, ZoneLevel, ZoneSet
 
 
-def _point(data: dict) -> Point3D:
-    return Point3D(x=float(data["x"]), y=float(data["y"]), z=float(data["z"]))
+class ConfigError(ValueError):
+    """Raised when a safety JSON coordinate cannot represent a real point."""
+
+
+def _point(data: object) -> Point3D:
+    if not isinstance(data, dict):
+        raise ConfigError("point must be an object with x, y and z")
+    values: dict[str, float] = {}
+    for axis in ("x", "y", "z"):
+        try:
+            value = float(data[axis])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ConfigError(f"point.{axis} must be numeric") from exc
+        if not math.isfinite(value):
+            raise ConfigError(f"point.{axis} must be finite")
+        values[axis] = value
+    return Point3D(x=values["x"], y=values["y"], z=values["z"])
 
 
 def load_zones(path: str | Path) -> tuple[Zone, ...]:
