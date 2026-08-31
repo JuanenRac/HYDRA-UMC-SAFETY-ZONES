@@ -22,6 +22,7 @@ import sys
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 
+from hydra_umc_safety_zones.api import SafetyZonesServer
 from hydra_umc_safety_zones.breach import check_breaches
 from hydra_umc_safety_zones.config import ConfigError, load_detections, load_zone_set
 from hydra_umc_safety_zones.estop import NullEStopRequester, request_estop_for
@@ -86,6 +87,20 @@ def _run_check(zones_path: str, detections_path: str) -> int:
     return 2
 
 
+def _run_serve(addr: str, port: int) -> int:
+    server = SafetyZonesServer((addr, port), ROLE)
+    print(f"[safety-zones] HTTP API listening on {addr}:{port}")
+    print("[safety-zones] POST /check, GET /stats")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+        print("[safety-zones] shutting down")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="hydra-umc-safety-zones")
     subparsers = parser.add_subparsers(dest="command")
@@ -98,6 +113,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--detections", required=True, help="Path to a detected-objects JSON file."
     )
 
+    serve_parser = subparsers.add_parser(
+        "serve",
+        help="Run 'check' as a JSON/HTTP API (POST /check) - the exact same "
+             "evaluate_safety()/check_breaches()/request_estop_for() functions the "
+             "CLI already runs, with zones/detections in the JSON body instead of a "
+             "server-side file path.",
+    )
+    serve_parser.add_argument("--addr", default="127.0.0.1", help="address to bind the HTTP API to")
+    serve_parser.add_argument("--port", type=int, default=8108, help="port for the HTTP API")
+
     return parser
 
 
@@ -107,6 +132,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "check":
         return _run_check(args.zones, args.detections)
+    if args.command == "serve":
+        return _run_serve(args.addr, args.port)
 
     # Bare invocation: unchanged identity/version/role report.
     print(f"{PROJECT_NAME} v{get_version()}")

@@ -18,6 +18,32 @@ hand.
   an untrustworthy boundary and risking a false ready state.
 - Added configuration and CLI regression tests for this fail-safe path.
 
+## [0.0.5] - Real v0: JSON/HTTP server mode, plus CM5 deployment
+
+- **`config.py`** - `load_zones`/`load_zone_set`/`load_detections` split
+  into a real file-reading wrapper plus a new `parse_zones`/
+  `parse_zone_set`/`parse_detections` that accepts already-loaded JSON
+  directly - the file-path form only ever made sense for the CLI,
+  running on the same machine as the file. Behavior-preserving: the 3
+  existing functions keep their exact signature and semantics.
+- **`api.py`** (new) - `POST /check` reaches the exact same
+  `evaluate_safety()`/`check_breaches()`/`request_estop_for()` functions
+  the CLI's own `check` subcommand already runs, with `zones`/
+  `detections` in the JSON body via the new `parse_*` functions above.
+  Never asserts an E-STOP itself, only ever requests one
+  (`NullEStopRequester`, same as the CLI) - a real transport still has to
+  be wired to actually assert it. Real gap this closes: this project's
+  own zone-breach/E-STOP-request logic was only ever reachable as a
+  one-shot CLI.
+- **`main.py`** - new `serve` subcommand (`--addr`/`--port`, default
+  `127.0.0.1:8108`).
+- **`systemd/hydra-umc-safety-zones.service`** (new) - loopback-only unit
+  for `HYDRA-UMC-OS/provisioning/install_safety_zones.sh` (new, that
+  repo), same stdlib "copy src/ + PYTHONPATH" shape as
+  `install_datalake.sh`.
+- 9 new tests (`tests/test_api.py`, real end-to-end HTTP, reusing this
+  repo's own `tests/test_cli.py` fixture shapes) - 57 total.
+
 ## [0.0.4] - established: real calibration-freshness enforcement, fail-safe by default
 ### Added
 - `calibration.py` - real `ZoneCalibration` (version, source, `calibrated_at`, `max_age_days`) and `parse_calibration()`, raising `CalibrationError` on any missing/malformed field. `calibration_age_days()`/`is_calibration_expired()` treat a calibration older than its own `max_age_days`, or dated in the future (clock skew/bad data), as invalid - `max_age_days` itself is inclusive (a calibration exactly that many days old is still trusted, one day older is not).

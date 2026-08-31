@@ -1,6 +1,6 @@
 [project]
 name = "hydra-umc-safety-zones"
-version = "0.0.4"
+version = "0.0.5"
 description = "Real-time 3D intrusion detection and E-STOP orchestration system for robotic safe-working areas, driven by Hailo-8 spatial segmentation on HYDRA-UMC-VISION-NODE."
 readme = "README.md"
 requires-python = ">=3.10"
