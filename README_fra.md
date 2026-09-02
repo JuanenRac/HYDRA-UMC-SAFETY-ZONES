@@ -93,17 +93,22 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── safety_state.py   # Vraie décision de sécurité intrinsèque : READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py          # Vraie demande d'E-STOP (jamais de déclenchement)
 │   ├── config.py         # Vrai chargement JSON pour zones/détections
+│   ├── api.py             # Surface JSON/HTTP simple (http.server de stdlib) sur la vraie logique `check`
 │   └── main.py            # Point d'entrée + vrai sous-commande `check`
-├── tests/                # Vrais tests : géométrie, franchissements, E-STOP, config, CLI
+├── tests/                # Vrais tests : géométrie, franchissements, calibration, safety_state, estop, config, api, CLI
 ├── docs/                # Documentation et normes de sécurité
 ├── build/               # Sortie de build (le .venv local y vit aussi)
 ├── images/              # Médias et diagrammes
-├── scripts/             # Scripts utilitaires
+├── systemd/
+│   └── hydra-umc-safety-zones.service # Unité systemd de l'API locale de vérification de franchissement sur la CM5
 ├── pyproject.toml       # Métadonnées du paquet, dépendances, version compteur kilométrique
-├── bump_version.py      # Incrément de version type compteur kilométrique (build.sh/.bat)
+├── bump_version.py      # Incrément de version native type compteur kilométrique (build.sh/.bat)
+├── bump_manifest_version.py # Synchronise la version de hydra-umc.project.json avec la version native (--sync)
 ├── build.sh / build.bat # venv + installation éditable (extras dev) + compile-check + tests
 ├── build-test.sh / .bat # Vérification de build sans versionnage (ne touche jamais version ni CHANGELOG)
-├── tools/build_test.py  # Moteur partagé auquel délèguent les deux lanceurs build-test
+├── tools/
+│   ├── build_test.py    # Moteur partagé auquel délèguent les deux lanceurs build-test
+│   └── ci_validate.py   # Validation manifeste/CHANGELOG/docs utilisée par CI
 ├── run.sh / run.bat     # Exécute le point d'entrée depuis le venv local (relaie les arguments)
 └── CHANGELOG.md         # Historique version par version (schéma compteur kilométrique, sans dates)
 ```

@@ -93,17 +93,22 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── safety_state.py   # Vera decisione di sicurezza intrinseca: READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py          # Vera richiesta E-STOP (mai attivazione)
 │   ├── config.py         # Vero caricamento JSON per zone/rilevamenti
+│   ├── api.py             # Superficie JSON/HTTP semplice (http.server di stdlib) sulla vera logica `check`
 │   └── main.py            # Entry point + vero sottocomando `check`
-├── tests/                # Test veri: geometria, violazioni, E-STOP, config, CLI
+├── tests/                # Test veri: geometria, violazioni, calibrazione, safety_state, estop, config, api, CLI
 ├── docs/                # Documentazione e standard di sicurezza
 ├── build/               # Output di build (qui vive anche il .venv locale)
 ├── images/              # Media e diagrammi
-├── scripts/             # Script di utilità
+├── systemd/
+│   └── hydra-umc-safety-zones.service # Unità systemd della API locale di controllo violazioni sulla CM5
 ├── pyproject.toml       # Metadati pacchetto, dipendenze, versione contachilometri
-├── bump_version.py      # Incremento versione tipo contachilometri (build.sh/.bat)
+├── bump_version.py      # Incremento versione nativa tipo contachilometri (build.sh/.bat)
+├── bump_manifest_version.py # Sincronizza la versione di hydra-umc.project.json con quella nativa (--sync)
 ├── build.sh / build.bat # venv + installazione editabile (extra dev) + compile-check + test
 ├── build-test.sh / .bat # Verifica di build senza versionamento (non tocca mai version o CHANGELOG)
-├── tools/build_test.py  # Motore condiviso a cui delegano entrambi i lanciatori build-test
+├── tools/
+│   ├── build_test.py    # Motore condiviso a cui delegano entrambi i lanciatori build-test
+│   └── ci_validate.py   # Validazione manifest/CHANGELOG/docs usata dalla CI
 ├── run.sh / run.bat     # Esegue l'entry point dal venv locale (inoltra gli argomenti)
 └── CHANGELOG.md         # Storico versione per versione (schema contachilometri, senza date)
 ```

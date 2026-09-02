@@ -93,17 +93,22 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── safety_state.py   # Decisión real de fallo seguro: READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py          # Solicitud real de E-STOP (nunca lo dispara)
 │   ├── config.py         # Carga real de JSON para zonas/detecciones
+│   ├── api.py             # Superficie JSON/HTTP plana (http.server de stdlib) sobre la lógica real de `check`
 │   └── main.py            # Entry point + subcomando real `check`
-├── tests/                # Tests reales: geometría, brechas, E-STOP, config, CLI
+├── tests/                # Tests reales: geometría, brechas, calibración, safety_state, estop, config, api, CLI
 ├── docs/                # Documentación y estándares de seguridad
 ├── build/               # Salida de build (aquí vive también el .venv local)
 ├── images/              # Medios y diagramas
-├── scripts/             # Scripts de utilidad
+├── systemd/
+│   └── hydra-umc-safety-zones.service # Unidad systemd de la API local de comprobación de brechas en la CM5
 ├── pyproject.toml       # Metadatos del paquete, dependencias, versión cuentakilómetros
-├── bump_version.py      # Bump de versión tipo cuentakilómetros (build.sh/.bat)
+├── bump_version.py      # Bump de versión nativa tipo cuentakilómetros (build.sh/.bat)
+├── bump_manifest_version.py # Sincroniza la versión de hydra-umc.project.json con la nativa (--sync)
 ├── build.sh / build.bat # venv + instalación editable (extras dev) + compile-check + tests
 ├── build-test.sh / .bat # Comprobación de build sin versionar (nunca toca version ni CHANGELOG)
-├── tools/build_test.py  # Motor compartido en el que delegan ambos lanzadores de build-test
+├── tools/
+│   ├── build_test.py    # Motor compartido en el que delegan ambos lanzadores de build-test
+│   └── ci_validate.py   # Validación de manifiesto/CHANGELOG/docs usada por CI
 ├── run.sh / run.bat     # Ejecuta el entry point desde el venv local (reenvía argumentos)
 └── CHANGELOG.md         # Historial versión a versión (esquema cuentakilómetros, sin fechas)
 ```

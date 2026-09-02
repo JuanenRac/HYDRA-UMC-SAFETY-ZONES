@@ -140,17 +140,22 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── safety_state.py   # 実際のフェイルセーフ判定：READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py          # 実際の E-STOP リクエスト（実行は決してしない）
 │   ├── config.py         # ゾーン/検知データの実際の JSON 読み込み
+│   ├── api.py             # シンプルなJSON/HTTPサーフェス(stdlibのhttp.server)。実際の`check`ロジックを橋渡し
 │   └── main.py            # エントリポイント + 実際の `check` サブコマンド
-├── tests/                # 実際のテスト：幾何、越境、E-STOP、設定、CLI
+├── tests/                # 実際のテスト：幾何、越境、キャリブレーション、safety_state、estop、設定、api、CLI
 ├── docs/                # ドキュメントと安全基準
 ├── build/               # ビルド出力（ローカルの .venv もここに存在）
 ├── images/              # メディアと図表
-├── scripts/             # ユーティリティスクリプト
+├── systemd/
+│   └── hydra-umc-safety-zones.service # ローカルCM5ゾーン越境チェックAPIのsystemdユニット
 ├── pyproject.toml       # パッケージメタデータ、依存関係、オドメーターバージョン
-├── bump_version.py      # オドメーター式バージョンインクリメント（build.sh/.bat が実行）
+├── bump_version.py      # ネイティブバージョンのオドメーター式インクリメント（build.sh/.bat が実行）
+├── bump_manifest_version.py # hydra-umc.project.json のバージョンをネイティブ版と同期(--sync)
 ├── build.sh / build.bat # venv + editable インストール（dev エクストラ付き） + コンパイルチェック + テスト
 ├── build-test.sh / .bat # バージョン管理しないビルドチェック（version や CHANGELOG には触れません）
-├── tools/build_test.py  # 両方の build-test ランチャーが委譲する共通エンジン
+├── tools/
+│   ├── build_test.py    # 両方の build-test ランチャーが委譲する共通エンジン
+│   └── ci_validate.py   # CI が使用するマニフェスト/CHANGELOG/ドキュメント検証
 ├── run.sh / run.bat     # ローカル venv からエントリポイントを実行（引数を転送）
 └── CHANGELOG.md         # バージョンごとの履歴（オドメーター方式、日付なし）
 ```

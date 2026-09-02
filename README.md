@@ -93,17 +93,22 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── safety_state.py   # Real fail-safe decision: READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py          # Real E-STOP requesting (never asserting)
 │   ├── config.py         # Real JSON loading for zones/detections
+│   ├── api.py             # Plain JSON/HTTP surface (stdlib http.server) over the real `check` logic
 │   └── main.py            # Entry point + real `check` subcommand
-├── tests/                # Real tests: geometry, breach, E-STOP, config, CLI
+├── tests/                # Real tests: geometry, breach, calibration, safety_state, estop, config, api, CLI
 ├── docs/                # Documentation and safety standards
 ├── build/               # Build output (local .venv lives here too)
 ├── images/              # Media and diagrams
-├── scripts/             # Utility scripts
+├── systemd/
+│   └── hydra-umc-safety-zones.service # Local CM5 zone-breach check API systemd unit
 ├── pyproject.toml       # Package metadata, dependencies, odometer version
-├── bump_version.py      # Odometer-style version bump (run by build.sh/.bat)
+├── bump_version.py      # Odometer-style native version bump (run by build.sh/.bat)
+├── bump_manifest_version.py # Syncs hydra-umc.project.json's version to the native one (--sync)
 ├── build.sh / build.bat # venv + editable install (dev extras) + compile-check + tests
 ├── build-test.sh / .bat # Non-versioning build check (never touches version or CHANGELOG)
-├── tools/build_test.py  # Shared engine both build-test launchers delegate to
+├── tools/
+│   ├── build_test.py    # Shared engine both build-test launchers delegate to
+│   └── ci_validate.py   # Manifest/CHANGELOG/docs validation used by CI
 ├── run.sh / run.bat     # Runs the entry point from the local venv (forwards args)
 └── CHANGELOG.md         # Version-by-version history (odometer scheme, no dates)
 ```

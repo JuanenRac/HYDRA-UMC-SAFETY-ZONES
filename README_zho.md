@@ -124,17 +124,22 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── safety_state.py   # 真实的故障安全决策：READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py          # 真实的 E-STOP 请求（从不执行）
 │   ├── config.py         # 真实的区域/检测 JSON 加载
+│   ├── api.py             # 简洁的 JSON/HTTP 接口(基于 stdlib http.server),桥接真实的 `check` 逻辑
 │   └── main.py            # 入口点 + 真实的 `check` 子命令
-├── tests/                # 真实测试：几何、越界、E-STOP、配置、CLI
+├── tests/                # 真实测试：几何、越界、校准、safety_state、estop、配置、api、CLI
 ├── docs/                # 文档与安全标准
 ├── build/               # 构建输出（本地 .venv 也存放于此）
 ├── images/              # 媒体与图表
-├── scripts/             # 实用脚本
+├── systemd/
+│   └── hydra-umc-safety-zones.service # 本地 CM5 区域越界检查 API 的 systemd 单元
 ├── pyproject.toml       # 包元数据、依赖项、里程表版本号
-├── bump_version.py      # 里程表式版本递增（由 build.sh/.bat 运行）
+├── bump_version.py      # 原生版本的里程表式递增（由 build.sh/.bat 运行）
+├── bump_manifest_version.py # 将 hydra-umc.project.json 的版本与原生版本同步(--sync)
 ├── build.sh / build.bat # venv + 可编辑安装（含 dev 附加依赖） + 编译检查 + 测试
 ├── build-test.sh / .bat # 不涉及版本递增的构建检查（从不修改 version 或 CHANGELOG）
-├── tools/build_test.py  # 两个 build-test 启动脚本共同委托的引擎
+├── tools/
+│   ├── build_test.py    # 两个 build-test 启动脚本共同委托的引擎
+│   └── ci_validate.py   # CI 使用的清单/CHANGELOG/文档校验
 ├── run.sh / run.bat     # 从本地 venv 运行入口点（转发参数）
 └── CHANGELOG.md         # 逐版本历史（里程表方案，无日期）
 ```

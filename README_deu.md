@@ -93,17 +93,22 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── safety_state.py   # Echte Fail-Safe-Entscheidung: READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py          # Echte E-STOP-Anforderung (nie Auslösung)
 │   ├── config.py         # Echtes JSON-Laden für Zonen/Erkennungen
+│   ├── api.py             # Einfache JSON/HTTP-Oberfläche (stdlib http.server) über die echte `check`-Logik
 │   └── main.py            # Einstiegspunkt + echter `check`-Subbefehl
-├── tests/                # Echte Tests: Geometrie, Verletzungen, E-STOP, Config, CLI
+├── tests/                # Echte Tests: Geometrie, Verletzungen, Kalibrierung, safety_state, estop, Config, api, CLI
 ├── docs/                # Dokumentation und Sicherheitsnormen
 ├── build/               # Build-Ausgabe (hier lebt auch das lokale .venv)
 ├── images/              # Medien und Diagramme
-├── scripts/             # Hilfsskripte
+├── systemd/
+│   └── hydra-umc-safety-zones.service # systemd-Unit der lokalen CM5-Zonenverletzungs-API
 ├── pyproject.toml       # Paketmetadaten, Abhängigkeiten, Kilometerzähler-Version
-├── bump_version.py      # Kilometerzähler-artiger Versions-Bump (build.sh/.bat)
+├── bump_version.py      # Native Kilometerzähler-artige Versions-Bump (build.sh/.bat)
+├── bump_manifest_version.py # Synchronisiert die Version von hydra-umc.project.json mit der nativen (--sync)
 ├── build.sh / build.bat # venv + editierbare Installation (Dev-Extras) + Compile-Check + Tests
 ├── build-test.sh / .bat # Nicht-versionierender Build-Check (rührt Version/CHANGELOG nie an)
-├── tools/build_test.py  # Gemeinsame Engine, an die beide build-test-Starter delegieren
+├── tools/
+│   ├── build_test.py    # Gemeinsame Engine, an die beide build-test-Starter delegieren
+│   └── ci_validate.py   # Manifest/CHANGELOG/Docs-Validierung, von CI genutzt
 ├── run.sh / run.bat     # Führt den Einstiegspunkt aus dem lokalen venv aus (leitet Argumente weiter)
 └── CHANGELOG.md         # Versions-für-Versions-Historie (Kilometerzähler-Schema, ohne Daten)
 ```
