@@ -144,7 +144,7 @@ Individua l'interprete dentro `.venv` ed esegue `python -m hydra_umc_safety_zone
 L'invocazione senza argomenti stampa nome + versione + ruolo:
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.0.4
+HYDRA-UMC-SAFETY-ZONES v0.0.5
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 

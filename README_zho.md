@@ -179,7 +179,7 @@ HYDRA-UMC-SAFETY-ZONES/
 无参数调用会打印名称 + 版本 + 角色：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.0.4
+HYDRA-UMC-SAFETY-ZONES v0.0.5
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 

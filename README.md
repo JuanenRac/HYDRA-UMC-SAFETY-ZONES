@@ -144,7 +144,7 @@ Locates the interpreter inside `.venv` (handling both the POSIX and Windows `.ve
 Bare invocation prints name + version + role:
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.0.4
+HYDRA-UMC-SAFETY-ZONES v0.0.5
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
