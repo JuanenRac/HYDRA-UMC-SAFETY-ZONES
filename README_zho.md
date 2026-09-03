@@ -32,6 +32,8 @@
 * 🚦 **多级区域（v0）：** 真实的 `Zone`/`ZoneLevel`（警告/危险）定义，作用于轴对齐的 3D 体积，以及区域集合与检测对象位置集合之间的真实越界检查（`check_breaches`）。
 * 🛑 **E-STOP 请求（v0，不执行）：** 任何最严重越界为"危险"级别的对象都会生成一个真实的 `EStopRequest`，交给 `EStopRequester`——具体为何本项目中的任何部分都从不自行执行物理停止，见下方的设计边界。
 * 🔒 **校准新鲜度强制检查（v0）：** 每个区域集合都携带一个可选的 `calibration`（版本、来源、校准日期、最大有效天数）。`evaluate_safety()` 会在执行任何越界逻辑**之前**先检查它——完全没有校准信息的区域集合、比自身声明的 `max_age_days` 更旧的校准、或日期在未来的校准，始终会解析为 `INHIBITED`，绝不会仅因为没有检测对象靠近某个区域就悄悄退回到 `READY`。
+* 🧮 **有限坐标故障保护(v0):** `config.py` 会在 `evaluate_safety()` 运行前拒绝区域或检测文件中任何 `NaN`/`Infinity`/`-Infinity` 的 `x`/`y`/`z` 值,直接解析为 `INHIBITED`(退出码 `3`),而不是用一个无法代表真实点的坐标去评估边界。
+* 🌐 **JSON/HTTP API(v0.0.5):** `serve` 子命令通过 stdlib 的 `http.server`(`POST /check`、`GET /stats`)对外暴露与 `check` 完全相同的逻辑(`evaluate_safety()`/`check_breaches()`/`request_estop_for()`),供非 CLI 调用方使用。默认仅限本地回环,与 `systemd/hydra-umc-safety-zones.service` 单元一致。完整的真实命令、参数和退出码请见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。
 * 📐 **动态遮挡（计划中）：** 自动将机器人自身结构从安全触发中屏蔽，使机器人不会将"自身"检测为入侵。
 * 🔍 **异物检测（计划中）：** 识别遗留在工作空间中的工具或碎屑。
 * 🎥 **基于 Hailo-8 的真实 3D 占用地图（计划中）：** v0 的 `check` 子命令从 JSON 文件读取检测对象位置，正是因为真正会产生这些位置的 Hailo-8 空间分割流水线在本环境中尚不存在——详见下方"诚实说明"。
@@ -240,6 +242,16 @@ build.bat
 run.bat
 run.bat check --zones zones.json --detections detections.json
 ```
+
+同样的 `check` 逻辑也可以通过 HTTP 访问,供非 CLI 调用方使用——`zones`/`detections` 通过 JSON 请求体传递,而不是文件路径:
+
+```bash
+./run.sh serve --addr 127.0.0.1 --port 8108
+# 在另一个终端:
+curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {...}}'
+```
+
+完整的命令、参数和退出码参考(包含从真实运行中采集的每个真实状态 `READY`/`WARNING`/`DANGER`/`INHIBITED`)请见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。
 
 ### 故障排查
 

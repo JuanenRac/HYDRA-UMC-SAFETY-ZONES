@@ -28,6 +28,8 @@ Este es uno de los 4 hijos de **[HYDRA-UMC-VISION-NODE](https://github.com/Juane
 * 🚦 **Zonas Multinivel (v0):** definiciones reales de `Zone`/`ZoneLevel` (Warning/Danger) sobre volúmenes 3D alineados con los ejes, y comprobación real de brechas (`check_breaches`) entre un conjunto de zonas y un conjunto de posiciones de objetos detectados.
 * 🛑 **Solicitud de E-STOP (v0, no lo dispara):** todo objeto cuya peor brecha sea Danger produce un `EStopRequest` real, entregado a un `EStopRequester` - ver el límite de diseño abajo para el porqué de que nada aquí dispare jamás la parada física por sí mismo.
 * 🔒 **Aplicación de frescura de calibración (v0):** todo conjunto de zonas lleva una `calibration` opcional (versión, fuente, fecha de calibración, edad máxima en días). `evaluate_safety()` la comprueba **antes** de ejecutar cualquier lógica de brechas - un conjunto de zonas sin ninguna calibración, uno más viejo que su propio `max_age_days` declarado, o uno fechado en el futuro, siempre resuelve a `INHIBITED`, nunca cae en un `READY` silencioso solo porque ningún objeto detectado está cerca de una zona.
+* 🧮 **Salvaguarda de coordenadas finitas (v0):** `config.py` rechaza cualquier `x`/`y`/`z` `NaN`/`Infinity`/`-Infinity` en un fichero de zonas o detecciones *antes* de que `evaluate_safety()` se ejecute, resolviendo directo a `INHIBITED` (salida `3`) en vez de evaluar un límite con una coordenada que no puede representar un punto real.
+* 🌐 **API JSON/HTTP (v0.0.5):** el subcomando `serve` expone la misma lógica exacta de `check` (`evaluate_safety()`/`check_breaches()`/`request_estop_for()`) sobre un `http.server` de la stdlib (`POST /check`, `GET /stats`) para clientes que no son la CLI - solo loopback por defecto, igual que la unidad `systemd/hydra-umc-safety-zones.service`. Ver [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) para cada comando, flag y código de salida real.
 * 📐 **Oclusión Dinámica (previsto):** enmascarar automáticamente la propia estructura del robot de los disparos de seguridad, para que el robot no se "detecte a sí mismo" como intrusión.
 * 🔍 **Detección de Objetos Extraños (previsto):** identificar herramientas o residuos dejados en el espacio de trabajo.
 * 🎥 **Mapeo real de ocupación 3D desde Hailo-8 (previsto):** el subcomando `check` de v0 toma posiciones de objetos detectados desde un fichero JSON precisamente porque el pipeline real de segmentación espacial de Hailo-8 que las produciría todavía no existe en este entorno - ver "Comprobación de honestidad" abajo.
@@ -200,6 +202,16 @@ build.bat
 run.bat
 run.bat check --zones zones.json --detections detections.json
 ```
+
+La misma lógica de `check` también es accesible por HTTP, para clientes que no son la CLI - `zones`/`detections` viajan en el cuerpo JSON en vez de una ruta de fichero:
+
+```bash
+./run.sh serve --addr 127.0.0.1 --port 8108
+# en otra terminal:
+curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {...}}'
+```
+
+Ver [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) para la referencia completa de comandos, flags y códigos de salida, incluyendo cada estado real (`READY`/`WARNING`/`DANGER`/`INHIBITED`) capturado de una ejecución real.
 
 ### Solución de problemas
 

@@ -28,6 +28,8 @@ Dies ist eines der 4 Kind-Projekte von **[HYDRA-UMC-VISION-NODE](https://github.
 * 🚦 **Mehrstufige Zonen (v0):** echte `Zone`/`ZoneLevel`-Definitionen (Warning/Danger) über achsenparallele 3D-Volumen, und echte Verletzungsprüfung (`check_breaches`) zwischen einer Zonenmenge und einer Menge erkannter Objektpositionen.
 * 🛑 **E-STOP-Anforderung (v0, keine Auslösung):** jedes Objekt, dessen schlimmste Verletzung Danger ist, erzeugt eine echte `EStopRequest`, übergeben an einen `EStopRequester` - siehe die Design-Grenze unten für das Warum, dass hier nichts jemals selbst den physischen Stopp auslöst.
 * 🔒 **Durchsetzung der Kalibrierungsfrische (v0):** jede Zonenmenge trägt eine optionale `calibration` (Version, Quelle, Kalibrierungsdatum, maximales Alter in Tagen). `evaluate_safety()` prüft sie **bevor** irgendeine Verletzungslogik ausgeführt wird - eine Zonenmenge ohne jegliche Kalibrierung, eine, die älter als ihr eigenes deklariertes `max_age_days` ist, oder eine mit einem Datum in der Zukunft, löst sich immer zu `INHIBITED` auf, fällt nie stillschweigend auf `READY` zurück, nur weil kein erkanntes Objekt in der Nähe einer Zone ist.
+* 🧮 **Absicherung durch endliche Koordinaten (v0):** `config.py` weist jedes `NaN`/`Infinity`/`-Infinity` in `x`/`y`/`z` einer Zonen- oder Detektionsdatei zurück, *bevor* `evaluate_safety()` überhaupt läuft, und löst direkt zu `INHIBITED` (Exit `3`) auf, statt eine Grenze gegen eine Koordinate zu prüfen, die keinen echten Punkt darstellen kann.
+* 🌐 **JSON/HTTP-API (v0.0.5):** der Subbefehl `serve` stellt exakt dieselbe `check`-Logik (`evaluate_safety()`/`check_breaches()`/`request_estop_for()`) über einen stdlib-`http.server` bereit (`POST /check`, `GET /stats`) für Aufrufer, die nicht die CLI sind - standardmäßig nur Loopback, passend zur `systemd/hydra-umc-safety-zones.service`-Unit. Siehe [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) für jeden echten Befehl, jedes Flag und jeden Exit-Code.
 * 📐 **Dynamische Verdeckung (geplant):** automatisches Ausblenden der eigenen Struktur des Roboters aus Sicherheitsauslösern, damit der Roboter sich nicht selbst als Eindringling "erkennt".
 * 🔍 **Fremdobjekterkennung (geplant):** Identifizierung von im Arbeitsbereich zurückgelassenen Werkzeugen oder Trümmern.
 * 🎥 **Echte 3D-Belegungskartierung von Hailo-8 (geplant):** der `check`-Subbefehl von v0 nimmt erkannte Objektpositionen aus einer JSON-Datei, gerade weil die echte Hailo-8-Segmentierungs-Pipeline, die sie erzeugen würde, in dieser Umgebung noch nicht existiert - siehe "Ehrlichkeitscheck" unten.
@@ -200,6 +202,16 @@ build.bat
 run.bat
 run.bat check --zones zones.json --detections detections.json
 ```
+
+Dieselbe `check`-Logik ist auch über HTTP erreichbar, für Aufrufer, die nicht die CLI sind - `zones`/`detections` reisen im JSON-Body statt als Dateipfad:
+
+```bash
+./run.sh serve --addr 127.0.0.1 --port 8108
+# in einem anderen Terminal:
+curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {...}}'
+```
+
+Siehe [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) für die vollständige Befehls-/Flag-/Exit-Code-Referenz, einschließlich jedes echten Zustands (`READY`/`WARNING`/`DANGER`/`INHIBITED`) aus einem echten Lauf.
 
 ### Fehlerbehebung
 

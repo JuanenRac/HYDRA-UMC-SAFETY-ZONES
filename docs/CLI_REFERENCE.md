@@ -14,12 +14,15 @@ against real fixture JSON files — not written from memory.
 
 ```
 $ hydra-umc-safety-zones -h
-usage: hydra-umc-safety-zones [-h] {check} ...
+usage: hydra-umc-safety-zones [-h] {check,serve} ...
 
 positional arguments:
-  {check}
-    check     Check detected objects against zones and request E-STOP for
-              Danger breaches.
+  {check,serve}
+    check       Check detected objects against zones and request E-STOP for
+                Danger breaches.
+    serve       Run 'check' as a JSON/HTTP API (POST /check) - the exact
+                same evaluate_safety()/check_breaches()/request_estop_for()
+                functions the CLI already runs.
 
 options:
   -h, --help  show this help message and exit
@@ -29,7 +32,7 @@ Bare invocation (no subcommand) prints identity/version/role and exits `0`:
 
 ```
 $ hydra-umc-safety-zones
-HYDRA-UMC-SAFETY-ZONES v0.0.4
+HYDRA-UMC-SAFETY-ZONES v0.0.5
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
@@ -132,6 +135,48 @@ FileNotFoundError: [Errno 2] No such file or directory: 'does-not-exist.json'
 $ echo $?
 1
 ```
+
+**INHIBITED — non-finite coordinate.** A `NaN`/`Infinity`/`-Infinity`
+`x`/`y`/`z` in either JSON file is caught by `config.py` *before*
+`evaluate_safety()` ever runs, and treated exactly as untrustworthy as a
+missing calibration — never silently coerced or skipped:
+
+```
+$ hydra-umc-safety-zones check --zones zones-valid.json --detections detections-nan.json
+SAFETY STATE: INHIBITED - invalid safety configuration: point.x must be finite
+$ echo $?
+3
+```
+
+### `serve [--addr ADDR] [--port PORT]`
+
+```
+$ hydra-umc-safety-zones serve -h
+usage: hydra-umc-safety-zones serve [-h] [--addr ADDR] [--port PORT]
+
+options:
+  -h, --help   show this help message and exit
+  --addr ADDR  address to bind the HTTP API to (default: 127.0.0.1)
+  --port PORT  port for the HTTP API (default: 8108)
+```
+
+Runs the exact same `evaluate_safety()`/`check_breaches()`/
+`request_estop_for()` functions as `check`, over a plain stdlib
+`http.server` JSON API instead of files on disk — `zones`/`detections`
+travel in the request body. Binds to loopback (`127.0.0.1:8108`) by
+default, matching the `systemd/hydra-umc-safety-zones.service` unit.
+
+* **`GET /stats`** — `{"role": "..."}`, a liveness/identity check.
+* **`POST /check`** — body `{"zones": {...}, "detections": {...}}` using
+  the exact same shapes as the `--zones`/`--detections` files above.
+  Responds `200` with `{"state", "reason", "breaches", "estopRequests"}`
+  for a well-formed request (including `INHIBITED`, which still reports
+  a normal `200` — inhibition is an expected safety outcome, not a
+  request error); responds `400` with `{"error": "..."}` for a malformed
+  JSON body, a missing `zones`/`detections` key, or an invalid safety
+  configuration (including a non-finite coordinate, same as the CLI).
+  Never asserts an E-STOP — only ever requests one, same
+  `NullEStopRequester` as the CLI.
 
 ## Exit codes
 
