@@ -18,6 +18,18 @@ hand.
   an untrustworthy boundary and risking a false ready state.
 - Added configuration and CLI regression tests for this fail-safe path.
 
+## [0.0.6]
+
+- **New real `Dockerfile`**, closing the real gap HYDRA-UMC-VISION-NODE's
+  own `docker-compose.yml` named ("still skeleton-stage... no Dockerfile
+  of their own"). Same `--addr`/`--port` CLI the real CM5 systemd unit
+  (`systemd/hydra-umc-safety-zones.service`) already runs, bound to
+  `0.0.0.0` instead of `127.0.0.1` (the container's own network
+  namespace is the real isolation boundary here, not the loopback
+  bind), non-root. Not build-tested (no Docker runtime on this dev
+  machine) - every path/flag matches the one already verified live on
+  the real CM5.
+
 ## [0.0.5] - Real v0: JSON/HTTP server mode, plus CM5 deployment
 
 - **`config.py`** - `load_zones`/`load_zone_set`/`load_detections` split
