@@ -17,6 +17,12 @@ hand.
   causes the command to report `INHIBITED` (exit 3), rather than evaluating
   an untrustworthy boundary and risking a false ready state.
 - Added configuration and CLI regression tests for this fail-safe path.
+- **`.github/workflows/ci.yml`** - the real `tests/` pytest suite is now
+  actually installed and run in CI. The baseline workflow's Python
+  handling previously only compile-checked (`py_compile`) every `.py`
+  file and validated the manifest/docs - it never ran `pytest`, so a
+  regression in `tests/` could be merged without CI ever failing.
+  CI-only fix, no runtime code changed, no version bump.
 
 ## [0.0.6]
 

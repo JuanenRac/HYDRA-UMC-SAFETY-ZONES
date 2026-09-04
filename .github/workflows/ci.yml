@@ -38,6 +38,16 @@ jobs:
               py_compile.compile(str(path), doraise=True)
           print(f"PYTHON_SYNTAX=PASS files={len(files)}")
           PY
+      - name: Install and run the real Python test suite
+        if: ${{ hashFiles('pyproject.toml') != '' }}
+        shell: bash
+        run: |
+          python -m pip install -e ".[dev]"
+          if [ -d tests ]; then
+            python -m pytest tests/ -q
+          else
+            echo "PYTHON_TESTS=SKIPPED no tests/ directory"
+          fi
       - name: Validate v1 SDK contract fixtures
         if: ${{ hashFiles('clients/python/tests/test_validation.py') != '' }}
         env:
