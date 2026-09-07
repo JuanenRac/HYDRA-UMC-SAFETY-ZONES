@@ -1,0 +1,33 @@
+# =============================================================================
+# HYDRA-UMC-SAFETY-ZONES - Local CM5 intrusion-detection API systemd unit
+# Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+# GPL-3.0-or-later - see LICENSE
+# =============================================================================
+# Loopback-only, same as every other internal-only API on this CM5 - this
+# real check/E-STOP-request logic never asserts an E-STOP itself
+# (NullEStopRequester, same as the CLI), it only ever requests one for a
+# real transport to actually assert, but it still has no authentication
+# of its own, so it stays unreachable from the wider LAN.
+[Unit]
+Description=HYDRA-UMC-SAFETY-ZONES real intrusion-detection/E-STOP-request API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hydra-umc-safety-zones
+Group=hydra-umc-safety-zones
+WorkingDirectory=/opt/hydra-umc/safety-zones
+Environment=PYTHONPATH=/opt/hydra-umc/safety-zones/src
+ExecStart=/usr/bin/python3 -m hydra_umc_safety_zones.main serve --addr 127.0.0.1 --port 8108
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
