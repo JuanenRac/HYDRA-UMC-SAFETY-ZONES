@@ -15,7 +15,7 @@ matching detect-vs-enforce boundary on the E-STOP side).
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timezone
 from enum import Enum
 
 from hydra_umc_safety_zones.breach import DetectedObject, check_breaches, worst_level_per_object
@@ -84,3 +84,57 @@ def evaluate_safety(
         )
 
     return SafetyEvaluation(SafetyState.READY, "no breach, calibration valid")
+
+
+# HYDRA-UMC-SDK's own formal contract (contracts/json-schema/v1/
+# safety-state.schema.json) requires `state` to be exactly one of
+# READY/INHIBITED/FAULT/SAFE_STOP - a real, DIFFERENT vocabulary (and
+# different member set) than this module's own internal SafetyState
+# above (lowercase ready/warning/danger/inhibited, no FAULT/SAFE_STOP at
+# all). Real gap found 2026-09-08 (private plan's own F05): nothing in
+# this repo ever emitted the SDK-conformant shape, so a consumer that
+# actually wired "the real SafetyState feed" HYDRA-UMC-VISUAL-SERVOING-
+# API's own authorization.py already anticipated in its own docstring
+# would have compared lowercase "ready" against that module's uppercase
+# "READY" and NEVER authorized a single correction, even in a genuinely
+# safe cell - a real, silent, would-have-shipped integration bug, not a
+# hypothetical one.
+SDK_SAFETY_STATE_SCHEMA_VERSION = "1.0"
+
+_SDK_STATE_BY_INTERNAL_STATE: dict[SafetyState, str] = {
+    SafetyState.READY: "READY",
+    # WARNING does not stop the physical cell in this module's own model
+    # (evaluate_safety() above never raises an E-STOP for it - see
+    # estop.py's own detect-vs-enforce boundary) but a vision-driven
+    # correction is a more sensitive consumer than a plain motion
+    # controller: authorizing a fine PBVS correction while an object has
+    # already breached a warning zone is a real, separate judgment call,
+    # made deliberately conservative (fail-closed) here rather than
+    # silently reusing READY.
+    SafetyState.WARNING: "INHIBITED",
+    # DANGER is this module's own live E-STOP-request condition (see
+    # api.py's own request_estop_for() call) - SAFE_STOP is the SDK's own
+    # closest real semantic match for "an e-stop is actively in effect",
+    # not a plain access-denial.
+    SafetyState.DANGER: "SAFE_STOP",
+    # Untrustworthy geometry (missing/expired calibration) is exactly the
+    # SDK's own INHIBITED semantics - a direct match, not a judgment call.
+    SafetyState.INHIBITED: "INHIBITED",
+}
+
+
+def to_sdk_safety_state(evaluation: SafetyEvaluation, source: str = "hydra-umc-safety-zones") -> dict:
+    """The one real place this module's own internal SafetyEvaluation is
+    translated into HYDRA-UMC-SDK's own formal SafetyState contract shape
+    (schema_version/state/source/timestamp_utc) - see
+    contracts/json-schema/v1/safety-state.schema.json in HYDRA-UMC-SDK for
+    the schema this must always validate against. `source` defaults to
+    this repo's own name (the schema's own required, non-empty
+    `source` field - "which real service reported this state").
+    """
+    return {
+        "schema_version": SDK_SAFETY_STATE_SCHEMA_VERSION,
+        "state": _SDK_STATE_BY_INTERNAL_STATE[evaluation.state],
+        "source": source,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+    }

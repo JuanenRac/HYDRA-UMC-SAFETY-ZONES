@@ -81,6 +81,11 @@ def test_check_no_breach_is_ready(tmp_path) -> None:
         assert status == 200
         assert body["state"] == "ready"
         assert body["breaches"] == []
+        # Real HYDRA-UMC-SDK-conformant field (F05) - the one a real
+        # consumer like VISUAL-SERVOING-API's authorize_correction()
+        # actually reads, distinct from this module's own lowercase
+        # `state` above.
+        assert body["sdkSafetyState"]["state"] == "READY"
 
 
 def test_check_warning_breach(tmp_path) -> None:
@@ -91,6 +96,10 @@ def test_check_warning_breach(tmp_path) -> None:
         assert len(body["breaches"]) == 1
         assert body["breaches"][0]["zone_id"] == "warn1"
         assert body["estopRequests"] == []
+        # Conservative real mapping (see to_sdk_safety_state's own header
+        # comment) - a warning breach must not authorize a vision-driven
+        # correction even though it doesn't e-stop the physical cell.
+        assert body["sdkSafetyState"]["state"] == "INHIBITED"
 
 
 def test_check_danger_breach_requests_estop(tmp_path) -> None:
@@ -100,6 +109,7 @@ def test_check_danger_breach_requests_estop(tmp_path) -> None:
         assert body["state"] == "danger"
         assert len(body["breaches"]) >= 1
         assert len(body["estopRequests"]) >= 1
+        assert body["sdkSafetyState"]["state"] == "SAFE_STOP"
 
 
 def test_check_missing_calibration_inhibits(tmp_path) -> None:
@@ -108,6 +118,7 @@ def test_check_missing_calibration_inhibits(tmp_path) -> None:
         assert status == 200
         assert body["state"] == "inhibited"
         assert body["breaches"] == []
+        assert body["sdkSafetyState"]["state"] == "INHIBITED"
 
 
 def test_check_expired_calibration_inhibits_even_inside_danger_zone(tmp_path) -> None:
@@ -116,6 +127,7 @@ def test_check_expired_calibration_inhibits_even_inside_danger_zone(tmp_path) ->
         assert status == 200
         assert body["state"] == "inhibited"
         assert body["breaches"] == []
+        assert body["sdkSafetyState"]["state"] == "INHIBITED"
 
 
 def test_check_invalid_coordinate_returns_400(tmp_path) -> None:

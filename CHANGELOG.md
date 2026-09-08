@@ -10,6 +10,37 @@ by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
 `MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
 hand.
 
+## [0.0.8] - F05: real HYDRA-UMC-SDK SafetyState now emitted alongside this module's own internal one
+
+Real gap found in an ecosystem-wide software-preparation checklist
+(private plan's own F05): HYDRA-UMC-SDK's own formal contract
+(`contracts/json-schema/v1/safety-state.schema.json`) requires `state`
+to be exactly one of `READY`/`INHIBITED`/`FAULT`/`SAFE_STOP`, but this
+repo's own internal `SafetyState` enum uses a completely different,
+lowercase vocabulary (`ready`/`warning`/`danger`/`inhibited`) with a
+different member set. Nothing in this repo ever emitted the
+SDK-conformant shape - a consumer that wired the real feed
+`HYDRA-UMC-VISUAL-SERVOING-API`'s own `authorization.py` already
+anticipated in its own docstring would have compared lowercase
+`"ready"` against that module's uppercase `"READY"` and never
+authorized a single correction, even in a genuinely safe cell.
+
+New `to_sdk_safety_state(evaluation)` in `safety_state.py` maps this
+module's own real evaluation to the SDK's real shape (`schema_version`/
+`state`/`source`/`timestamp_utc`) - `READY`/`INHIBITED` map directly,
+`DANGER` maps to `SAFE_STOP` (this module's own live E-STOP-request
+condition), and `WARNING` maps conservatively to `INHIBITED` (a
+vision-driven correction is a more sensitive consumer than this
+module's own physical-cell model, which doesn't e-stop for a warning
+breach). `POST /check`'s response now carries this as a new
+`sdkSafetyState` field alongside the existing `state` field, which stays
+unchanged for every existing consumer. See
+`HYDRA-UMC-VISUAL-SERVOING-API`'s own CHANGELOG for the other real half
+of this integration, and its own `tests/test_safety_zones_integration.py`
+for a real end-to-end test proving the full chain (this repo's own real
+HTTP server, feeding VISUAL-SERVOING-API's own real authorization
+check) - not just each side trusting the other's own unit tests.
+
 ## [0.0.7] - SAFE-01: reject bool/fraction max_age_days before it reaches a real calibration
 
 - **SAFE-01 (found in an ecosystem-wide software-improvements audit,
