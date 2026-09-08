@@ -27,7 +27,7 @@ from urllib.parse import urlparse
 from .breach import check_breaches
 from .config import ConfigError, parse_detections, parse_zone_set
 from .estop import NullEStopRequester, request_estop_for
-from .safety_state import SafetyState, evaluate_safety
+from .safety_state import SafetyState, evaluate_safety, to_sdk_safety_state
 
 
 def _write_json(handler: BaseHTTPRequestHandler, status: int, payload: object) -> None:
@@ -113,7 +113,20 @@ class Handler(BaseHTTPRequestHandler):
         today = datetime.now(timezone.utc).date()
         evaluation = evaluate_safety(zone_set, objects, today)
 
-        response: dict = {"state": evaluation.state.value, "reason": evaluation.reason, "breaches": [], "estopRequests": []}
+        response: dict = {
+            "state": evaluation.state.value,
+            "reason": evaluation.reason,
+            "breaches": [],
+            "estopRequests": [],
+            # Real HYDRA-UMC-SDK-conformant SafetyState (contracts/
+            # json-schema/v1/safety-state.schema.json) alongside this
+            # module's own internal `state` above - a real consumer like
+            # HYDRA-UMC-VISUAL-SERVOING-API's authorize_correction() reads
+            # THIS field, never the internal one (different vocabulary,
+            # different member set - see to_sdk_safety_state()'s own
+            # header comment for why both must keep existing side by side).
+            "sdkSafetyState": to_sdk_safety_state(evaluation),
+        }
 
         if evaluation.state in (SafetyState.INHIBITED, SafetyState.READY):
             _write_json(self, 200, response)
