@@ -43,8 +43,7 @@ check) - not just each side trusting the other's own unit tests.
 
 ## [0.0.7] - SAFE-01: reject bool/fraction max_age_days before it reaches a real calibration
 
-- **SAFE-01 (found in an ecosystem-wide software-improvements audit,
-  P2):** `parse_calibration()`'s old `int(data["max_age_days"])`
+- **SAFE-01 (P2):** `parse_calibration()`'s old `int(data["max_age_days"])`
   accepted values that were never really a strict positive integer -
   `bool` is a subclass of `int` in Python (`int(True) == 1`), and
   `int()` on a `float` silently truncates (`int(1.5) == 1`) instead of
@@ -56,7 +55,7 @@ check) - not just each side trusting the other's own unit tests.
   plus a real valid calibration still parsing and expiring correctly).
   `pytest tests/ -q`: 64/64 passing.
 - **`api.py`'s `_read_json_body()` now caps request bodies** (`MAX_BODY_BYTES`,
-  1 MiB) - found in an ecosystem-wide software-improvements audit: this
+  1 MiB) - found while auditing the code: this
   endpoint used to read `Content-Length` bytes with no upper bound before
   parsing, so a malformed or oversized header let a caller force unbounded
   memory buffering. An over-limit request is drained (up to `DRAIN_CAP_BYTES`)
