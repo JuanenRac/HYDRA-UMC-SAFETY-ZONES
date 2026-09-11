@@ -79,8 +79,8 @@ def test_evaluate_safety_danger_outranks_warning_for_same_object():
 
 
 # --- to_sdk_safety_state(): real HYDRA-UMC-SDK contract conformance ---
-# (private plan's own F05 - see this function's own header comment for
-# the real bug this closes).
+# (F05 - see this function's own header comment for the real bug this
+# closes).
 
 REAL_SDK_STATES = {"READY", "INHIBITED", "FAULT", "SAFE_STOP"}
 
