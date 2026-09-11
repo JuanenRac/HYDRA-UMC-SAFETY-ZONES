@@ -12,8 +12,7 @@ hand.
 
 ## [0.0.8] - F05: real HYDRA-UMC-SDK SafetyState now emitted alongside this module's own internal one
 
-Real gap found in an ecosystem-wide software-preparation checklist
-(private plan's own F05): HYDRA-UMC-SDK's own formal contract
+Real gap found while auditing the code: HYDRA-UMC-SDK's own formal contract
 (`contracts/json-schema/v1/safety-state.schema.json`) requires `state`
 to be exactly one of `READY`/`INHIBITED`/`FAULT`/`SAFE_STOP`, but this
 repo's own internal `SafetyState` enum uses a completely different,
