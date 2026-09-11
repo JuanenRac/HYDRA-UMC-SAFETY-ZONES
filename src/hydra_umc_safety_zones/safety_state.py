@@ -91,7 +91,7 @@ def evaluate_safety(
 # READY/INHIBITED/FAULT/SAFE_STOP - a real, DIFFERENT vocabulary (and
 # different member set) than this module's own internal SafetyState
 # above (lowercase ready/warning/danger/inhibited, no FAULT/SAFE_STOP at
-# all). Real gap found 2026-09-08 (private plan's own F05): nothing in
+# all). Real gap found while auditing the code (F05): nothing in
 # this repo ever emitted the SDK-conformant shape, so a consumer that
 # actually wired "the real SafetyState feed" HYDRA-UMC-VISUAL-SERVOING-
 # API's own authorization.py already anticipated in its own docstring
