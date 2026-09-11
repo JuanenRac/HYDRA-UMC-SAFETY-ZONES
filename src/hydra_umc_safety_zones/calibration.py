@@ -64,8 +64,7 @@ def parse_calibration(data: dict) -> ZoneCalibration:
     if "max_age_days" not in data:
         raise CalibrationError("calibration is missing required field: max_age_days")
     raw_max_age_days = data["max_age_days"]
-    # SAFE-01 (found in an ecosystem-wide software-improvements audit,
-    # P2): the old `int(data["max_age_days"])` accepted values that were
+    # SAFE-01 (P2): the old `int(data["max_age_days"])` accepted values that were
     # never really a strict positive integer - `bool` is a subclass of
     # `int` in Python (`int(True) == 1`), and `int()` on a `float`
     # silently truncates (`int(1.5) == 1`) instead of raising. Both let a

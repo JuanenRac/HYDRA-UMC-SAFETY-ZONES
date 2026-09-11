@@ -156,7 +156,7 @@ def test_not_found() -> None:
 
 
 def test_oversized_json_request_is_rejected_before_parsing() -> None:
-    # Found in an ecosystem-wide software-improvements audit: this
+    # Found while auditing the code: this
     # endpoint used to read Content-Length bytes with no upper bound
     # before parsing - an oversized/malformed header let a caller force
     # unbounded memory buffering. Confirmed real against a live server,
