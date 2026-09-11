@@ -51,7 +51,7 @@ def test_parse_calibration_bad_max_age_raises():
         )
 
 
-# SAFE-01 (found in an ecosystem-wide software-improvements audit, P2):
+# SAFE-01 (P2):
 # int(True) == 1 and int(1.5) == 1 both used to sail through the old
 # `int(data["max_age_days"])` conversion as if they were genuinely valid
 # positive integers.
