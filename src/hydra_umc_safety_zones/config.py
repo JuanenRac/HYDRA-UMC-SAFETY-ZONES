@@ -18,6 +18,7 @@ from pathlib import Path
 from hydra_umc_safety_zones.breach import DetectedObject
 from hydra_umc_safety_zones.calibration import parse_calibration
 from hydra_umc_safety_zones.geometry import AABB, Point3D
+from hydra_umc_safety_zones.observation import ObservationStatus, parse_observation_status
 from hydra_umc_safety_zones.zones import Zone, ZoneLevel, ZoneSet
 
 
@@ -111,3 +112,11 @@ def load_detections(path: str | Path) -> tuple[DetectedObject, ...]:
     function's own docstring for the real JSON shape."""
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     return parse_detections(raw)
+
+
+def load_observation_status(path: str | Path) -> ObservationStatus:
+    """Reads `path` and parses it via `parse_observation_status`
+    (observation.py) - see that function's own docstring for the real
+    JSON shape."""
+    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    return parse_observation_status(raw)

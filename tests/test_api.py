@@ -43,6 +43,22 @@ def _detections(x, y, z):
     return {"objects": [{"id": "op1", "position": {"x": x, "y": y, "z": z}}]}
 
 
+def _observation(*, active=True, fresh=True, error=None):
+    # I32: real evidence that `detections` was actually produced by an
+    # active, recently-updated observer - see observation.py's own doc
+    # comment. `fresh=True` uses the real current instant (never "today
+    # at midnight", which could already be hours stale by the time a
+    # test actually runs); `fresh=False` uses a real, unambiguously old
+    # timestamp instead.
+    observed_at = datetime.now(timezone.utc).isoformat() if fresh else "2020-01-01T00:00:00+00:00"
+    return {
+        "active": active,
+        "observedAt": observed_at,
+        "maxAgeSeconds": 3600,
+        "error": error,
+    }
+
+
 def _post(url: str, body: dict) -> tuple[int, dict]:
     data = json.dumps(body).encode("utf-8")
     req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"}, method="POST")
@@ -77,7 +93,7 @@ def running_server() -> Iterator[str]:
 
 def test_check_no_breach_is_ready(tmp_path) -> None:
     with running_server() as base:
-        status, body = _post(f"{base}/check", {"zones": _zones(), "detections": _detections(50, 50, 50)})
+        status, body = _post(f"{base}/check", {"zones": _zones(), "detections": _detections(50, 50, 50), "observation": _observation()})
         assert status == 200
         assert body["state"] == "ready"
         assert body["breaches"] == []
@@ -90,7 +106,7 @@ def test_check_no_breach_is_ready(tmp_path) -> None:
 
 def test_check_warning_breach(tmp_path) -> None:
     with running_server() as base:
-        status, body = _post(f"{base}/check", {"zones": _zones(), "detections": _detections(5, 5, 5)})
+        status, body = _post(f"{base}/check", {"zones": _zones(), "detections": _detections(5, 5, 5), "observation": _observation()})
         assert status == 200
         assert body["state"] == "warning"
         assert len(body["breaches"]) == 1
@@ -104,12 +120,70 @@ def test_check_warning_breach(tmp_path) -> None:
 
 def test_check_danger_breach_requests_estop(tmp_path) -> None:
     with running_server() as base:
-        status, body = _post(f"{base}/check", {"zones": _zones(), "detections": _detections(1, 1, 1)})
+        status, body = _post(f"{base}/check", {"zones": _zones(), "detections": _detections(1, 1, 1), "observation": _observation()})
         assert status == 200
         assert body["state"] == "danger"
         assert len(body["breaches"]) >= 1
         assert len(body["estopRequests"]) >= 1
         assert body["sdkSafetyState"]["state"] == "SAFE_STOP"
+
+
+# --- I32: observer health must gate READY over real HTTP too ---
+
+
+def test_check_no_observation_field_inhibits_even_with_no_breach(tmp_path) -> None:
+    # The exact real anti-pattern this fix closes: a caller not yet
+    # updated to send "observation" at all (an old integration) must
+    # never silently get "ready" back just because the field is absent.
+    with running_server() as base:
+        status, body = _post(f"{base}/check", {"zones": _zones(), "detections": _detections(50, 50, 50)})
+        assert status == 200
+        assert body["state"] == "inhibited"
+        assert body["sdkSafetyState"]["state"] == "INHIBITED"
+
+
+def test_check_disabled_observer_inhibits_even_with_empty_detections(tmp_path) -> None:
+    # I32's own literal acceptance test over real HTTP: removing/never
+    # sending detections while the observer itself is disabled must not
+    # read as a confirmed-clear zone.
+    with running_server() as base:
+        status, body = _post(
+            f"{base}/check",
+            {"zones": _zones(), "detections": {"objects": []}, "observation": _observation(active=False)},
+        )
+        assert status == 200
+        assert body["state"] == "inhibited"
+        assert "disabled" in body["reason"]
+
+
+def test_check_stale_observation_inhibits(tmp_path) -> None:
+    with running_server() as base:
+        status, body = _post(
+            f"{base}/check",
+            {"zones": _zones(), "detections": {"objects": []}, "observation": _observation(fresh=False)},
+        )
+        assert status == 200
+        assert body["state"] == "inhibited"
+
+
+def test_check_observer_internal_error_inhibits(tmp_path) -> None:
+    with running_server() as base:
+        status, body = _post(
+            f"{base}/check",
+            {"zones": _zones(), "detections": {"objects": []}, "observation": _observation(error="camera driver disconnected")},
+        )
+        assert status == 200
+        assert body["state"] == "inhibited"
+        assert "camera driver disconnected" in body["reason"]
+
+
+def test_check_malformed_observation_returns_400(tmp_path) -> None:
+    with running_server() as base:
+        status, body = _post(
+            f"{base}/check",
+            {"zones": _zones(), "detections": _detections(50, 50, 50), "observation": {"active": "not-a-boolean"}},
+        )
+        assert status == 400
 
 
 def test_check_missing_calibration_inhibits(tmp_path) -> None:

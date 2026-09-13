@@ -10,6 +10,44 @@ by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
 `MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
 hand.
 
+## [0.0.9] - I32: explicit observer health now gated before any breach logic runs
+
+Real gap found while auditing the software-improvements backlog (I32):
+`evaluate_safety()` trusted `objects` unconditionally as long as
+calibration was fresh - an empty `objects` tuple was indistinguishable
+from a real, active observer confirming the cell clear. A detector
+process crashed, a camera unplugged, or a fresh boot with no observation
+received yet all silently read as `READY`, exactly like a genuinely
+confirmed-clear zone.
+
+New `observation.py` module (mirrors `calibration.py`'s own established
+shape): `ObservationStatus` (`active`, `observed_at`, `max_age_seconds`,
+`error`), `parse_observation_status()`, `observation_age_seconds()`,
+`is_observation_stale()` - never-observed, stale, or future-timestamped
+(clock skew) all fail safe as stale, same convention
+`is_calibration_expired()` already uses.
+
+`evaluate_safety()` gained an `observation: ObservationStatus | None`
+parameter, checked right after calibration and before any breach logic:
+no observation status at all, an observer reporting `active: false`, an
+observer reporting an internal `error`, or a stale observation all now
+resolve to `INHIBITED` with a specific, real reason naming the actual
+cause (age in seconds, the reported error text, etc.) instead of falling
+through to the breach check. A real, active, fresh observer confirming
+zero objects still resolves to `READY` - this closes the unsafe gap
+without turning a genuinely confirmed-clear zone into a permanent false
+alarm.
+
+Wired through `--observation PATH` (optional; omitting it always
+resolves to `INHIBITED`, never a silent `READY`) on the CLI's `check`
+subcommand, and an optional `"observation"` key on `serve`'s `POST
+/check` body. Also fixed a real pre-existing bug found while wiring this
+in: `main.py`'s `_run_check()` only ever caught `ConfigError`, so a
+malformed calibration block crashed the CLI with an uncaught traceback
+instead of the graceful `INHIBITED` result `api.py`'s own broader
+`except` clause already gave the HTTP surface - now both catch
+`ConfigError`/`CalibrationError`/`ObservationError` alike.
+
 ## [0.0.8] - F05: real HYDRA-UMC-SDK SafetyState now emitted alongside this module's own internal one
 
 Real gap found while auditing the code: HYDRA-UMC-SDK's own formal contract

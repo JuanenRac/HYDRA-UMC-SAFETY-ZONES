@@ -33,6 +33,7 @@
 * 🚦 **多段階ゾーン（v0）：** 軸に沿った 3D ボリューム上の実際の `Zone`/`ZoneLevel`（警告/危険）定義、およびゾーン集合と検知対象位置集合の間の実際の越境チェック（`check_breaches`）。
 * 🛑 **E-STOP リクエスト（v0、実行はしない）：** 最悪の越境が危険レベルであるすべての対象について、実際の `EStopRequest` が生成され、`EStopRequester` に渡されます——ここで物理的な停止を自ら実行するものが一切ない理由については、下記の設計上の境界を参照してください。
 * 🔒 **キャリブレーション鮮度の強制（v0）：** すべてのゾーン集合はオプションの `calibration`（バージョン、ソース、キャリブレーション日、最大許容日数）を持ちます。`evaluate_safety()` は越境ロジックを実行する**前に**それをチェックします——キャリブレーションが全く無いゾーン集合、自身の宣言した `max_age_days` より古いもの、あるいは未来の日付のものは、常に `INHIBITED` に解決され、検知対象がどのゾーンにも近づいていないという理由だけで黙って `READY` に流れ込むことは決してありません。
+* 👁️ **観測者健全性の強制(v0):** `evaluate_safety()` はオプションの `observation` ステータス(有効/無効、最終観測時刻、自身のエラー)も受け付けます—— [I32](docs/CLI_REFERENCE.md) 参照。観測エビデンスが全くない、観測者が無効化されている、観測者が内部エラーを報告している、または観測が古すぎる場合はすべて、越境ロジックが実行される前に `INHIBITED` に解決されます——キャリブレーション欠如とまったく同じです: クラッシュした検知器や起動直後の状態が、対象が報告されなかったというだけで黙って「確認済みでクリア」と読まれることは決してありません。
 * 🧮 **有限座標フェイルセーフ(v0):** `config.py` はゾーンまたは検知ファイル内の `NaN`/`Infinity`/`-Infinity` の `x`/`y`/`z` を、`evaluate_safety()` が実行される前に拒否し、実在の点を表せない座標で境界評価を行う代わりに直接 `INHIBITED`(終了コード `3`)に解決します。
 * 🌐 **JSON/HTTP API(v0.0.7):** `serve` サブコマンドは `check` とまったく同じロジック(`evaluate_safety()`/`check_breaches()`/`request_estop_for()`)を、stdlib の `http.server`(`POST /check`、`GET /stats`)経由でCLI以外の呼び出し元にも公開します。デフォルトはループバックのみで、`systemd/hydra-umc-safety-zones.service` ユニットと同じです。すべての実コマンド・フラグ・終了コードは [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) を参照してください。
 * 📐 **動的オクルージョン（計画中）：** ロボット自身の構造を安全トリガーから自動的にマスクし、ロボットが「自分自身」を侵入として検知しないようにします。
@@ -54,15 +55,20 @@
 **正直な現状確認 —— 今日実際に動くもの：** 実際のエントリポイント
 （`src/hydra_umc_safety_zones/main.py`）は、引数なしで呼び出された場合は
 これまで通り識別情報・バージョン・役割を表示しますが、今では実際の
-`check --zones パス --detections パス` サブコマンドも備えています：
-JSON からゾーン集合（ゾーン + オプションのキャリブレーションメタデータ）
-と検知対象位置を読み込み、まずキャリブレーションの鮮度をチェックしてから、
+`check --zones パス --detections パス [--observation パス]` サブコマンドも備えています：
+JSON からゾーン集合（ゾーン + オプションのキャリブレーションメタデータ）、
+検知対象位置、そしてオプションの観測ステータスを読み込み、まずキャリブレーションの
+鮮度をチェックしてから、観測者の健全性をチェックします（I32——観測ステータスが
+全くない、無効化/エラー/古すぎる観測者は、いずれもキャリブレーション欠落と
+まったく同じように `INHIBITED` に解決されます）。その後、
 実際の越境チェックを実行し、危険レベルの越境ごとに E-STOP をリクエストし、
 結果に応じて 0（Ready）/ 1（Warning）/ 2（Danger、E-STOP をリクエスト済み）
-/ 3（Inhibited——キャリブレーションが欠落または期限切れ）で終了します。
+/ 3（Inhibited——キャリブレーションが欠落/期限切れ、または観測者が欠落/
+無効化/古すぎる/エラー）で終了します。
 本当にまだ実際には存在しないもの：実際のハードウェア上
 でこれらの検知対象位置を生成する Hailo-8 セグメンテーション、自己遮蔽
-マスキング、そして E-STOP リクエストのための実際の CAN 伝送手段です。
+マスキング、`--observation` がその生存状態を報告する実際の観測者プロセス、
+そして E-STOP リクエストのための実際の CAN 伝送手段です。
 実際に出荷済みの内容は
 [`CHANGELOG.md`](CHANGELOG.md) を、まだ残っている作業は下記の「現在の
 状況と次のステップ」セクションを参照してください。
@@ -73,10 +79,10 @@ JSON からゾーン集合（ゾーン + オプションのキャリブレーシ
 
 下図は、本プロジェクトが構築を目指している目標データフローです。JSON
 ファイルから読み込んだ検知対象位置を起点として、図中の `CAL`（キャリブ
-レーションチェック）、`ZONE`（ゾーンチェック）とそれに続く警告/危険の
+レーションチェック）、`OBS`（観測者健全性チェック、I32）、`ZONE`（ゾーンチェック）とそれに続く警告/危険の
 分岐は、`evaluate_safety()`（`check_breaches()`/`request_estop_for()` を
 ラップ）によって駆動され、今日すでに実際に動作しています。
-`CAL`/`ZONE` より前（実際の Hailo-8 パイプライン）と `STOP` より後（実際の CAN
+`CAL`/`OBS`/`ZONE` より前（実際の Hailo-8 パイプライン、および `OBS` がその生存状態をチェックする実際の観測者プロセス）と `STOP` より後（実際の CAN
 伝送手段）はすべて、まだ今後の課題です。
 
 ```mermaid
@@ -85,7 +91,9 @@ flowchart TB
     SEG --> MAP["3D Occupancy Map - 計画中"]
     MAP --> CAL{"Calibration Fresh? - 実際の v0"}
     CAL -- No --> INHIBIT["INHIBITED - 実際の v0（フェイルセーフ）"]
-    CAL -- Yes --> ZONE{"Zone Check - 実際の v0"}
+    CAL -- Yes --> OBS{"Observer Active & Fresh? - 実際の v0（I32）"}
+    OBS -- No --> INHIBIT
+    OBS -- Yes --> ZONE{"Zone Check - 実際の v0"}
     ZONE -- Warning --> SLOW["Velocity Scaling Command - 計画中"]
     ZONE -- Danger --> STOP["CAN E-STOP Request - 実際の v0（リクエストのみ）"]
     SLOW --> CAN["HYDRA CAN Bus - 計画中"]
@@ -127,6 +135,7 @@ CM5 + Hailo-8 は市販のハードウェアであり、独自に設計する基
 * **ゾーンと検知データは YAML ではなく単純な JSON です** —— `pyproject.toml` の依存関係リストは依然として `[]` です。`json` は標準ライブラリの一部であり、`pyyaml` はシリアライズする価値のある実際のゾーン作成ツールが登場した時点での、実際の今後の課題です。
 * **キャリブレーションは越境ロジックより前にチェックされ、後には決してチェックされません** —— `evaluate_safety()` は、`check_breaches()` を呼び出す前に、キャリブレーションが欠落または期限切れになった瞬間に `INHIBITED` を返します。これは意図的です：キャリブレーションが古いということは、ゾーンジオメトリ自体が信頼できないことを意味するため、それに対して越境チェックを実行した結果もどのみち無意味です——キャリブレーションを先にチェックすることは、期限切れのキャリブレーションが、本物の危険越境のように見えるものより常に優先されることも意味します。その逆ではありません。
 * **`"calibration"` キーが欠落していても正常に読み込まれ、単に `INHIBITED` になるだけです** —— `load_zone_set()` は、ゾーンファイルがこの機能より前のものであったり、キャリブレーションメタデータなしで手書きされたりしたという理由だけではエラーを送出しません。読み込み時ではなく、評価時に安全に失敗するよう設計されています。
+* **`--observation`/`"observation"` はインターフェースレベルではオプションですが、安全レベルではそうではありません(I32)** —— それを一度も渡さない呼び出し元は、毎回正直な `INHIBITED` を得るだけで、クラッシュすることも黙って `READY` になることも決してありません。これにより、まだ更新されていない呼び出し元に対する後方互換性をパースレイヤーで維持しつつ、空の `objects` リストが実際にアクティブな観測者がセルのクリアを確認したことと区別できなかったという実際のギャップを閉じます。
 
 ---
 
@@ -139,12 +148,13 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── zones.py          # 実際の ZoneLevel/Zone/ZoneSet 定義
 │   ├── breach.py         # 実際のゾーン越境チェック
 │   ├── calibration.py    # 実際のキャリブレーション鮮度追跡
+│   ├── observation.py    # 実際の観測者健全性追跡(I32) —— calibration.py を反映
 │   ├── safety_state.py   # 実際のフェイルセーフ判定：READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py          # 実際の E-STOP リクエスト（実行は決してしない）
-│   ├── config.py         # ゾーン/検知データの実際の JSON 読み込み
+│   ├── config.py         # ゾーン/検知/観測データの実際の JSON 読み込み
 │   ├── api.py             # シンプルなJSON/HTTPサーフェス(stdlibのhttp.server)。実際の`check`ロジックを橋渡し
 │   └── main.py            # エントリポイント + 実際の `check` サブコマンド
-├── tests/                # 実際のテスト：幾何、越境、キャリブレーション、safety_state、estop、設定、api、CLI
+├── tests/                # 実際のテスト：幾何、越境、キャリブレーション、観測、safety_state、estop、設定、api、CLI
 ├── docs/                # ドキュメントと安全基準
 ├── build/               # ビルド出力（ローカルの .venv もここに存在）
 ├── images/              # メディアと図表
@@ -204,13 +214,15 @@ HYDRA-UMC-SAFETY-ZONES/
 引数なしで呼び出すと名前・バージョン・役割を表示します：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.0.8
+HYDRA-UMC-SAFETY-ZONES v0.0.9
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
 実際の `check` サブコマンドには、ゾーンファイルと検知ファイルの両方が
-必要で、どちらも単純な JSON です。`calibration` はゾーンファイル内でオプション
-です——それが無い場合に何が起きるかは以下を参照してください：
+必要で、どちらも単純な JSON です。さらにオプションの観測ステータス
+ファイルも使えます。`calibration` はゾーンファイル内でオプションで、
+コマンドラインの `--observation` もオプションです——それが無い場合に
+何が起きるかは以下を参照してください：
 
 ```json
 // zones.json
@@ -228,8 +240,14 @@ Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-worki
 {"objects": [{"id": "op1", "position": {"x": 0.5, "y": 0.5, "z": 0.5}}]}
 ```
 
+```json
+// observation.json - 上記の検知が実際にアクティブで最近更新された
+// 観測者から得られたものであるという実際のエビデンス(I32)
+{"active": true, "observedAt": "2024-01-15T12:00:00Z", "maxAgeSeconds": 5}
+```
+
 ```bash
-./run.sh check --zones zones.json --detections detections.json
+./run.sh check --zones zones.json --detections detections.json --observation observation.json
 ```
 
 ```text
@@ -240,14 +258,16 @@ E-STOP REQUESTED: object 'op1' breached danger zone 'danger1' (not asserted - se
 ```
 
 終了コードは `2`（危険、E-STOP をリクエスト済み）、`1`（警告レベルの
-越境のみ）、`0`（越境なし、キャリブレーション有効）、または `3`
-（**Inhibited**——キャリブレーションが欠落または期限切れ、越境ロジックより
+越境のみ）、`0`（越境なし、キャリブレーション有効、観測者がアクティブで
+新鮮）、または `3`
+（**Inhibited**——キャリブレーションが欠落/期限切れ、または観測者が欠落/
+無効化/古すぎる/エラー、越境ロジックより
 前にチェック）です。以下はフェイルセーフパスの実際の例です——上記と同じ
 `detections.json` を使い、`zones.json` には `"calibration"` キーが全く
 ありません：
 
 ```bash
-./run.sh check --zones zones_no_calibration.json --detections detections.json
+./run.sh check --zones zones_no_calibration.json --detections detections.json --observation observation.json
 ```
 
 ```text
@@ -256,21 +276,31 @@ SAFETY STATE: INHIBITED - no calibration metadata present - zone geometry cannot
 
 終了コードは `3` です——`op1` が両方のゾーン内にあるにもかかわらず、
 `BREACH`/`E-STOP` の出力が全く無いことに注目してください：信頼できない
-ゾーン集合は、越境チェックのステップに決して到達しません。
+ゾーン集合は、越境チェックのステップに決して到達しません。`--observation`
+を完全に省略した場合も、キャリブレーションが新鮮でどのゾーンにも対象が
+近づいていなくても、同じように安全に失敗します：
+
+```bash
+./run.sh check --zones zones.json --detections detections_clear.json
+```
+
+```text
+SAFETY STATE: INHIBITED - no observation status provided - cannot confirm the supplied detections reflect a real, active observer
+```
 
 ```bat
 :: Windows - 手順は同じ、バッチ構文
 build.bat
 run.bat
-run.bat check --zones zones.json --detections detections.json
+run.bat check --zones zones.json --detections detections.json --observation observation.json
 ```
 
-同じ `check` ロジックは、CLI以外の呼び出し元向けにHTTP経由でも利用できます—`zones`/`detections` はファイルパスではなくJSONボディで渡されます:
+同じ `check` ロジックは、CLI以外の呼び出し元向けにHTTP経由でも利用できます—`zones`/`detections`/`observation` はファイルパスではなくJSONボディで渡されます:
 
 ```bash
 ./run.sh serve --addr 127.0.0.1 --port 8108
 # 別のターミナルで:
-curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {...}}'
+curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {...}, "observation": {...}}'
 ```
 
 実際のコマンド・フラグ・終了コードの完全なリファレンス(実際の実行から採取した `READY`/`WARNING`/`DANGER`/`INHIBITED` の各状態を含む)は [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) を参照してください。
@@ -281,7 +311,7 @@ curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {
 * **`compileall` が失敗する** —— `src/` 下に実際の構文エラーが導入されたことを意味します。ビルドは意図的にインストールに触れることなく停止します。
 * **`run.sh`/`run.bat` が「`.venv` が見つかりません」と表示する** —— 先に少なくとも 1 回 `build.sh`/`build.bat` を実行してください。
 * **editable インストールが古いままになる** —— `.venv/` を削除して再構築してください。これが必要になることはまれです。
-* **`check` が非ゼロの終了コードで終わる** —— これは実際の正しい動作であり、失敗ではありません：`1` は警告レベルの越境のみが見つかったことを、`2` は危険レベルの越境が E-STOP をリクエストしたことを、`3` はゾーン集合のキャリブレーションが欠落または期限切れであること（フェイルセーフ、越境ロジックが実行される前にチェック）を意味します。Python のトレースバックや不正な JSON によるエラーだけが、実際のバグです。
+* **`check` が非ゼロの終了コードで終わる** —— これは実際の正しい動作であり、失敗ではありません：`1` は警告レベルの越境のみが見つかったことを、`2` は危険レベルの越境が E-STOP をリクエストしたことを、`3` はゾーン集合のキャリブレーションが欠落/期限切れであるか、観測者ステータスが欠落/無効化/古すぎる/エラーであること（フェイルセーフ、越境ロジックが実行される前にチェック）を意味します。Python のトレースバックや不正な JSON によるエラーだけが、実際のバグです。
 
 ---
 
