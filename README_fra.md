@@ -28,6 +28,7 @@ C'est l'un des 4 enfants de **[HYDRA-UMC-VISION-NODE](https://github.com/JuanenR
 * 🚦 **Zones multi-niveaux (v0) :** de vraies définitions `Zone`/`ZoneLevel` (Warning/Danger) sur des volumes 3D alignés sur les axes, et une vraie vérification des franchissements (`check_breaches`) entre un ensemble de zones et un ensemble de positions d'objets détectés.
 * 🛑 **Demande d'E-STOP (v0, sans déclenchement) :** tout objet dont le pire franchissement est Danger produit un vrai `EStopRequest`, remis à un `EStopRequester` - voir la frontière de conception ci-dessous pour le pourquoi de ce que rien ici ne déclenche jamais l'arrêt physique lui-même.
 * 🔒 **Application de la fraîcheur de calibration (v0) :** chaque ensemble de zones porte une `calibration` optionnelle (version, source, date de calibration, âge maximal en jours). `evaluate_safety()` la vérifie **avant** d'exécuter la moindre logique de franchissement - un ensemble de zones sans calibration du tout, plus ancien que son propre `max_age_days` déclaré, ou daté dans le futur, se résout toujours en `INHIBITED`, sans jamais retomber silencieusement sur `READY` simplement parce qu'aucun objet détecté n'est proche d'une zone.
+* 👁️ **Application de la santé de l'observateur (v0) :** `evaluate_safety()` accepte aussi un statut `observation` optionnel (actif/inactif, dernière heure d'observation, propre erreur) - voir [I32](docs/CLI_REFERENCE.md). Aucune évidence d'observation du tout, un observateur désactivé, une erreur signalée par l'observateur, ou une observation obsolète se résolvent tous en `INHIBITED` avant l'exécution de toute logique de franchissement - exactement comme une calibration manquante : un détecteur planté ou un démarrage frais ne doivent jamais être silencieusement lus comme « confirmé dégagé » simplement parce qu'aucun objet n'a été signalé.
 * 🧮 **Garde-fou des coordonnées finies (v0) :** `config.py` rejette tout `x`/`y`/`z` `NaN`/`Infinity`/`-Infinity` dans un fichier de zones ou de détections *avant* que `evaluate_safety()` ne s'exécute, se résolvant directement en `INHIBITED` (sortie `3`) plutôt que d'évaluer une frontière avec une coordonnée qui ne peut représenter un point réel.
 * 🌐 **API JSON/HTTP (v0.0.7) :** la sous-commande `serve` expose exactement la même logique que `check` (`evaluate_safety()`/`check_breaches()`/`request_estop_for()`) via un `http.server` de la stdlib (`POST /check`, `GET /stats`) pour les appelants autres que la CLI - loopback uniquement par défaut, comme l'unité `systemd/hydra-umc-safety-zones.service`. Voir [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) pour chaque commande, flag et code de sortie réel.
 * 📐 **Occlusion dynamique (prévu) :** masquer automatiquement la propre structure du robot des déclenchements de sécurité, pour que le robot ne se « détecte » pas lui-même comme une intrusion.
@@ -37,13 +38,13 @@ C'est l'un des 4 enfants de **[HYDRA-UMC-VISION-NODE](https://github.com/JuanenR
 
 **Une frontière de conception critique, déjà décidée et désormais renforcée dans le code :** ce projet ne fait que **détecter et demander** un E-STOP - il ne déclenche jamais lui-même le signal d'arrêt physique. Le seul requester réel d'`estop.py`, `NullEStopRequester`, enregistre ce qu'il aurait envoyé sans rien transmettre nulle part - il n'y a pas encore de vrai transport CAN dans ce dépôt, volontairement. Couper réellement l'alimentation moteur via CAN est la responsabilité de [HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC) (le firmware), sur du matériel construit pour ce rôle. Garder cette frontière là signifie qu'un bug dans ce service Python peut échouer à *demander* un arrêt, mais ne peut jamais *empêcher* le firmware de l'appliquer indépendamment.
 
-**Vérification d'honnêteté - ce qui fonctionne réellement aujourd'hui :** le point d'entrée réel (`src/hydra_umc_safety_zones/main.py`) affiche toujours identité/version/rôle sur un appel sans argument, mais dispose désormais aussi d'un vrai sous-commande `check --zones CHEMIN --detections CHEMIN` : il charge un ensemble de zones (zones + métadonnées de calibration optionnelles) et positions d'objets détectés depuis JSON, vérifie d'abord la fraîcheur de la calibration, puis exécute une vraie vérification des franchissements, demande des E-STOP pour chaque franchissement Danger, et se termine avec 0 (Ready) / 1 (Warning) / 2 (Danger, E-STOP demandé) / 3 (Inhibited - calibration absente ou expirée) selon le résultat. Ce qui n'est vraiment pas encore réel : la segmentation spatiale Hailo-8 qui produirait ces positions d'objets détectés sur du matériel réel, le masquage d'auto-occlusion, et tout transport CAN réel pour la demande d'E-STOP. Voir [`CHANGELOG.md`](CHANGELOG.md) pour ce qui a été livré exactement jusqu'à présent, et « État Actuel et Prochaines Étapes » ci-dessous pour ce qui reste ouvert.
+**Vérification d'honnêteté - ce qui fonctionne réellement aujourd'hui :** le point d'entrée réel (`src/hydra_umc_safety_zones/main.py`) affiche toujours identité/version/rôle sur un appel sans argument, mais dispose désormais aussi d'un vrai sous-commande `check --zones CHEMIN --detections CHEMIN [--observation CHEMIN]` : il charge un ensemble de zones (zones + métadonnées de calibration optionnelles), des positions d'objets détectés et un statut d'observation optionnel depuis JSON, vérifie d'abord la fraîcheur de la calibration, puis la santé de l'observateur (I32 - aucun statut d'observation, un observateur désactivé/en erreur/obsolète se résolvent tous en `INHIBITED` exactement comme une calibration manquante), puis exécute une vraie vérification des franchissements, demande des E-STOP pour chaque franchissement Danger, et se termine avec 0 (Ready) / 1 (Warning) / 2 (Danger, E-STOP demandé) / 3 (Inhibited - calibration absente/expirée, ou observateur absent/désactivé/obsolète/en erreur) selon le résultat. Ce qui n'est vraiment pas encore réel : la segmentation spatiale Hailo-8 qui produirait ces positions d'objets détectés sur du matériel réel, le masquage d'auto-occlusion, le vrai processus observateur dont `--observation` signale la vivacité, et tout transport CAN réel pour la demande d'E-STOP. Voir [`CHANGELOG.md`](CHANGELOG.md) pour ce qui a été livré exactement jusqu'à présent, et « État Actuel et Prochaines Étapes » ci-dessous pour ce qui reste ouvert.
 
 ---
 
 ## 2. 🔄 FLUX DE LOGIQUE DE SÉCURITÉ PRÉVU
 
-Le diagramme ci-dessous est le flux de données cible vers lequel ce projet est construit. `CAL` (vérification de calibration), `ZONE` (Vérification de Zone) et la répartition Warning/Danger qui suit sont réels aujourd'hui, pilotés par `evaluate_safety()` (qui enveloppe `check_breaches()`/`request_estop_for()`), à partir de positions d'objets détectés lues depuis un fichier JSON. Tout ce qui précède `CAL`/`ZONE` (le vrai pipeline Hailo-8) et suit `STOP` (le vrai transport CAN) reste du travail futur.
+Le diagramme ci-dessous est le flux de données cible vers lequel ce projet est construit. `CAL` (vérification de calibration), `OBS` (vérification de santé de l'observateur, I32), `ZONE` (Vérification de Zone) et la répartition Warning/Danger qui suit sont réels aujourd'hui, pilotés par `evaluate_safety()` (qui enveloppe `check_breaches()`/`request_estop_for()`), à partir de positions d'objets détectés lues depuis un fichier JSON. Tout ce qui précède `CAL`/`OBS`/`ZONE` (le vrai pipeline Hailo-8, et le vrai processus observateur dont `OBS` vérifie la vivacité) et suit `STOP` (le vrai transport CAN) reste du travail futur.
 
 ```mermaid
 flowchart TB
@@ -51,7 +52,9 @@ flowchart TB
     SEG --> MAP["Carte d'Occupation 3D - prévu"]
     MAP --> CAL{"Calibration Fraîche ? - réel v0"}
     CAL -- Non --> INHIBIT["INHIBITED - réel v0 (sécurité intrinsèque)"]
-    CAL -- Oui --> ZONE{"Vérification de Zone - réel v0"}
+    CAL -- Oui --> OBS{"Observateur Actif & Frais ? - réel v0 (I32)"}
+    OBS -- Non --> INHIBIT
+    OBS -- Oui --> ZONE{"Vérification de Zone - réel v0"}
     ZONE -- Warning --> SLOW["Commande de Réduction de Vitesse - prévu"]
     ZONE -- Danger --> STOP["Demande CAN d'E-STOP - réel v0 (demande seulement)"]
     SLOW --> CAN["Bus CAN HYDRA - prévu"]
@@ -80,6 +83,7 @@ CM5 + Hailo-8 est du matériel existant sur étagère sans carte propre à conce
 * **Zones et détections sont du JSON simple, pas du YAML** - la liste de dépendances de `pyproject.toml` reste `[]` ; `json` fait partie de la bibliothèque standard, `pyyaml` est un vrai travail futur une fois qu'il existera un outil d'édition de zones digne d'être sérialisé.
 * **La calibration est vérifiée avant toute logique de franchissement, jamais après** - `evaluate_safety()` renvoie `INHIBITED` dès que la calibration est absente ou expirée, avant même d'appeler `check_breaches()`. C'est délibéré : une calibration périmée signifie que la géométrie de zone elle-même n'est pas fiable, donc le résultat d'une vérification de franchissement contre elle serait tout aussi dénué de sens - vérifier la calibration en premier signifie aussi qu'une calibration expirée l'emporte toujours sur ce qui ressemblerait sinon à un vrai franchissement Danger, et non l'inverse.
 * **Une clé `"calibration"` absente se charge avec succès, cela signifie juste `INHIBITED`** - `load_zone_set()` ne lève jamais d'erreur simplement parce qu'un fichier de zones est antérieur à cette fonctionnalité ou a été écrit à la main sans métadonnées de calibration ; il échoue de façon sûre par conception au moment de l'évaluation, pas au chargement.
+* **`--observation`/`"observation"` est optionnel au niveau de l'interface, pas au niveau de la sécurité (I32)** - un appelant qui ne le passe jamais obtient un `INHIBITED` honnête à chaque fois, jamais un plantage et jamais un `READY` silencieux ; cela garde la couche de parsing rétrocompatible pour les appelants pas encore mis à jour tout en fermant la vraie lacune où une liste `objects` vide était indiscernable d'un vrai observateur actif confirmant la cellule dégagée.
 
 ---
 
@@ -92,12 +96,13 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── zones.py          # Vraies définitions ZoneLevel/Zone/ZoneSet
 │   ├── breach.py         # Vraie vérification des franchissements de zone
 │   ├── calibration.py    # Vrai suivi de la fraîcheur de calibration
+│   ├── observation.py    # Vrai suivi de la santé de l'observateur (I32) - reflète calibration.py
 │   ├── safety_state.py   # Vraie décision de sécurité intrinsèque : READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py          # Vraie demande d'E-STOP (jamais de déclenchement)
-│   ├── config.py         # Vrai chargement JSON pour zones/détections
+│   ├── config.py         # Vrai chargement JSON pour zones/détections/observation
 │   ├── api.py             # Surface JSON/HTTP simple (http.server de stdlib) sur la vraie logique `check`
 │   └── main.py            # Point d'entrée + vrai sous-commande `check`
-├── tests/                # Vrais tests : géométrie, franchissements, calibration, safety_state, estop, config, api, CLI
+├── tests/                # Vrais tests : géométrie, franchissements, calibration, observation, safety_state, estop, config, api, CLI
 ├── docs/                # Documentation et normes de sécurité
 ├── build/               # Sortie de build (le .venv local y vit aussi)
 ├── images/              # Médias et diagrammes
@@ -151,11 +156,11 @@ Localise l'interpréteur dans `.venv` et exécute `python -m hydra_umc_safety_zo
 L'appel sans argument affiche nom + version + rôle :
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.0.8
+HYDRA-UMC-SAFETY-ZONES v0.0.9
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
-Le vrai sous-commande `check` a besoin d'un fichier de zones et d'un fichier de détections, tous deux en JSON simple. `calibration` est optionnel dans le fichier de zones - voir ci-dessous ce qui se passe sans elle :
+Le vrai sous-commande `check` a besoin d'un fichier de zones et d'un fichier de détections, tous deux en JSON simple, plus un fichier de statut d'observation optionnel. `calibration` est optionnel dans le fichier de zones, et `--observation` est optionnel en ligne de commande - voir ci-dessous ce qui se passe sans eux :
 
 ```json
 // zones.json
@@ -173,8 +178,14 @@ Le vrai sous-commande `check` a besoin d'un fichier de zones et d'un fichier de 
 {"objects": [{"id": "op1", "position": {"x": 0.5, "y": 0.5, "z": 0.5}}]}
 ```
 
+```json
+// observation.json - vraie évidence que les détections ci-dessus proviennent
+// vraiment d'un observateur actif et récemment mis à jour (I32)
+{"active": true, "observedAt": "2024-01-15T12:00:00Z", "maxAgeSeconds": 5}
+```
+
 ```bash
-./run.sh check --zones zones.json --detections detections.json
+./run.sh check --zones zones.json --detections detections.json --observation observation.json
 ```
 
 ```text
@@ -184,31 +195,39 @@ BREACH: object 'op1' inside danger zone 'danger1'
 E-STOP REQUESTED: object 'op1' breached danger zone 'danger1' (not asserted - see estop.py)
 ```
 
-Se termine avec `2` (Danger, E-STOP demandé), `1` (franchissement Warning seulement), `0` (aucun franchissement, calibration valide), ou `3` (**Inhibited** - calibration absente ou expirée, vérifiée avant toute logique de franchissement). Exemple réel du chemin de sécurité intrinsèque - les mêmes `detections.json` ci-dessus, mais `zones.json` sans aucune clé `"calibration"` :
+Se termine avec `2` (Danger, E-STOP demandé), `1` (franchissement Warning seulement), `0` (aucun franchissement, calibration valide, observateur actif et frais), ou `3` (**Inhibited** - calibration absente/expirée, ou observateur absent/désactivé/obsolète/en erreur, vérifiée avant toute logique de franchissement). Exemple réel du chemin de sécurité intrinsèque - les mêmes `detections.json` ci-dessus, mais `zones.json` sans aucune clé `"calibration"` :
 
 ```bash
-./run.sh check --zones zones_no_calibration.json --detections detections.json
+./run.sh check --zones zones_no_calibration.json --detections detections.json --observation observation.json
 ```
 
 ```text
 SAFETY STATE: INHIBITED - no calibration metadata present - zone geometry cannot be trusted
 ```
 
-Sortie `3` - notez qu'il n'y a aucune sortie `BREACH`/`E-STOP` du tout, même si `op1` se trouve à l'intérieur des deux zones : un ensemble de zones non fiable n'atteint jamais l'étape de vérification des franchissements.
+Sortie `3` - notez qu'il n'y a aucune sortie `BREACH`/`E-STOP` du tout, même si `op1` se trouve à l'intérieur des deux zones : un ensemble de zones non fiable n'atteint jamais l'étape de vérification des franchissements. Omettre entièrement `--observation` échoue de la même façon sûre, même avec une calibration fraîche et aucun objet proche d'une zone :
+
+```bash
+./run.sh check --zones zones.json --detections detections_clear.json
+```
+
+```text
+SAFETY STATE: INHIBITED - no observation status provided - cannot confirm the supplied detections reflect a real, active observer
+```
 
 ```bat
 :: Windows - mêmes étapes, syntaxe batch
 build.bat
 run.bat
-run.bat check --zones zones.json --detections detections.json
+run.bat check --zones zones.json --detections detections.json --observation observation.json
 ```
 
-La même logique `check` est aussi accessible en HTTP, pour les appelants autres que la CLI - `zones`/`detections` voyagent dans le corps JSON plutôt qu'un chemin de fichier :
+La même logique `check` est aussi accessible en HTTP, pour les appelants autres que la CLI - `zones`/`detections`/`observation` voyagent dans le corps JSON plutôt qu'un chemin de fichier :
 
 ```bash
 ./run.sh serve --addr 127.0.0.1 --port 8108
 # dans un autre terminal :
-curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {...}}'
+curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {...}, "observation": {...}}'
 ```
 
 Voir [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) pour la référence complète des commandes, flags et codes de sortie, incluant chaque état réel (`READY`/`WARNING`/`DANGER`/`INHIBITED`) capturé lors d'une exécution réelle.
@@ -219,7 +238,7 @@ Voir [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) pour la référence compl�
 * **`compileall` échoue** - une vraie erreur de syntaxe a été introduite sous `src/` ; le build s'arrête sans toucher à l'installation, volontairement.
 * **« No `.venv` found » depuis `run.sh`/`run.bat`** - exécutez `build.sh`/`build.bat` au moins une fois avant.
 * **Installation éditable obsolète** - supprimez `.venv/` et reconstruisez ; rarement nécessaire.
-* **`check` se termine avec un code non nul** - c'est un comportement réel et correct, pas un échec : `1` signifie qu'un franchissement Warning seulement a été trouvé, `2` signifie qu'un franchissement Danger a demandé un E-STOP, `3` signifie que la calibration de l'ensemble de zones est absente ou expirée (sécurité intrinsèque, vérifiée avant que toute logique de franchissement ne s'exécute). Seul un traceback Python ou une erreur de JSON malformé est un vrai bug.
+* **`check` se termine avec un code non nul** - c'est un comportement réel et correct, pas un échec : `1` signifie qu'un franchissement Warning seulement a été trouvé, `2` signifie qu'un franchissement Danger a demandé un E-STOP, `3` signifie que la calibration de l'ensemble de zones est absente/expirée ou que le statut de l'observateur est absent/désactivé/obsolète/en erreur (sécurité intrinsèque, vérifiée avant que toute logique de franchissement ne s'exécute). Seul un traceback Python ou une erreur de JSON malformé est un vrai bug.
 
 ---
 

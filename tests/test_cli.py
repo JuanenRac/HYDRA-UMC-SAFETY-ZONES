@@ -59,6 +59,20 @@ def _write_detections(tmp_path, x, y, z):
     return path
 
 
+def _write_observation(tmp_path, *, active=True, fresh=True, error=None, filename="observation.json"):
+    # I32: real evidence that `detections` was actually produced by an
+    # active, recently-updated observer. `fresh=True` uses the real
+    # current instant (never a fixed "today at midnight", which could
+    # already be stale by the time a test actually runs).
+    observed_at = datetime.now(timezone.utc).isoformat() if fresh else "2020-01-01T00:00:00+00:00"
+    path = tmp_path / filename
+    path.write_text(
+        json.dumps({"active": active, "observedAt": observed_at, "maxAgeSeconds": 3600, "error": error}),
+        encoding="utf-8",
+    )
+    return path
+
+
 def test_bare_invocation_prints_identity_and_exits_zero(capsys):
     exit_code = main([])
     out = capsys.readouterr().out
@@ -69,7 +83,8 @@ def test_bare_invocation_prints_identity_and_exits_zero(capsys):
 def test_check_no_breach_exits_zero(tmp_path, capsys):
     zones = _write_zones(tmp_path)
     detections = _write_detections(tmp_path, 50, 50, 50)
-    exit_code = main(["check", "--zones", str(zones), "--detections", str(detections)])
+    observation = _write_observation(tmp_path)
+    exit_code = main(["check", "--zones", str(zones), "--detections", str(detections), "--observation", str(observation)])
     out = capsys.readouterr().out
     assert exit_code == 0
     assert "SAFETY STATE: READY" in out
@@ -78,7 +93,8 @@ def test_check_no_breach_exits_zero(tmp_path, capsys):
 def test_check_warning_breach_exits_one(tmp_path, capsys):
     zones = _write_zones(tmp_path)
     detections = _write_detections(tmp_path, 5, 5, 5)
-    exit_code = main(["check", "--zones", str(zones), "--detections", str(detections)])
+    observation = _write_observation(tmp_path)
+    exit_code = main(["check", "--zones", str(zones), "--detections", str(detections), "--observation", str(observation)])
     out = capsys.readouterr().out
     assert exit_code == 1
     assert "SAFETY STATE: WARNING" in out
@@ -89,12 +105,53 @@ def test_check_warning_breach_exits_one(tmp_path, capsys):
 def test_check_danger_breach_exits_two_and_requests_estop(tmp_path, capsys):
     zones = _write_zones(tmp_path)
     detections = _write_detections(tmp_path, 1, 1, 1)
-    exit_code = main(["check", "--zones", str(zones), "--detections", str(detections)])
+    observation = _write_observation(tmp_path)
+    exit_code = main(["check", "--zones", str(zones), "--detections", str(detections), "--observation", str(observation)])
     out = capsys.readouterr().out
     assert exit_code == 2
     assert "SAFETY STATE: DANGER" in out
     assert "danger zone 'danger1'" in out
     assert "E-STOP REQUESTED" in out
+
+
+# --- I32: observer health must gate READY over the CLI too ---
+
+
+def test_check_without_observation_flag_inhibits_even_with_no_breach(tmp_path, capsys):
+    # The exact real anti-pattern this fix closes: omitting --observation
+    # entirely (an old script not yet updated) must never silently
+    # resolve to READY just because the flag wasn't given.
+    zones = _write_zones(tmp_path)
+    detections = _write_detections(tmp_path, 50, 50, 50)
+    exit_code = main(["check", "--zones", str(zones), "--detections", str(detections)])
+    out = capsys.readouterr().out
+    assert exit_code == 3
+    assert "SAFETY STATE: INHIBITED" in out
+    assert "no observation status" in out
+
+
+def test_check_disabled_observer_inhibits_regardless_of_empty_detections(tmp_path, capsys):
+    # I32's own literal acceptance test over the real CLI.
+    zones = _write_zones(tmp_path)
+    detections = tmp_path / "empty-detections.json"
+    detections.write_text(json.dumps({"objects": []}), encoding="utf-8")
+    observation = _write_observation(tmp_path, active=False)
+    exit_code = main(["check", "--zones", str(zones), "--detections", str(detections), "--observation", str(observation)])
+    out = capsys.readouterr().out
+    assert exit_code == 3
+    assert "SAFETY STATE: INHIBITED" in out
+    assert "disabled" in out
+
+
+def test_check_stale_observation_inhibits(tmp_path, capsys):
+    zones = _write_zones(tmp_path)
+    detections = tmp_path / "empty-detections.json"
+    detections.write_text(json.dumps({"objects": []}), encoding="utf-8")
+    observation = _write_observation(tmp_path, fresh=False)
+    exit_code = main(["check", "--zones", str(zones), "--detections", str(detections), "--observation", str(observation)])
+    out = capsys.readouterr().out
+    assert exit_code == 3
+    assert "SAFETY STATE: INHIBITED" in out
 
 
 def test_check_missing_calibration_inhibits_regardless_of_position(tmp_path, capsys):

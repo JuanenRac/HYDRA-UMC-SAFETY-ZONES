@@ -24,8 +24,10 @@ from importlib.metadata import PackageNotFoundError, version
 
 from hydra_umc_safety_zones.api import SafetyZonesServer
 from hydra_umc_safety_zones.breach import check_breaches
-from hydra_umc_safety_zones.config import ConfigError, load_detections, load_zone_set
+from hydra_umc_safety_zones.calibration import CalibrationError
+from hydra_umc_safety_zones.config import ConfigError, load_detections, load_observation_status, load_zone_set
 from hydra_umc_safety_zones.estop import NullEStopRequester, request_estop_for
+from hydra_umc_safety_zones.observation import ObservationError
 from hydra_umc_safety_zones.safety_state import SafetyState, evaluate_safety
 
 PROJECT_NAME = "HYDRA-UMC-SAFETY-ZONES"
@@ -50,18 +52,25 @@ def get_version() -> str:
         return "0.0.0-dev (package not installed - run build.sh/build.bat first)"
 
 
-def _run_check(zones_path: str, detections_path: str) -> int:
+def _run_check(zones_path: str, detections_path: str, observation_path: str | None) -> int:
     try:
         zone_set = load_zone_set(zones_path)
         objects = load_detections(detections_path)
-    except ConfigError as exc:
-        # Invalid spatial data is as untrustworthy as stale calibration: never
-        # fall through to READY or evaluate a boundary with NaN coordinates.
+        # I32: real, required-in-spirit observer evidence - see
+        # evaluate_safety()'s own fail-safe default (None -> INHIBITED)
+        # for why this stays an optional CLI flag rather than a hard
+        # argparse requirement: a caller that omits it gets an honest,
+        # visible INHIBITED result, not a crash and not a silent READY.
+        observation = load_observation_status(observation_path) if observation_path else None
+    except (ConfigError, CalibrationError, ObservationError) as exc:
+        # Invalid spatial/calibration/observation data is as untrustworthy
+        # as stale calibration: never fall through to READY or evaluate a
+        # boundary with NaN coordinates or unverifiable evidence.
         print(f"SAFETY STATE: INHIBITED - invalid safety configuration: {exc}")
         return 3
     today = datetime.now(timezone.utc).date()
 
-    evaluation = evaluate_safety(zone_set, objects, today)
+    evaluation = evaluate_safety(zone_set, objects, today, observation)
     print(f"SAFETY STATE: {evaluation.state.value.upper()} - {evaluation.reason}")
 
     if evaluation.state is SafetyState.INHIBITED:
@@ -112,6 +121,14 @@ def build_parser() -> argparse.ArgumentParser:
     check_parser.add_argument(
         "--detections", required=True, help="Path to a detected-objects JSON file."
     )
+    check_parser.add_argument(
+        "--observation",
+        required=False,
+        help="Path to an observation-status JSON file (I32) - real evidence the "
+             "supplied detections were actually produced by an active, recently-"
+             "updated observer. Omitting this always resolves to INHIBITED, never "
+             "a silent READY - see evaluate_safety()'s own fail-safe default.",
+    )
 
     serve_parser = subparsers.add_parser(
         "serve",
@@ -131,7 +148,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args.command == "check":
-        return _run_check(args.zones, args.detections)
+        return _run_check(args.zones, args.detections, args.observation)
     if args.command == "serve":
         return _run_serve(args.addr, args.port)
 

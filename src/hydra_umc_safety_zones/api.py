@@ -27,6 +27,7 @@ from urllib.parse import urlparse
 from .breach import check_breaches
 from .config import ConfigError, parse_detections, parse_zone_set
 from .estop import NullEStopRequester, request_estop_for
+from .observation import ObservationError, parse_observation_status
 from .safety_state import SafetyState, evaluate_safety, to_sdk_safety_state
 
 
@@ -103,15 +104,22 @@ class Handler(BaseHTTPRequestHandler):
         try:
             zone_set = parse_zone_set(body["zones"])
             objects = parse_detections(body["detections"])
+            # I32: an "observation" key at all is optional in the request
+            # body (a caller not yet updated to send it must not get a
+            # hard 400 for a field that didn't exist before this fix) -
+            # but omitting it always resolves to INHIBITED, never a
+            # silent READY, via evaluate_safety()'s own fail-safe default.
+            observation_raw = body.get("observation")
+            observation = parse_observation_status(observation_raw) if observation_raw is not None else None
         except KeyError as e:
             _write_error(self, 400, f"missing required field: {e}")
             return
-        except (ConfigError, KeyError, TypeError, ValueError) as e:
+        except (ConfigError, ObservationError, KeyError, TypeError, ValueError) as e:
             _write_error(self, 400, f"invalid safety configuration: {e}")
             return
 
         today = datetime.now(timezone.utc).date()
-        evaluation = evaluate_safety(zone_set, objects, today)
+        evaluation = evaluate_safety(zone_set, objects, today, observation)
 
         response: dict = {
             "state": evaluation.state.value,

@@ -4,13 +4,16 @@
 # GPL-3.0 - see LICENSE
 # =============================================================================
 """Combines zone-breach checking with calibration-freshness enforcement
-into the single real fail-safe decision the README's E-STOP orchestration
-depends on: a `ZoneSet` whose geometry cannot currently be trusted must
-resolve to INHIBITED, never fall through and silently report READY as if
-nothing were wrong. This module is the one place that decision gets made,
-so no other service in the ecosystem has to invent its own criteria for
-"what counts as INHIBITED" (see the module docstring in estop.py for the
-matching detect-vs-enforce boundary on the E-STOP side).
+AND observer-health enforcement (I32) into the single real fail-safe
+decision the README's E-STOP orchestration depends on: a `ZoneSet` whose
+geometry cannot currently be trusted, or a set of `objects` not actually
+backed by a real, active, fresh observer, must both resolve to
+INHIBITED - never fall through and silently report READY as if nothing
+were wrong. This module is the one place that decision gets made, so no
+other service in the ecosystem has to invent its own criteria for "what
+counts as INHIBITED" (see the module docstring in estop.py for the
+matching detect-vs-enforce boundary on the E-STOP side, and in
+observation.py for exactly what "a real, active, fresh observer" means).
 """
 from __future__ import annotations
 
@@ -20,6 +23,7 @@ from enum import Enum
 
 from hydra_umc_safety_zones.breach import DetectedObject, check_breaches, worst_level_per_object
 from hydra_umc_safety_zones.calibration import calibration_age_days, is_calibration_expired
+from hydra_umc_safety_zones.observation import ObservationStatus, is_observation_stale, observation_age_seconds
 from hydra_umc_safety_zones.zones import ZoneLevel, ZoneSet
 
 
@@ -46,13 +50,26 @@ class SafetyEvaluation:
 
 
 def evaluate_safety(
-    zone_set: ZoneSet, objects: tuple[DetectedObject, ...], today: date
+    zone_set: ZoneSet,
+    objects: tuple[DetectedObject, ...],
+    today: date,
+    observation: ObservationStatus | None = None,
+    now: datetime | None = None,
 ) -> SafetyEvaluation:
     """The one real entry point that decides READY/WARNING/DANGER/INHIBITED.
 
     Calibration is checked FIRST, before any breach logic runs - a missing
     or expired calibration always wins over what the (untrusted) geometry
-    would otherwise report, by design.
+    would otherwise report, by design. Observer health is checked SECOND,
+    still before any breach logic - I32's own real fix: an empty
+    `objects` tuple must never be trusted as "confirmed clear" unless a
+    real, active, fresh observer is what actually produced it.
+
+    `observation` defaults to `None` - fail-safe, same choice
+    `zone_set.calibration` already makes: a caller that does not supply
+    real observer evidence gets INHIBITED, never silently treated as
+    "must be fine". `now` defaults to the real UTC clock; only ever
+    overridden by a test.
     """
     if zone_set.calibration is None:
         return SafetyEvaluation(
@@ -66,6 +83,34 @@ def evaluate_safety(
             f"calibration '{zone_set.calibration.version}' (source="
             f"{zone_set.calibration.source}) is {age} day(s) old, exceeds "
             f"max_age_days={zone_set.calibration.max_age_days}",
+        )
+
+    if observation is None:
+        return SafetyEvaluation(
+            SafetyState.INHIBITED,
+            "no observation status provided - cannot confirm the supplied detections reflect a real, active observer",
+        )
+    if observation.error is not None:
+        return SafetyEvaluation(
+            SafetyState.INHIBITED,
+            f"observer reported an internal error: {observation.error}",
+        )
+    if not observation.active:
+        return SafetyEvaluation(
+            SafetyState.INHIBITED,
+            "tracking observer is disabled - dependent functions are inhibited",
+        )
+    effective_now = now if now is not None else datetime.now(timezone.utc)
+    if is_observation_stale(observation, effective_now):
+        age = observation_age_seconds(observation, effective_now)
+        if age is None:
+            return SafetyEvaluation(
+                SafetyState.INHIBITED,
+                "no real observation has been received yet this session - a prior safe state is never reused without a new one",
+            )
+        return SafetyEvaluation(
+            SafetyState.INHIBITED,
+            f"last real observation is {age:.1f}s old, exceeds max_age_seconds={observation.max_age_seconds}",
         )
 
     breaches = check_breaches(zone_set.zones, objects)

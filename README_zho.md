@@ -32,6 +32,7 @@
 * 🚦 **多级区域（v0）：** 真实的 `Zone`/`ZoneLevel`（警告/危险）定义，作用于轴对齐的 3D 体积，以及区域集合与检测对象位置集合之间的真实越界检查（`check_breaches`）。
 * 🛑 **E-STOP 请求（v0，不执行）：** 任何最严重越界为"危险"级别的对象都会生成一个真实的 `EStopRequest`，交给 `EStopRequester`——具体为何本项目中的任何部分都从不自行执行物理停止，见下方的设计边界。
 * 🔒 **校准新鲜度强制检查（v0）：** 每个区域集合都携带一个可选的 `calibration`（版本、来源、校准日期、最大有效天数）。`evaluate_safety()` 会在执行任何越界逻辑**之前**先检查它——完全没有校准信息的区域集合、比自身声明的 `max_age_days` 更旧的校准、或日期在未来的校准，始终会解析为 `INHIBITED`，绝不会仅因为没有检测对象靠近某个区域就悄悄退回到 `READY`。
+* 👁️ **观测者健康强制检查(v0):** `evaluate_safety()` 还接受一个可选的 `observation` 状态(活动/非活动、最后观测时间、自身错误)——见 [I32](docs/CLI_REFERENCE.md)。完全没有观测证据、观测者被禁用、观测者报告了内部错误,或观测已过期,都会在任何越界逻辑运行之前解析为 `INHIBITED`——与校准缺失完全一样:崩溃的检测器或刚启动的系统绝不能因为没有报告任何对象就被悄悄读作"确认已清空"。
 * 🧮 **有限坐标故障保护(v0):** `config.py` 会在 `evaluate_safety()` 运行前拒绝区域或检测文件中任何 `NaN`/`Infinity`/`-Infinity` 的 `x`/`y`/`z` 值,直接解析为 `INHIBITED`(退出码 `3`),而不是用一个无法代表真实点的坐标去评估边界。
 * 🌐 **JSON/HTTP API(v0.0.7):** `serve` 子命令通过 stdlib 的 `http.server`(`POST /check`、`GET /stats`)对外暴露与 `check` 完全相同的逻辑(`evaluate_safety()`/`check_breaches()`/`request_estop_for()`),供非 CLI 调用方使用。默认仅限本地回环,与 `systemd/hydra-umc-safety-zones.service` 单元一致。完整的真实命令、参数和退出码请见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。
 * 📐 **动态遮挡（计划中）：** 自动将机器人自身结构从安全触发中屏蔽，使机器人不会将"自身"检测为入侵。
@@ -48,12 +49,16 @@ Python 服务中的一个漏洞可能导致*未能请求*停止，但绝不可�
 
 **诚实说明——今天实际运行的内容：** 无参数调用时，真正的入口点
 （`src/hydra_umc_safety_zones/main.py`）仍会打印项目名称、已安装的版本号
-及角色说明，但现在还新增了一个真实的 `check --zones 路径 --detections 路径`
-子命令：从 JSON 加载区域集合（区域 + 可选的校准元数据）与检测对象位置，
-先检查校准新鲜度，再执行真实的越界检查，为每个"危险"越界请求 E-STOP，
+及角色说明，但现在还新增了一个真实的 `check --zones 路径 --detections 路径 [--observation 路径]`
+子命令：从 JSON 加载区域集合（区域 + 可选的校准元数据）、检测对象位置，以及
+可选的观测状态，先检查校准新鲜度，再检查观测者健康状况（I32——完全没有
+观测状态、观测者被禁用/出错/过期，都会像校准缺失一样解析为 `INHIBITED`），
+再执行真实的越界检查，为每个"危险"越界请求 E-STOP，
 并根据结果以 0（Ready）/ 1（Warning）/ 2（Danger，已请求 E-STOP）/
-3（Inhibited——校准缺失或已过期）退出。真正尚未实现的内容：
-在真实硬件上产生这些检测对象位置的 Hailo-8 空间分割、自身遮挡屏蔽，以及
+3（Inhibited——校准缺失/已过期，或观测者缺失/被禁用/已过期/出错）退出。
+真正尚未实现的内容：
+在真实硬件上产生这些检测对象位置的 Hailo-8 空间分割、自身遮挡屏蔽、
+`--observation` 所报告其存活状态的真实观测者进程，以及
 用于 E-STOP 请求的任何真实 CAN 传输。具体已交付内容请
 参见 [`CHANGELOG.md`](CHANGELOG.md)，尚待完成的内容请参见下方"当前状态
 与后续步骤"章节。
@@ -63,9 +68,9 @@ Python 服务中的一个漏洞可能导致*未能请求*停止，但绝不可�
 ## 2. 🔄 目标安全逻辑流程
 
 下图是本项目正朝其构建的目标数据流。给定从 JSON 文件读取的检测对象位置，
-图中的 `CAL`（校准检查）、`ZONE`（区域检查）及其后的警告/危险分流，由
+图中的 `CAL`（校准检查）、`OBS`（观测者健康检查，I32）、`ZONE`（区域检查）及其后的警告/危险分流，由
 `evaluate_safety()`（包装了 `check_breaches()`/`request_estop_for()`）驱动，
-今天已是真实的。`CAL`/`ZONE` 之前的一切（真实的 Hailo-8 流水线）和 `STOP`
+今天已是真实的。`CAL`/`OBS`/`ZONE` 之前的一切（真实的 Hailo-8 流水线，以及 `OBS` 检查其存活状态的真实观测者进程）和 `STOP`
 之后的一切（真实的 CAN 传输）仍是未来工作。
 
 ```mermaid
@@ -74,7 +79,9 @@ flowchart TB
     SEG --> MAP["3D Occupancy Map - 计划中"]
     MAP --> CAL{"Calibration Fresh? - 真实 v0"}
     CAL -- No --> INHIBIT["INHIBITED - 真实 v0（故障安全）"]
-    CAL -- Yes --> ZONE{"Zone Check - 真实 v0"}
+    CAL -- Yes --> OBS{"Observer Active & Fresh? - 真实 v0（I32）"}
+    OBS -- No --> INHIBIT
+    OBS -- Yes --> ZONE{"Zone Check - 真实 v0"}
     ZONE -- Warning --> SLOW["Velocity Scaling Command - 计划中"]
     ZONE -- Danger --> STOP["CAN E-STOP Request - 真实 v0（仅请求）"]
     SLOW --> CAN["HYDRA CAN Bus - 计划中"]
@@ -111,6 +118,7 @@ Node 系列的其他项目一样——这里不存在 `hardware/`/`firmware/` �
 * **区域与检测数据使用纯 JSON，而非 YAML** —— `pyproject.toml` 的依赖列表仍为 `[]`；`json` 属于标准库，`pyyaml` 是真正的未来工作，等到出现值得为其序列化的真实区域编辑工具时再引入。
 * **校准检查在任何越界逻辑之前执行，绝不在之后** —— `evaluate_safety()` 会在校准缺失或过期的那一刻立即返回 `INHIBITED`，甚至在调用 `check_breaches()` 之前。这是刻意为之：过期的校准意味着区域几何本身已不可信，因此针对它运行越界检查的结果同样毫无意义——先检查校准也意味着过期的校准始终会胜过看起来像真实"危险"越界的结果，而不是反过来。
 * **缺少 `"calibration"` 键仍可成功加载，只是意味着 `INHIBITED`** —— `load_zone_set()` 绝不会仅因为某个区域文件早于此功能存在、或是手写而没有校准元数据就抛出错误；它按设计在评估阶段安全失败，而不是在加载阶段失败。
+* **`--observation`/`"observation"` 仅在接口层面是可选的，在安全层面并非如此(I32)** —— 从不传递它的调用方每次都会得到一个诚实的 `INHIBITED`，绝不会崩溃，也绝不会悄悄得到 `READY`；这在为尚未更新的调用方保持解析层向后兼容的同时，关闭了空 `objects` 列表与真实、活动的观测者确认单元已清空这两种情况无法区分的真实漏洞。
 
 ---
 
@@ -123,12 +131,13 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── zones.py          # 真实的 ZoneLevel/Zone/ZoneSet 定义
 │   ├── breach.py         # 真实的区域越界检查
 │   ├── calibration.py    # 真实的校准新鲜度跟踪
+│   ├── observation.py    # 真实的观测者健康跟踪(I32) - 镜像 calibration.py
 │   ├── safety_state.py   # 真实的故障安全决策：READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py          # 真实的 E-STOP 请求（从不执行）
-│   ├── config.py         # 真实的区域/检测 JSON 加载
+│   ├── config.py         # 真实的区域/检测/观测 JSON 加载
 │   ├── api.py             # 简洁的 JSON/HTTP 接口(基于 stdlib http.server),桥接真实的 `check` 逻辑
 │   └── main.py            # 入口点 + 真实的 `check` 子命令
-├── tests/                # 真实测试：几何、越界、校准、safety_state、estop、配置、api、CLI
+├── tests/                # 真实测试：几何、越界、校准、观测、safety_state、estop、配置、api、CLI
 ├── docs/                # 文档与安全标准
 ├── build/               # 构建输出（本地 .venv 也存放于此）
 ├── images/              # 媒体与图表
@@ -186,12 +195,13 @@ HYDRA-UMC-SAFETY-ZONES/
 无参数调用会打印名称 + 版本 + 角色：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.0.8
+HYDRA-UMC-SAFETY-ZONES v0.0.9
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
-真实的 `check` 子命令需要一个区域文件和一个检测文件，均为纯 JSON。`calibration`
-在区域文件中是可选的——没有它会发生什么见下文：
+真实的 `check` 子命令需要一个区域文件和一个检测文件，均为纯 JSON，外加一个
+可选的观测状态文件。`calibration` 在区域文件中是可选的，命令行的 `--observation`
+也是可选的——没有它们会发生什么见下文：
 
 ```json
 // zones.json
@@ -209,8 +219,14 @@ Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-worki
 {"objects": [{"id": "op1", "position": {"x": 0.5, "y": 0.5, "z": 0.5}}]}
 ```
 
+```json
+// observation.json - 真实证据，证明上面的检测确实来自一个活动的、
+// 最近更新过的观测者(I32)
+{"active": true, "observedAt": "2024-01-15T12:00:00Z", "maxAgeSeconds": 5}
+```
+
 ```bash
-./run.sh check --zones zones.json --detections detections.json
+./run.sh check --zones zones.json --detections detections.json --observation observation.json
 ```
 
 ```text
@@ -221,12 +237,13 @@ E-STOP REQUESTED: object 'op1' breached danger zone 'danger1' (not asserted - se
 ```
 
 退出码为 `2`（危险，已请求 E-STOP）、`1`（仅警告级越界）、`0`（无越界，校准
-有效）或 `3`（**Inhibited**——校准缺失或已过期，在任何越界逻辑之前检查）。
+有效，观测者活动且新鲜）或 `3`（**Inhibited**——校准缺失/已过期，或观测者
+缺失/被禁用/已过期/出错，在任何越界逻辑之前检查）。
 以下是故障安全路径的真实示例——使用上面同样的 `detections.json`，但
 `zones.json` 完全没有 `"calibration"` 键：
 
 ```bash
-./run.sh check --zones zones_no_calibration.json --detections detections.json
+./run.sh check --zones zones_no_calibration.json --detections detections.json --observation observation.json
 ```
 
 ```text
@@ -234,21 +251,30 @@ SAFETY STATE: INHIBITED - no calibration metadata present - zone geometry cannot
 ```
 
 退出码为 `3`——注意完全没有 `BREACH`/`E-STOP` 输出，即使 `op1` 同时位于两个
-区域内：不可信的区域集合永远不会到达越界检查这一步。
+区域内：不可信的区域集合永远不会到达越界检查这一步。完全省略 `--observation`
+也会同样安全地失败，即使校准新鲜且没有对象靠近任何区域：
+
+```bash
+./run.sh check --zones zones.json --detections detections_clear.json
+```
+
+```text
+SAFETY STATE: INHIBITED - no observation status provided - cannot confirm the supplied detections reflect a real, active observer
+```
 
 ```bat
 :: Windows - 步骤相同，批处理语法
 build.bat
 run.bat
-run.bat check --zones zones.json --detections detections.json
+run.bat check --zones zones.json --detections detections.json --observation observation.json
 ```
 
-同样的 `check` 逻辑也可以通过 HTTP 访问,供非 CLI 调用方使用——`zones`/`detections` 通过 JSON 请求体传递,而不是文件路径:
+同样的 `check` 逻辑也可以通过 HTTP 访问,供非 CLI 调用方使用——`zones`/`detections`/`observation` 通过 JSON 请求体传递,而不是文件路径:
 
 ```bash
 ./run.sh serve --addr 127.0.0.1 --port 8108
 # 在另一个终端:
-curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {...}}'
+curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {...}, "observation": {...}}'
 ```
 
 完整的命令、参数和退出码参考(包含从真实运行中采集的每个真实状态 `READY`/`WARNING`/`DANGER`/`INHIBITED`)请见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。
@@ -259,7 +285,7 @@ curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {
 * **`compileall` 失败** —— 意味着 `src/` 下确实引入了语法错误；构建会故意在不触及安装的情况下停止。
 * **`run.sh`/`run.bat` 提示"未找到 `.venv`"** —— 先至少运行一次 `build.sh`/`build.bat`。
 * **可编辑安装过期** —— 删除 `.venv/` 并重新构建；很少需要这样做。
-* **`check` 以非零退出码结束** —— 这是真实且正确的行为，而非失败：`1` 表示发现了仅警告级越界，`2` 表示发现了危险级越界并已请求 E-STOP，`3` 表示区域集合的校准缺失或已过期（故障安全，在任何越界逻辑执行之前检查）。只有 Python 回溯或 JSON 格式错误才是真正的 bug。
+* **`check` 以非零退出码结束** —— 这是真实且正确的行为，而非失败：`1` 表示发现了仅警告级越界，`2` 表示发现了危险级越界并已请求 E-STOP，`3` 表示区域集合的校准缺失/已过期，或观测者状态缺失/被禁用/已过期/出错（故障安全，在任何越界逻辑执行之前检查）。只有 Python 回溯或 JSON 格式错误才是真正的 bug。
 
 ---
 
