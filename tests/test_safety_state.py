@@ -148,6 +148,49 @@ def test_evaluate_safety_ready_when_a_real_active_fresh_observer_confirms_clear(
     assert result.state is SafetyState.READY
 
 
+# --- tool_velocity_mps: real, bounded, fail-safe envelope scaling ---
+
+
+def test_evaluate_safety_omitted_velocity_is_byte_for_byte_the_same_as_before():
+    # An object just outside the static danger zone (max corner (2,2,2)):
+    # with no velocity supplied, this must stay exactly the pre-existing
+    # static behavior - no breach, no matter what a velocity-aware caller
+    # might otherwise expect.
+    zone_set = ZoneSet(zones=(WARNING_ZONE, DANGER_ZONE), calibration=FRESH_CAL)
+    objects = (DetectedObject("op1", Point3D(2.1, 1, 1)),)
+    result = evaluate_safety(zone_set, objects, TODAY, FRESH_OBSERVATION, now=NOW)
+    assert result.state is SafetyState.WARNING  # still inside the wider warning zone, not danger
+
+
+def test_evaluate_safety_zero_velocity_matches_omitted_velocity():
+    zone_set = ZoneSet(zones=(WARNING_ZONE, DANGER_ZONE), calibration=FRESH_CAL)
+    objects = (DetectedObject("op1", Point3D(2.1, 1, 1)),)
+    omitted = evaluate_safety(zone_set, objects, TODAY, FRESH_OBSERVATION, now=NOW)
+    zero = evaluate_safety(zone_set, objects, TODAY, FRESH_OBSERVATION, now=NOW, tool_velocity_mps=0.0)
+    assert omitted.state == zero.state
+
+
+def test_evaluate_safety_real_velocity_grows_the_danger_zone_and_triggers_earlier():
+    # Same object position as the "omitted velocity" case above - only
+    # difference is a real, non-zero tool velocity - now the grown danger
+    # envelope actually reaches it.
+    zone_set = ZoneSet(zones=(WARNING_ZONE, DANGER_ZONE), calibration=FRESH_CAL)
+    objects = (DetectedObject("op1", Point3D(2.1, 1, 1)),)
+    result = evaluate_safety(zone_set, objects, TODAY, FRESH_OBSERVATION, now=NOW, tool_velocity_mps=2.0)
+    assert result.state is SafetyState.DANGER
+
+
+def test_evaluate_safety_velocity_never_shrinks_the_static_danger_zone():
+    # An object well inside the static danger zone must still be DANGER at
+    # every velocity, including 0 - the static extent is the unconditional
+    # floor, never reduced by this parameter.
+    zone_set = ZoneSet(zones=(WARNING_ZONE, DANGER_ZONE), calibration=FRESH_CAL)
+    objects = (DetectedObject("op1", Point3D(1, 1, 1)),)
+    for velocity in (None, 0.0, 1.0, 50.0):
+        result = evaluate_safety(zone_set, objects, TODAY, FRESH_OBSERVATION, now=NOW, tool_velocity_mps=velocity)
+        assert result.state is SafetyState.DANGER
+
+
 def test_evaluate_safety_observer_check_runs_before_breach_logic_but_after_calibration():
     # Ordering matters for a consistent, predictable reason string: missing
     # calibration still wins over a missing observation, but a missing

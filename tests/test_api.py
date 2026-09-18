@@ -216,6 +216,83 @@ def test_check_missing_field(tmp_path) -> None:
         assert status == 400
 
 
+# --- toolVelocityMps: real, bounded, fail-safe envelope scaling over HTTP ---
+
+
+def test_check_omitted_velocity_matches_static_behavior(tmp_path) -> None:
+    # Just outside the static danger zone (max corner (2,2,2)) but inside
+    # the wider warning zone - no `toolVelocityMps` field at all must stay
+    # exactly the pre-existing static outcome.
+    with running_server() as base:
+        status, body = _post(
+            f"{base}/check",
+            {"zones": _zones(), "detections": _detections(2.1, 1, 1), "observation": _observation()},
+        )
+        assert status == 200
+        assert body["state"] == "warning"
+
+
+def test_check_real_velocity_grows_the_danger_zone_over_http(tmp_path) -> None:
+    # Same position as above - a real, non-zero toolVelocityMps now grows
+    # the danger envelope enough to actually reach it.
+    with running_server() as base:
+        status, body = _post(
+            f"{base}/check",
+            {
+                "zones": _zones(),
+                "detections": _detections(2.1, 1, 1),
+                "observation": _observation(),
+                "toolVelocityMps": 2.0,
+            },
+        )
+        assert status == 200
+        assert body["state"] == "danger"
+        assert any(b["zone_id"] == "danger1" for b in body["breaches"])
+
+
+def test_check_zero_velocity_matches_omitted_velocity(tmp_path) -> None:
+    with running_server() as base:
+        status, body = _post(
+            f"{base}/check",
+            {
+                "zones": _zones(),
+                "detections": _detections(2.1, 1, 1),
+                "observation": _observation(),
+                "toolVelocityMps": 0,
+            },
+        )
+        assert status == 200
+        assert body["state"] == "warning"
+
+
+def test_check_negative_velocity_returns_400(tmp_path) -> None:
+    with running_server() as base:
+        status, body = _post(
+            f"{base}/check",
+            {
+                "zones": _zones(),
+                "detections": _detections(50, 50, 50),
+                "observation": _observation(),
+                "toolVelocityMps": -1,
+            },
+        )
+        assert status == 400
+
+
+def test_check_non_numeric_velocity_returns_400(tmp_path) -> None:
+    with running_server() as base:
+        status, body = _post(
+            f"{base}/check",
+            {
+                "zones": _zones(),
+                "detections": _detections(50, 50, 50),
+                "observation": _observation(),
+                "toolVelocityMps": "fast",
+            },
+        )
+        assert status == 400
+
+
 def test_stats() -> None:
     with running_server() as base:
         status, body = _get(f"{base}/stats")

@@ -114,6 +114,26 @@ def load_detections(path: str | Path) -> tuple[DetectedObject, ...]:
     return parse_detections(raw)
 
 
+def parse_tool_velocity(data: object) -> float:
+    """Parses the optional real head/tool speed (meters/second) a caller
+    can supply to `evaluate_safety()`'s own velocity-proportional envelope
+    scaling (see zones.py's `scale_zones_for_velocity`). Deliberately
+    strict rather than silently clamping a bad value to 0 or to the static
+    behavior - a negative or non-finite speed is a real caller/sensor bug
+    the caller needs to know about, not something this module should paper
+    over for safety-relevant geometry.
+    """
+    try:
+        value = float(data)
+    except (TypeError, ValueError) as exc:
+        raise ConfigError("toolVelocityMps must be numeric") from exc
+    if not math.isfinite(value):
+        raise ConfigError("toolVelocityMps must be finite")
+    if value < 0:
+        raise ConfigError("toolVelocityMps must be non-negative")
+    return value
+
+
 def load_observation_status(path: str | Path) -> ObservationStatus:
     """Reads `path` and parses it via `parse_observation_status`
     (observation.py) - see that function's own docstring for the real

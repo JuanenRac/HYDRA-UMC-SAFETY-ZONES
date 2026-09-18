@@ -214,7 +214,7 @@ HYDRA-UMC-SAFETY-ZONES/
 引数なしで呼び出すと名前・バージョン・役割を表示します：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.0.9
+HYDRA-UMC-SAFETY-ZONES v0.1.0
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
