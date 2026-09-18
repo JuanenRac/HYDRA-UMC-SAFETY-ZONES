@@ -28,9 +28,9 @@ itself used, so the reported breaches always match the reported state.
 New real unit/HTTP tests cover both the unchanged-static path and the
 velocity-scaled path.
 
-## [0.0.9] - I32: explicit observer health now gated before any breach logic runs
+## [0.0.9] - Explicit observer health now gated before any breach logic runs
 
-Real gap found while auditing the software-improvements backlog (I32):
+Real gap found while auditing the software-improvements backlog:
 `evaluate_safety()` trusted `objects` unconditionally as long as
 calibration was fresh - an empty `objects` tuple was indistinguishable
 from a real, active observer confirming the cell clear. A detector

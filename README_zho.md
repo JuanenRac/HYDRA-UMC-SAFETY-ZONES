@@ -32,7 +32,7 @@
 * 🚦 **多级区域（v0）：** 真实的 `Zone`/`ZoneLevel`（警告/危险）定义，作用于轴对齐的 3D 体积，以及区域集合与检测对象位置集合之间的真实越界检查（`check_breaches`）。
 * 🛑 **E-STOP 请求（v0，不执行）：** 任何最严重越界为"危险"级别的对象都会生成一个真实的 `EStopRequest`，交给 `EStopRequester`——具体为何本项目中的任何部分都从不自行执行物理停止，见下方的设计边界。
 * 🔒 **校准新鲜度强制检查（v0）：** 每个区域集合都携带一个可选的 `calibration`（版本、来源、校准日期、最大有效天数）。`evaluate_safety()` 会在执行任何越界逻辑**之前**先检查它——完全没有校准信息的区域集合、比自身声明的 `max_age_days` 更旧的校准、或日期在未来的校准，始终会解析为 `INHIBITED`，绝不会仅因为没有检测对象靠近某个区域就悄悄退回到 `READY`。
-* 👁️ **观测者健康强制检查(v0):** `evaluate_safety()` 还接受一个可选的 `observation` 状态(活动/非活动、最后观测时间、自身错误)——见 [I32](docs/CLI_REFERENCE.md)。完全没有观测证据、观测者被禁用、观测者报告了内部错误,或观测已过期,都会在任何越界逻辑运行之前解析为 `INHIBITED`——与校准缺失完全一样:崩溃的检测器或刚启动的系统绝不能因为没有报告任何对象就被悄悄读作"确认已清空"。
+* 👁️ **观测者健康强制检查(v0):** `evaluate_safety()` 还接受一个可选的 `observation` 状态(活动/非活动、最后观测时间、自身错误)——见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。完全没有观测证据、观测者被禁用、观测者报告了内部错误,或观测已过期,都会在任何越界逻辑运行之前解析为 `INHIBITED`——与校准缺失完全一样:崩溃的检测器或刚启动的系统绝不能因为没有报告任何对象就被悄悄读作"确认已清空"。
 * 🧮 **有限坐标故障保护(v0):** `config.py` 会在 `evaluate_safety()` 运行前拒绝区域或检测文件中任何 `NaN`/`Infinity`/`-Infinity` 的 `x`/`y`/`z` 值,直接解析为 `INHIBITED`(退出码 `3`),而不是用一个无法代表真实点的坐标去评估边界。
 * 🌐 **JSON/HTTP API(v0.0.7):** `serve` 子命令通过 stdlib 的 `http.server`(`POST /check`、`GET /stats`)对外暴露与 `check` 完全相同的逻辑(`evaluate_safety()`/`check_breaches()`/`request_estop_for()`),供非 CLI 调用方使用。默认仅限本地回环,与 `systemd/hydra-umc-safety-zones.service` 单元一致。完整的真实命令、参数和退出码请见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。
 * 📐 **动态遮挡（计划中）：** 自动将机器人自身结构从安全触发中屏蔽，使机器人不会将"自身"检测为入侵。
@@ -51,7 +51,7 @@ Python 服务中的一个漏洞可能导致*未能请求*停止，但绝不可�
 （`src/hydra_umc_safety_zones/main.py`）仍会打印项目名称、已安装的版本号
 及角色说明，但现在还新增了一个真实的 `check --zones 路径 --detections 路径 [--observation 路径]`
 子命令：从 JSON 加载区域集合（区域 + 可选的校准元数据）、检测对象位置，以及
-可选的观测状态，先检查校准新鲜度，再检查观测者健康状况（I32——完全没有
+可选的观测状态，先检查校准新鲜度，再检查观测者健康状况（完全没有
 观测状态、观测者被禁用/出错/过期，都会像校准缺失一样解析为 `INHIBITED`），
 再执行真实的越界检查，为每个"危险"越界请求 E-STOP，
 并根据结果以 0（Ready）/ 1（Warning）/ 2（Danger，已请求 E-STOP）/
@@ -68,7 +68,7 @@ Python 服务中的一个漏洞可能导致*未能请求*停止，但绝不可�
 ## 2. 🔄 目标安全逻辑流程
 
 下图是本项目正朝其构建的目标数据流。给定从 JSON 文件读取的检测对象位置，
-图中的 `CAL`（校准检查）、`OBS`（观测者健康检查，I32）、`ZONE`（区域检查）及其后的警告/危险分流，由
+图中的 `CAL`（校准检查）、`OBS`（观测者健康检查）、`ZONE`（区域检查）及其后的警告/危险分流，由
 `evaluate_safety()`（包装了 `check_breaches()`/`request_estop_for()`）驱动，
 今天已是真实的。`CAL`/`OBS`/`ZONE` 之前的一切（真实的 Hailo-8 流水线，以及 `OBS` 检查其存活状态的真实观测者进程）和 `STOP`
 之后的一切（真实的 CAN 传输）仍是未来工作。
@@ -79,7 +79,7 @@ flowchart TB
     SEG --> MAP["3D Occupancy Map - 计划中"]
     MAP --> CAL{"Calibration Fresh? - 真实 v0"}
     CAL -- No --> INHIBIT["INHIBITED - 真实 v0（故障安全）"]
-    CAL -- Yes --> OBS{"Observer Active & Fresh? - 真实 v0（I32）"}
+    CAL -- Yes --> OBS{"Observer Active & Fresh? - 真实 v0"}
     OBS -- No --> INHIBIT
     OBS -- Yes --> ZONE{"Zone Check - 真实 v0"}
     ZONE -- Warning --> SLOW["Velocity Scaling Command - 计划中"]
@@ -118,7 +118,7 @@ Node 系列的其他项目一样——这里不存在 `hardware/`/`firmware/` �
 * **区域与检测数据使用纯 JSON，而非 YAML** —— `pyproject.toml` 的依赖列表仍为 `[]`；`json` 属于标准库，`pyyaml` 是真正的未来工作，等到出现值得为其序列化的真实区域编辑工具时再引入。
 * **校准检查在任何越界逻辑之前执行，绝不在之后** —— `evaluate_safety()` 会在校准缺失或过期的那一刻立即返回 `INHIBITED`，甚至在调用 `check_breaches()` 之前。这是刻意为之：过期的校准意味着区域几何本身已不可信，因此针对它运行越界检查的结果同样毫无意义——先检查校准也意味着过期的校准始终会胜过看起来像真实"危险"越界的结果，而不是反过来。
 * **缺少 `"calibration"` 键仍可成功加载，只是意味着 `INHIBITED`** —— `load_zone_set()` 绝不会仅因为某个区域文件早于此功能存在、或是手写而没有校准元数据就抛出错误；它按设计在评估阶段安全失败，而不是在加载阶段失败。
-* **`--observation`/`"observation"` 仅在接口层面是可选的，在安全层面并非如此(I32)** —— 从不传递它的调用方每次都会得到一个诚实的 `INHIBITED`，绝不会崩溃，也绝不会悄悄得到 `READY`；这在为尚未更新的调用方保持解析层向后兼容的同时，关闭了空 `objects` 列表与真实、活动的观测者确认单元已清空这两种情况无法区分的真实漏洞。
+* **`--observation`/`"observation"` 仅在接口层面是可选的，在安全层面并非如此** —— 从不传递它的调用方每次都会得到一个诚实的 `INHIBITED`，绝不会崩溃，也绝不会悄悄得到 `READY`；这在为尚未更新的调用方保持解析层向后兼容的同时，关闭了空 `objects` 列表与真实、活动的观测者确认单元已清空这两种情况无法区分的真实漏洞。
 
 ---
 
@@ -131,7 +131,7 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── zones.py          # 真实的 ZoneLevel/Zone/ZoneSet 定义
 │   ├── breach.py         # 真实的区域越界检查
 │   ├── calibration.py    # 真实的校准新鲜度跟踪
-│   ├── observation.py    # 真实的观测者健康跟踪(I32) - 镜像 calibration.py
+│   ├── observation.py    # 真实的观测者健康跟踪 - 镜像 calibration.py
 │   ├── safety_state.py   # 真实的故障安全决策：READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py          # 真实的 E-STOP 请求（从不执行）
 │   ├── config.py         # 真实的区域/检测/观测 JSON 加载
@@ -221,7 +221,7 @@ Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-worki
 
 ```json
 // observation.json - 真实证据，证明上面的检测确实来自一个活动的、
-// 最近更新过的观测者(I32)
+// 最近更新过的观测者
 {"active": true, "observedAt": "2024-01-15T12:00:00Z", "maxAgeSeconds": 5}
 ```
 

@@ -51,7 +51,7 @@ options:
   --detections DETECTIONS
                         Path to a detected-objects JSON file.
   --observation OBSERVATION
-                        Path to an observation-status JSON file (I32) - real
+                        Path to an observation-status JSON file - real
                         evidence the supplied detections were actually
                         produced by an active, recently-updated observer.
                         Omitting this always resolves to INHIBITED, never a
@@ -62,7 +62,7 @@ options:
 `--zones` is a JSON file shaped like
 `{"zones": [{"id", "level": "warning"|"danger", "min": {"x","y","z"}, "max": {"x","y","z"}}, ...], "calibration": {...}}`.
 `--detections` is shaped like `{"objects": [{"id", "position": {"x","y","z"}}, ...]}`.
-`--observation` (I32) is shaped like
+`--observation` is shaped like
 `{"active": bool, "observedAt": ISO-8601 string or null, "maxAgeSeconds": number, "error": string or null}` —
 real evidence that `--detections` was actually produced by an active,
 recently-updated observer, never guessed or defaulted. `observedAt`
@@ -71,7 +71,7 @@ accepts a bare `Z` suffix as well as an explicit UTC offset.
 There are three checks, run in this fixed order, each able to
 short-circuit the rest: **calibration** first (a missing or expired
 calibration always wins over what the untrusted geometry would
-otherwise report), then **observation** (I32 — no observer evidence at
+otherwise report), then **observation** (no observer evidence at
 all, a disabled observer, an observer-reported error, or a stale
 observation all win over what the geometry would otherwise report), and
 only then the real breach check. All examples below run against the
@@ -138,7 +138,7 @@ $ echo $?
 3
 ```
 
-**INHIBITED — `--observation` omitted entirely (I32).** The exact real
+**INHIBITED — `--observation` omitted entirely.** The exact real
 anti-pattern this fix closes: a caller not yet updated to pass
 `--observation` at all must never silently get `READY` back just
 because the flag wasn't given — calibration is fresh and the object is
@@ -151,7 +151,7 @@ $ echo $?
 3
 ```
 
-**INHIBITED — observer disabled (I32).** I32's own literal acceptance
+**INHIBITED — observer disabled.** The literal acceptance
 case: removing detections (`{"objects": []}`) while the observer itself
 reports `active: false` must not read as a confirmed-clear zone:
 
@@ -162,7 +162,7 @@ $ echo $?
 3
 ```
 
-**INHIBITED — stale observation (I32).** The observer's own
+**INHIBITED — stale observation.** The observer's own
 `observedAt` is older than its own `maxAgeSeconds` — the real reason
 names the actual age and limit, never a vague "stale" label:
 
@@ -173,8 +173,8 @@ $ echo $?
 3
 ```
 
-**INHIBITED — observer-reported internal error (I32).** I32's own
-literal acceptance case: a real error reported by the observer itself
+**INHIBITED — observer-reported internal error.** The literal
+acceptance case: a real error reported by the observer itself
 blocks logical enablement, naming the real error text:
 
 ```
@@ -248,7 +248,7 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
   using the exact same shapes as the `--zones`/`--detections`/
   `--observation` files above. `"observation"` is an optional key (a
   caller not yet updated to send it at all is not rejected with a `400`
-  for a field that didn't exist before I32) — but omitting it always
+  for a field that didn't exist before this check) — but omitting it always
   resolves to `"inhibited"`, never a silent `"ready"`, via
   `evaluate_safety()`'s own fail-safe default:
 
@@ -260,7 +260,7 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
   ```
 
   A disabled observer resolves the same way even with `"detections":
-  {"objects": []}` (I32's own literal acceptance case over real HTTP —
+  {"objects": []}` (the literal acceptance case over real HTTP —
   removing detections must not, by itself, ever look like a confirmed-clear
   zone):
 
@@ -296,7 +296,7 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
 | `0` | `READY` — no breach, calibration valid, observer active and fresh |
 | `1` | `WARNING` — a warning-zone breach, or an uncaught Python exception (e.g. a missing/malformed `--zones`/`--detections`/`--observation` file — not yet a handled, friendly error) |
 | `2` | `DANGER` — a danger-zone breach; E-STOP was requested (not asserted) |
-| `3` | `INHIBITED` — calibration missing/expired, or (I32) no observer evidence, a disabled/stale/errored observer, or a malformed `--observation` file; the fail-safe path, checked before any breach logic runs |
+| `3` | `INHIBITED` — calibration missing/expired, or no observer evidence, a disabled/stale/errored observer, or a malformed `--observation` file; the fail-safe path, checked before any breach logic runs |
 
 ## Not yet implemented
 
@@ -309,5 +309,5 @@ this CLI consumes today from a plain JSON file) is also not built —
 against any real or synthetic detection source. Real observer-health
 reporting (populating `--observation`/`"observation"` from an actual
 tracking process's own liveness, rather than a hand-authored JSON file)
-is likewise out of scope for this repo — I32 defines and enforces the
+is likewise out of scope for this repo — this repo defines and enforces the
 contract, not the producer.
