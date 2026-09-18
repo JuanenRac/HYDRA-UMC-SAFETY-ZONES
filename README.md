@@ -31,6 +31,7 @@ This is one of the 4 children of **[HYDRA-UMC-VISION-NODE](https://github.com/Ju
 * 👁️ **Observer-health enforcement (v0):** `evaluate_safety()` also takes an optional `observation` status (active/inactive, last-observed time, own error) - see [I32](docs/CLI_REFERENCE.md). No observer evidence at all, a disabled observer, an observer-reported error, or a stale observation all resolve to `INHIBITED` before any breach logic runs, exactly like a missing calibration - a crashed detector or a fresh boot must never silently read as "confirmed clear" just because no objects were reported.
 * 🧮 **Finite-coordinate fail-safe (v0):** `config.py` rejects any `NaN`/`Infinity`/`-Infinity` `x`/`y`/`z` in a zones or detections file *before* `evaluate_safety()` ever runs, resolving straight to `INHIBITED` (exit `3`) instead of evaluating a boundary against a coordinate that cannot represent a real point.
 * 🌐 **JSON/HTTP API (v0.0.7):** the `serve` subcommand exposes `check`'s exact same `evaluate_safety()`/`check_breaches()`/`request_estop_for()` logic over a plain stdlib `http.server` (`POST /check`, `GET /stats`) for callers that aren't the CLI itself - loopback-only by default, matching the `systemd/hydra-umc-safety-zones.service` unit. See [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) for every real command, flag and exit code.
+* 📏 **Velocity-proportional safety envelopes (v0.1.0, first bounded version):** `POST /check` accepts an optional `toolVelocityMps` (real head/tool speed, meters/second) - every zone's static volume then grows by a margin linear in that speed (`AABB.expanded()`), capped at a fixed maximum. The configured static volume is always the unconditional floor: an omitted or zero velocity leaves every zone byte-for-byte unchanged, and the scaling can only ever grow a zone, never shrink one.
 * 📐 **Dynamic Occlusion (planned):** automatically masking the robot's own structure out of safety triggers, so the robot does not "detect itself" as an intrusion.
 * 🔍 **Foreign Object Detection (planned):** identifying tools or debris left in the workspace.
 * 🎥 **Real 3D occupancy mapping from Hailo-8 (planned):** v0's `check` subcommand takes detected-object positions from a JSON file precisely because the real Hailo-8 spatial segmentation pipeline that would produce them doesn't exist yet in this environment - see "Honesty check" below.
@@ -156,7 +157,7 @@ Locates the interpreter inside `.venv` (handling both the POSIX and Windows `.ve
 Bare invocation prints name + version + role:
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.0.9
+HYDRA-UMC-SAFETY-ZONES v0.1.0
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 

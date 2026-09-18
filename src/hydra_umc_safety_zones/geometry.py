@@ -62,3 +62,19 @@ class AABB:
             and self.min_corner.y <= point.y <= self.max_corner.y
             and self.min_corner.z <= point.z <= self.max_corner.z
         )
+
+    def expanded(self, margin: float) -> "AABB":
+        """A new box grown outward by `margin` meters on every axis, same
+        center as this one. `margin` must be >= 0 - this can only ever grow
+        a volume, never shrink it, matching the fail-safe requirement that
+        a dynamically-scaled safety envelope must never end up smaller than
+        the static zone it started from (see zones.py's own
+        `scale_zones_for_velocity`, the one real caller of this today).
+        `margin=0` returns an equivalent box, unchanged in extent.
+        """
+        if margin < 0:
+            raise ValueError("margin must be non-negative - a safety envelope can only grow, never shrink")
+        return AABB(
+            Point3D(self.min_corner.x - margin, self.min_corner.y - margin, self.min_corner.z - margin),
+            Point3D(self.max_corner.x + margin, self.max_corner.y + margin, self.max_corner.z + margin),
+        )

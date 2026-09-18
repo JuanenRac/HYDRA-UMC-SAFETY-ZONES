@@ -10,6 +10,24 @@ by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
 `MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
 hand.
 
+## [0.1.0] - real, bounded velocity-proportional safety envelopes
+
+First real implementation of a dynamic safety envelope: `POST /check`
+accepts an optional `toolVelocityMps` field (the real head/tool speed in
+meters/second). When supplied and non-zero, every zone's own static volume
+grows by a margin linear in that speed (`AABB.expanded()`), capped at a
+fixed maximum (`zones.py`'s `VELOCITY_MARGIN_MAX_M`) so a single bad or
+extreme reading can never grow a zone without bound. The static volume is
+the unconditional floor - `expanded()` itself refuses a negative margin,
+and an omitted or zero `toolVelocityMps` leaves every zone byte-for-byte
+identical to the pre-existing static behavior. `evaluate_safety()` gained
+a matching optional `tool_velocity_mps` parameter (default `None`,
+preserving every existing call site unchanged), and `api.py`'s own breach
+list now recomputes against the same scaled zones the state decision
+itself used, so the reported breaches always match the reported state.
+New real unit/HTTP tests cover both the unchanged-static path and the
+velocity-scaled path.
+
 ## [0.0.9] - I32: explicit observer health now gated before any breach logic runs
 
 Real gap found while auditing the software-improvements backlog (I32):

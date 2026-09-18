@@ -25,10 +25,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 from .breach import check_breaches
-from .config import ConfigError, parse_detections, parse_zone_set
+from .config import ConfigError, parse_detections, parse_tool_velocity, parse_zone_set
 from .estop import NullEStopRequester, request_estop_for
 from .observation import ObservationError, parse_observation_status
 from .safety_state import SafetyState, evaluate_safety, to_sdk_safety_state
+from .zones import scale_zones_for_velocity
 
 
 def _write_json(handler: BaseHTTPRequestHandler, status: int, payload: object) -> None:
@@ -111,6 +112,13 @@ class Handler(BaseHTTPRequestHandler):
             # silent READY, via evaluate_safety()'s own fail-safe default.
             observation_raw = body.get("observation")
             observation = parse_observation_status(observation_raw) if observation_raw is not None else None
+            # Optional real head/tool velocity (meters/second) - an
+            # additional, opt-in envelope-scaling input alongside
+            # `observation` above, with the exact same fail-safe shape: a
+            # caller that never sends it (or an older caller not yet
+            # updated to) gets today's static zone behavior, unchanged.
+            velocity_raw = body.get("toolVelocityMps")
+            tool_velocity_mps = parse_tool_velocity(velocity_raw) if velocity_raw is not None else None
         except KeyError as e:
             _write_error(self, 400, f"missing required field: {e}")
             return
@@ -119,7 +127,7 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         today = datetime.now(timezone.utc).date()
-        evaluation = evaluate_safety(zone_set, objects, today, observation)
+        evaluation = evaluate_safety(zone_set, objects, today, observation, tool_velocity_mps=tool_velocity_mps)
 
         response: dict = {
             "state": evaluation.state.value,
@@ -140,7 +148,11 @@ class Handler(BaseHTTPRequestHandler):
             _write_json(self, 200, response)
             return
 
-        breaches = check_breaches(zone_set.zones, objects)
+        # Same scaled zones evaluate_safety() itself just breach-checked
+        # against internally - recomputing here with the unscaled
+        # zone_set.zones would report a DANGER/WARNING state alongside a
+        # `breaches` list that doesn't actually explain it.
+        breaches = check_breaches(scale_zones_for_velocity(zone_set.zones, tool_velocity_mps), objects)
         response["breaches"] = [asdict(b) for b in breaches]
 
         if evaluation.state is SafetyState.WARNING:

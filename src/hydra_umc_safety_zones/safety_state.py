@@ -24,7 +24,7 @@ from enum import Enum
 from hydra_umc_safety_zones.breach import DetectedObject, check_breaches, worst_level_per_object
 from hydra_umc_safety_zones.calibration import calibration_age_days, is_calibration_expired
 from hydra_umc_safety_zones.observation import ObservationStatus, is_observation_stale, observation_age_seconds
-from hydra_umc_safety_zones.zones import ZoneLevel, ZoneSet
+from hydra_umc_safety_zones.zones import ZoneLevel, ZoneSet, scale_zones_for_velocity
 
 
 class SafetyState(str, Enum):
@@ -55,6 +55,7 @@ def evaluate_safety(
     today: date,
     observation: ObservationStatus | None = None,
     now: datetime | None = None,
+    tool_velocity_mps: float | None = None,
 ) -> SafetyEvaluation:
     """The one real entry point that decides READY/WARNING/DANGER/INHIBITED.
 
@@ -70,6 +71,14 @@ def evaluate_safety(
     real observer evidence gets INHIBITED, never silently treated as
     "must be fine". `now` defaults to the real UTC clock; only ever
     overridden by a test.
+
+    `tool_velocity_mps` defaults to `None` - the exact same fail-safe
+    shape: omitting it (or a caller that hasn't been updated to send it
+    yet) breach-checks against `zone_set.zones` completely unchanged, the
+    same static behavior as before this parameter existed. Only a real,
+    non-negative velocity value grows the breach-checking volume via
+    `scale_zones_for_velocity()` - which itself can only ever grow a zone,
+    never shrink it below its own configured static extent.
     """
     if zone_set.calibration is None:
         return SafetyEvaluation(
@@ -113,7 +122,7 @@ def evaluate_safety(
             f"last real observation is {age:.1f}s old, exceeds max_age_seconds={observation.max_age_seconds}",
         )
 
-    breaches = check_breaches(zone_set.zones, objects)
+    breaches = check_breaches(scale_zones_for_velocity(zone_set.zones, tool_velocity_mps), objects)
     worst = worst_level_per_object(breaches)
 
     danger_objects = sorted(oid for oid, level in worst.items() if level is ZoneLevel.DANGER)
