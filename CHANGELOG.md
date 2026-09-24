@@ -10,6 +10,14 @@ by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
 `MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
 hand.
 
+## [0.1.1] - Calibration author recorded
+
+- **Who ran the calibration is now recorded.** A zone set's `calibration`
+  accepts an optional `calibrated_by` name (non-empty when given; existing
+  files without it keep loading). When a calibration is too old and the cell
+  is inhibited, the reason now names who ran it next to the version and
+  source. The README examples show the field.
+
 ## [0.1.0] - real, bounded velocity-proportional safety envelopes
 
 First real implementation of a dynamic safety envelope: `POST /check`

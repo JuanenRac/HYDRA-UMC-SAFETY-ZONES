@@ -106,3 +106,17 @@ def test_is_calibration_expired_future_calibrated_at_is_treated_as_invalid():
     fail safe just like an expired one - never treated as extra-fresh."""
     cal = ZoneCalibration(version="v", source="s", calibrated_at=date(2026, 6, 1), max_age_days=30)
     assert is_calibration_expired(cal, date(2026, 5, 1))
+
+
+def test_calibrated_by_is_optional_and_kept_when_given():
+    base = {"version": "cal-1", "source": "manual", "calibrated_at": "2026-08-01", "max_age_days": 30}
+    assert parse_calibration(base).calibrated_by is None
+    assert parse_calibration({**base, "calibrated_by": "A. Operator"}).calibrated_by == "A. Operator"
+
+
+@pytest.mark.parametrize("bad", ["", "   ", 7, ["x"]])
+def test_calibrated_by_when_given_must_be_a_non_empty_string(bad):
+    data = {"version": "cal-1", "source": "manual", "calibrated_at": "2026-08-01", "max_age_days": 30, "calibrated_by": bad}
+    with pytest.raises(CalibrationError):
+        parse_calibration(data)
+
