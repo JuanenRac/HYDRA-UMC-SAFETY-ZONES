@@ -156,7 +156,7 @@ Sucht den Interpreter innerhalb von `.venv` und führt `python -m hydra_umc_safe
 Der argumentlose Aufruf gibt Name + Version + Rolle aus:
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.1.0
+HYDRA-UMC-SAFETY-ZONES v0.1.1
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
@@ -165,7 +165,7 @@ Der echte `check`-Subbefehl braucht eine Zonen- und eine Erkennungsdatei, beide 
 ```json
 // zones.json
 {
-  "calibration": {"version": "cal-1", "source": "manual", "calibrated_at": "2024-01-15", "max_age_days": 30},
+  "calibration": {"version": "cal-1", "source": "manual", "calibrated_at": "2024-01-15", "max_age_days": 30, "calibrated_by": "A. Operator"},
   "zones": [
     {"id": "warn1", "level": "warning", "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 5, "y": 5, "z": 5}},
     {"id": "danger1", "level": "danger", "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 1, "y": 1, "z": 1}}

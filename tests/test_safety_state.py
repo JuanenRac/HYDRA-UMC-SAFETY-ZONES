@@ -264,3 +264,14 @@ def test_to_sdk_safety_state_never_reuses_this_modules_own_lowercase_vocabulary(
 def test_to_sdk_safety_state_source_is_overridable():
     payload = to_sdk_safety_state(SafetyEvaluation(SafetyState.READY, "no breach"), source="a-real-caller")
     _assert_real_sdk_shape(payload, "READY", expected_source="a-real-caller")
+
+
+def test_an_expired_calibration_names_who_ran_it():
+    stale = ZoneCalibration(
+        version="cal-9", source="manual", calibrated_at=date(2026, 1, 1), max_age_days=30, calibrated_by="A. Operator"
+    )
+    zone_set = ZoneSet(zones=(WARNING_ZONE, DANGER_ZONE), calibration=stale)
+    result = evaluate_safety(zone_set, (), TODAY, FRESH_OBSERVATION, now=NOW)
+    assert result.state is SafetyState.INHIBITED
+    assert "by A. Operator" in result.reason
+

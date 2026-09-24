@@ -90,7 +90,9 @@ def evaluate_safety(
         return SafetyEvaluation(
             SafetyState.INHIBITED,
             f"calibration '{zone_set.calibration.version}' (source="
-            f"{zone_set.calibration.source}) is {age} day(s) old, exceeds "
+            f"{zone_set.calibration.source}"
+            + (f", by {zone_set.calibration.calibrated_by}" if zone_set.calibration.calibrated_by else "")
+            + f") is {age} day(s) old, exceeds "
             f"max_age_days={zone_set.calibration.max_age_days}",
         )
 

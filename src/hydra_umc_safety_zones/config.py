@@ -74,7 +74,7 @@ def parse_zone_set(raw: dict) -> ZoneSet:
     """Parses the same already-loaded JSON `parse_zones` does, plus an
     optional top-level ``"calibration"`` object shaped like:
     ``{"version": "...", "source": "...", "calibrated_at": "YYYY-MM-DD",
-    "max_age_days": N}``. Data with no ``"calibration"`` key at all
+    "max_age_days": N}`` (plus an optional ``"calibrated_by"`` name). Data with no ``"calibration"`` key at all
     parses successfully with ``calibration=None`` - deliberately not a
     parse error, since the whole point of `ZoneSet` is to let a caller
     (see `safety_state.py`) fail safe on missing calibration rather than

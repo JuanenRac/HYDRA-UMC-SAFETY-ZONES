@@ -38,6 +38,10 @@ class ZoneCalibration:
     source: str
     calibrated_at: date
     max_age_days: int
+    # Who ran the calibration. Optional so existing zone files keep loading;
+    # when present it is a non-empty name and is quoted in the reason a
+    # stale calibration blocks the cell.
+    calibrated_by: str | None = None
 
     def __post_init__(self) -> None:
         if not self.version:
@@ -46,6 +50,8 @@ class ZoneCalibration:
             raise CalibrationError("calibration source must be a non-empty string")
         if self.max_age_days <= 0:
             raise CalibrationError("max_age_days must be a positive integer")
+        if self.calibrated_by is not None and not self.calibrated_by.strip():
+            raise CalibrationError("calibrated_by, when given, must be a non-empty string")
 
 
 def parse_calibration(data: dict) -> ZoneCalibration:
@@ -83,11 +89,16 @@ def parse_calibration(data: dict) -> ZoneCalibration:
     if not isinstance(source, str) or not source:
         raise CalibrationError("calibration is missing required non-empty field: source")
 
+    calibrated_by = data.get("calibrated_by")
+    if calibrated_by is not None and (not isinstance(calibrated_by, str) or not calibrated_by.strip()):
+        raise CalibrationError("calibrated_by, when given, must be a non-empty string")
+
     return ZoneCalibration(
         version=version,
         source=source,
         calibrated_at=calibrated_at,
         max_age_days=max_age_days,
+        calibrated_by=calibrated_by,
     )
 
 
