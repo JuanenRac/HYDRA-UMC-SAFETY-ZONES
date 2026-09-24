@@ -56,7 +56,7 @@ def _run_check(zones_path: str, detections_path: str, observation_path: str | No
     try:
         zone_set = load_zone_set(zones_path)
         objects = load_detections(detections_path)
-        # I32: real, required-in-spirit observer evidence - see
+        # real, required-in-spirit observer evidence - see
         # evaluate_safety()'s own fail-safe default (None -> INHIBITED)
         # for why this stays an optional CLI flag rather than a hard
         # argparse requirement: a caller that omits it gets an honest,

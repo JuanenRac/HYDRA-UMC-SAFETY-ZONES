@@ -71,7 +71,7 @@ def test_parse_observation_status_non_string_error_raises():
 
 
 # Same real guard calibration.py's own max_age_days parsing already
-# applies (SAFE-01): bool is a subclass of int in Python.
+# applies: bool is a subclass of int in Python.
 @pytest.mark.parametrize("bad_max_age", [True, False, "soon"])
 def test_parse_observation_status_rejects_bool_or_non_numeric_max_age(bad_max_age):
     with pytest.raises(ObservationError):

@@ -23,7 +23,7 @@ FRESH_CAL = ZoneCalibration(version="cal-1", source="manual", calibrated_at=TODA
 EXPIRED_CAL = ZoneCalibration(
     version="cal-0", source="manual", calibrated_at=date(2020, 1, 1), max_age_days=30
 )
-# I32: a real, active, fresh observer - the evidence evaluate_safety()
+# a real, active, fresh observer - the evidence evaluate_safety
 # now requires before it will ever trust `objects` at all. Used by every
 # pre-existing breach-logic test below so they keep testing exactly what
 # they always tested (calibration/breach interaction), not this new gate.
@@ -84,7 +84,7 @@ def test_evaluate_safety_danger_outranks_warning_for_same_object():
     assert result.state is SafetyState.DANGER
 
 
-# --- I32: observer health must gate READY, exactly like calibration does ---
+# --- observer health must gate READY, exactly like calibration does ---
 
 
 def test_evaluate_safety_inhibited_when_no_observation_status_provided():
@@ -99,7 +99,7 @@ def test_evaluate_safety_inhibited_when_no_observation_status_provided():
 
 
 def test_evaluate_safety_inhibited_when_detections_removed_but_observer_reports_disabled():
-    # I32's own literal acceptance test: "retirar detecciones... no
+    # this project's own literal acceptance test: "retirar detecciones... no
     # convierte la zona en libre" - removing detections must not, by
     # itself, ever look like a confirmed-clear zone.
     zone_set = ZoneSet(zones=(WARNING_ZONE, DANGER_ZONE), calibration=FRESH_CAL)
@@ -110,7 +110,7 @@ def test_evaluate_safety_inhibited_when_detections_removed_but_observer_reports_
 
 
 def test_evaluate_safety_inhibited_when_the_observer_reports_an_internal_error():
-    # I32's own literal acceptance test: "un error interno bloquea la
+    # this project's own literal acceptance test: "un error interno bloquea la
     # habilitacion logica."
     zone_set = ZoneSet(zones=(WARNING_ZONE, DANGER_ZONE), calibration=FRESH_CAL)
     errored = ObservationStatus(active=True, observed_at=NOW, max_age_seconds=5.0, error="camera driver disconnected")
@@ -129,7 +129,7 @@ def test_evaluate_safety_inhibited_when_observation_is_stale():
 
 
 def test_evaluate_safety_inhibited_after_a_fresh_boot_never_reuses_a_prior_safe_state():
-    # I32's own literal acceptance test: "tras reinicio no se reutiliza
+    # this project's own literal acceptance test: "tras reinicio no se reutiliza
     # el ultimo estado seguro sin nueva observacion."
     zone_set = ZoneSet(zones=(WARNING_ZONE, DANGER_ZONE), calibration=FRESH_CAL)
     never_observed = ObservationStatus(active=True, observed_at=None, max_age_seconds=5.0)
@@ -139,7 +139,7 @@ def test_evaluate_safety_inhibited_after_a_fresh_boot_never_reuses_a_prior_safe_
 
 
 def test_evaluate_safety_ready_when_a_real_active_fresh_observer_confirms_clear():
-    # The other half of I32's own real point: this fix must NOT turn
+    # The other half of this project's own real point: this fix must NOT turn
     # "genuinely confirmed clear" into a permanent false alarm - a real,
     # active, fresh observer honestly reporting zero objects is legitimate
     # evidence, not something to second-guess.

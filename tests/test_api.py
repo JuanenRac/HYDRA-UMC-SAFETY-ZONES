@@ -44,7 +44,7 @@ def _detections(x, y, z):
 
 
 def _observation(*, active=True, fresh=True, error=None):
-    # I32: real evidence that `detections` was actually produced by an
+    # real evidence that `detections` was actually produced by an
     # active, recently-updated observer - see observation.py's own doc
     # comment. `fresh=True` uses the real current instant (never "today
     # at midnight", which could already be hours stale by the time a
@@ -128,7 +128,7 @@ def test_check_danger_breach_requests_estop(tmp_path) -> None:
         assert body["sdkSafetyState"]["state"] == "SAFE_STOP"
 
 
-# --- I32: observer health must gate READY over real HTTP too ---
+# --- observer health must gate READY over real HTTP too ---
 
 
 def test_check_no_observation_field_inhibits_even_with_no_breach(tmp_path) -> None:
@@ -143,7 +143,7 @@ def test_check_no_observation_field_inhibits_even_with_no_breach(tmp_path) -> No
 
 
 def test_check_disabled_observer_inhibits_even_with_empty_detections(tmp_path) -> None:
-    # I32's own literal acceptance test over real HTTP: removing/never
+    # this project's own literal acceptance test over real HTTP: removing/never
     # sending detections while the observer itself is disabled must not
     # read as a confirmed-clear zone.
     with running_server() as base:
