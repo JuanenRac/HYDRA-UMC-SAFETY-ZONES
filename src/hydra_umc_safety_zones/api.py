@@ -105,7 +105,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             zone_set = parse_zone_set(body["zones"])
             objects = parse_detections(body["detections"])
-            # I32: an "observation" key at all is optional in the request
+            # an "observation" key at all is optional in the request
             # body (a caller not yet updated to send it must not get a
             # hard 400 for a field that didn't exist before this fix) -
             # but omitting it always resolves to INHIBITED, never a

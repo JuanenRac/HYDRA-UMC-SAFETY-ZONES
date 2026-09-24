@@ -4,7 +4,7 @@
 # GPL-3.0 - see LICENSE
 # =============================================================================
 """Combines zone-breach checking with calibration-freshness enforcement
-AND observer-health enforcement (I32) into the single real fail-safe
+AND observer-health enforcement into the single real fail-safe
 decision the README's E-STOP orchestration depends on: a `ZoneSet` whose
 geometry cannot currently be trusted, or a set of `objects` not actually
 backed by a real, active, fresh observer, must both resolve to
@@ -62,7 +62,7 @@ def evaluate_safety(
     Calibration is checked FIRST, before any breach logic runs - a missing
     or expired calibration always wins over what the (untrusted) geometry
     would otherwise report, by design. Observer health is checked SECOND,
-    still before any breach logic - I32's own real fix: an empty
+    still before any breach logic - this project's own real fix: an empty
     `objects` tuple must never be trusted as "confirmed clear" unless a
     real, active, fresh observer is what actually produced it.
 

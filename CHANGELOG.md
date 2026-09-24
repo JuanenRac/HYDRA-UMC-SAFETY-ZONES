@@ -96,9 +96,9 @@ for a real end-to-end test proving the full chain (this repo's own real
 HTTP server, feeding VISUAL-SERVOING-API's own real authorization
 check) - not just each side trusting the other's own unit tests.
 
-## [0.0.7] - SAFE-01: reject bool/fraction max_age_days before it reaches a real calibration
+## [0.0.7] - reject bool/fraction max_age_days before it reaches a real calibration
 
-- **SAFE-01 (P2):** `parse_calibration()`'s old `int(data["max_age_days"])`
+- `parse_calibration`'s old `int(data["max_age_days"])`
   accepted values that were never really a strict positive integer -
   `bool` is a subclass of `int` in Python (`int(True) == 1`), and
   `int()` on a `float` silently truncates (`int(1.5) == 1`) instead of

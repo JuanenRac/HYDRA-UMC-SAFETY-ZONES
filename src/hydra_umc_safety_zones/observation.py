@@ -3,7 +3,7 @@
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 # GPL-3.0 - see LICENSE
 # =============================================================================
-"""I32 ("estado desconocido explicito y observador obligatorio"): real
+"""("estado desconocido explicito y observador obligatorio"): real
 evidence that a detection/tracking observer actually produced the
 `objects` evaluate_safety() is about to reason over - the missing half
 of the picture that function used to lack entirely. An empty `objects`
@@ -119,7 +119,7 @@ def parse_observation_status(data: dict) -> ObservationStatus:
         raise ObservationError("observation is missing required field: maxAgeSeconds")
     raw_max_age = data["maxAgeSeconds"]
     # Same real guard calibration.py's own max_age_days parsing already
-    # applies (SAFE-01): `bool` is a subclass of `int` in Python, so a
+    # applies: `bool` is a subclass of `int` in Python, so a
     # plain numeric cast would silently accept one instead of raising.
     if isinstance(raw_max_age, bool) or not isinstance(raw_max_age, (int, float)):
         raise ObservationError(

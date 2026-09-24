@@ -60,7 +60,7 @@ def _write_detections(tmp_path, x, y, z):
 
 
 def _write_observation(tmp_path, *, active=True, fresh=True, error=None, filename="observation.json"):
-    # I32: real evidence that `detections` was actually produced by an
+    # real evidence that `detections` was actually produced by an
     # active, recently-updated observer. `fresh=True` uses the real
     # current instant (never a fixed "today at midnight", which could
     # already be stale by the time a test actually runs).
@@ -114,7 +114,7 @@ def test_check_danger_breach_exits_two_and_requests_estop(tmp_path, capsys):
     assert "E-STOP REQUESTED" in out
 
 
-# --- I32: observer health must gate READY over the CLI too ---
+# --- observer health must gate READY over the CLI too ---
 
 
 def test_check_without_observation_flag_inhibits_even_with_no_breach(tmp_path, capsys):
@@ -131,7 +131,7 @@ def test_check_without_observation_flag_inhibits_even_with_no_breach(tmp_path, c
 
 
 def test_check_disabled_observer_inhibits_regardless_of_empty_detections(tmp_path, capsys):
-    # I32's own literal acceptance test over the real CLI.
+    # this project's own literal acceptance test over the real CLI.
     zones = _write_zones(tmp_path)
     detections = tmp_path / "empty-detections.json"
     detections.write_text(json.dumps({"objects": []}), encoding="utf-8")
