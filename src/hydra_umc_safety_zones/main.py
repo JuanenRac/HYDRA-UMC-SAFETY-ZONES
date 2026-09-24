@@ -124,7 +124,7 @@ def build_parser() -> argparse.ArgumentParser:
     check_parser.add_argument(
         "--observation",
         required=False,
-        help="Path to an observation-status JSON file (I32) - real evidence the "
+        help="Path to an observation-status JSON file - real evidence the "
              "supplied detections were actually produced by an active, recently-"
              "updated observer. Omitting this always resolves to INHIBITED, never "
              "a silent READY - see evaluate_safety()'s own fail-safe default.",
