@@ -38,7 +38,7 @@ velocity-scaled path.
 
 ## [0.0.9] - Explicit observer health now gated before any breach logic runs
 
-Real gap found while auditing the software-improvements backlog:
+Real gap found while reviewing the software-improvements backlog:
 `evaluate_safety()` trusted `objects` unconditionally as long as
 calibration was fresh - an empty `objects` tuple was indistinguishable
 from a real, active observer confirming the cell clear. A detector
@@ -76,7 +76,7 @@ instead of the graceful `INHIBITED` result `api.py`'s own broader
 
 ## [0.0.8] - F05: real HYDRA-UMC-SDK SafetyState now emitted alongside this module's own internal one
 
-Real gap found while auditing the code: HYDRA-UMC-SDK's own formal contract
+Real gap found on code review: HYDRA-UMC-SDK's own formal contract
 (`contracts/json-schema/v1/safety-state.schema.json`) requires `state`
 to be exactly one of `READY`/`INHIBITED`/`FAULT`/`SAFE_STOP`, but this
 repo's own internal `SafetyState` enum uses a completely different,
@@ -118,7 +118,7 @@ check) - not just each side trusting the other's own unit tests.
   plus a real valid calibration still parsing and expiring correctly).
   `pytest tests/ -q`: 64/64 passing.
 - **`api.py`'s `_read_json_body()` now caps request bodies** (`MAX_BODY_BYTES`,
-  1 MiB) - found while auditing the code: this
+  1 MiB) - found on code review: this
   endpoint used to read `Content-Length` bytes with no upper bound before
   parsing, so a malformed or oversized header let a caller force unbounded
   memory buffering. An over-limit request is drained (up to `DRAIN_CAP_BYTES`)
