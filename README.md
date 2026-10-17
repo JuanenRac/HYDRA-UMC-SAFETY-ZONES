@@ -4,7 +4,7 @@
 
 # 🛡️ HYDRA-UMC-SAFETY-ZONES
 
-<p align="center">🇺🇸 <b>English</b> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a></p>
+<p align="center">🇺🇸 <b>English</b> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a> | <a href="README_por.md">🇵🇹 Português</a></p>
 
 ### 🚨 Real-Time 3D Intrusion Detection & E-STOP Orchestrator
 
@@ -30,6 +30,8 @@ This is one of the 4 children of **[HYDRA-UMC-VISION-NODE](https://github.com/Ju
 * 🔒 **Calibration-freshness enforcement (v0):** every zone set carries an optional `calibration` (version, source, calibrated-on date, max age in days). `evaluate_safety()` checks it **before** running any breach logic - a zone set with no calibration at all, one older than its own declared `max_age_days`, or one dated in the future, always resolves to `INHIBITED`, never falls through to a silent `READY` just because no detected object happens to be near a zone.
 * 👁️ **Observer-health enforcement (v0):** `evaluate_safety()` also takes an optional `observation` status (active/inactive, last-observed time, own error) - see [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md). No observer evidence at all, a disabled observer, an observer-reported error, or a stale observation all resolve to `INHIBITED` before any breach logic runs, exactly like a missing calibration - a crashed detector or a fresh boot must never silently read as "confirmed clear" just because no objects were reported.
 * 🧮 **Finite-coordinate fail-safe (v0):** `config.py` rejects any `NaN`/`Infinity`/`-Infinity` `x`/`y`/`z` in a zones or detections file *before* `evaluate_safety()` ever runs, resolving straight to `INHIBITED` (exit `3`) instead of evaluating a boundary against a coordinate that cannot represent a real point.
+* 🧱 **No NaN switches a zone off, in the library as at the edge:** `Point3D` refuses non-finite coordinates (a NaN zone corner made `contains()` always false: a zone that never trips), `AABB.expanded()` and `velocity_margin_m()` refuse a NaN or infinite margin or speed (a NaN speed built a box of NaN around every zone), and a `DetectedObject` cannot have a NaN position. *(implemented)*
+* 🧍 **Objects have an extent:** `DetectedObject.radius_m` (JSON `radiusM`, default 0) makes an object a sphere: it breaches every zone the sphere touches, so a person whose centre is outside a zone but whose arm reaches into it is a breach (`AABB.intersects_sphere`, inclusive like `contains()`; radius 0 is exactly the old point behaviour). *(implemented)*
 * 🌐 **JSON/HTTP API (v0.0.7):** the `serve` subcommand exposes `check`'s exact same `evaluate_safety()`/`check_breaches()`/`request_estop_for()` logic over a plain stdlib `http.server` (`POST /check`, `GET /stats`) for callers that aren't the CLI itself - loopback-only by default, matching the `systemd/hydra-umc-safety-zones.service` unit. See [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) for every real command, flag and exit code.
 * 📏 **Velocity-proportional safety envelopes (v0.1.0, first bounded version):** `POST /check` accepts an optional `toolVelocityMps` (real head/tool speed, meters/second) - every zone's static volume then grows by a margin linear in that speed (`AABB.expanded()`), capped at a fixed maximum. The configured static volume is always the unconditional floor: an omitted or zero velocity leaves every zone byte-for-byte unchanged, and the scaling can only ever grow a zone, never shrink one.
 * 📐 **Dynamic Occlusion (planned):** automatically masking the robot's own structure out of safety triggers, so the robot does not "detect itself" as an intrusion.
@@ -144,7 +146,7 @@ No `hardware/`, `firmware/`, `os/` or `models/` folder - see "Advanced Technical
 2. **Virtual environment** - creates `.venv/` if missing; reuses it otherwise.
 3. **Editable install (with dev extras)** - `pip install -e ".[dev]"` so `src/` edits take effect immediately, pulls in `pytest`, and registers the `hydra-umc-safety-zones` console entry point.
 4. **Compile-check** - `python -m compileall -q src` byte-compiles every file under `src/`, catching syntax errors ecosystem-wide.
-5. **Real test suite** - `pytest tests/` runs all 131 tests.
+5. **Real test suite** - `pytest tests/` runs all 155 tests.
 
 `set -euo pipefail` stops the script at the first failing step; the window stays open (`Press Enter to close...`) if it was double-clicked instead of run from an already-open terminal.
 
@@ -157,7 +159,7 @@ Locates the interpreter inside `.venv` (handling both the POSIX and Windows `.ve
 Bare invocation prints name + version + role:
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.1.1
+HYDRA-UMC-SAFETY-ZONES v0.1.2
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
@@ -247,7 +249,7 @@ See [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) for the full command/flag/e
 
 ## 🚀 Current Status & Next Steps
 
-**What works today:** real Warning/Danger zone definitions and breach checking (`geometry.py`/`zones.py`/`breach.py`), real calibration-freshness enforcement that fails safe to `INHIBITED` before any breach logic runs (`calibration.py`/`safety_state.py`), a real E-STOP *requesting* pipeline that respects the detect-vs-enforce boundary by construction (`estop.py`), a real `check` CLI subcommand over JSON zone/detection files, and 131 passing tests - see [`CHANGELOG.md`](CHANGELOG.md) for the full real build/run output.
+**What works today:** real Warning/Danger zone definitions and breach checking (`geometry.py`/`zones.py`/`breach.py`), real calibration-freshness enforcement that fails safe to `INHIBITED` before any breach logic runs (`calibration.py`/`safety_state.py`), a real E-STOP *requesting* pipeline that respects the detect-vs-enforce boundary by construction (`estop.py`), a real `check` CLI subcommand over JSON zone/detection files, and 155 passing tests - see [`CHANGELOG.md`](CHANGELOG.md) for the full real build/run output.
 
 **What is still open, in no particular order and with no committed timeline:**
 

@@ -14,6 +14,7 @@ the narrow interface between the two: one 3D point per tracked object.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from hydra_umc_safety_zones.geometry import Point3D
@@ -22,10 +23,19 @@ from hydra_umc_safety_zones.zones import Zone, ZoneLevel
 
 @dataclass(frozen=True)
 class DetectedObject:
-    """One tracked object's position in the shared 3D workspace frame."""
+    """One tracked object's position in the shared 3D workspace frame.
+
+    `radius_m` is the extent of the object around that position (default 0: the object is its one point). A person whose centre is outside a zone but whose arm reaches into it
+    breaches the zone: with a radius the object is a sphere, and it breaches every zone the sphere touches.
+    """
 
     object_id: str
     position: Point3D
+    radius_m: float = 0.0
+
+    def __post_init__(self) -> None:
+        if isinstance(self.radius_m, bool) or not isinstance(self.radius_m, (int, float)) or not math.isfinite(self.radius_m) or self.radius_m < 0:
+            raise ValueError(f"radius_m must be a finite, non-negative number, got {self.radius_m!r}")
 
 
 @dataclass(frozen=True)
@@ -51,7 +61,7 @@ def check_breaches(
     breaches: list[Breach] = []
     for obj in objects:
         for zone in zones:
-            if zone.volume.contains(obj.position):
+            if zone.volume.intersects_sphere(obj.position, obj.radius_m):
                 breaches.append(
                     Breach(
                         zone_id=zone.zone_id,

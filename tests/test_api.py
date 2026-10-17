@@ -328,3 +328,26 @@ def test_oversized_json_request_is_rejected_before_parsing() -> None:
         except urllib.error.HTTPError as error:
             assert error.code == 400
             assert str(MAX_BODY_BYTES) in json.loads(error.read())["error"]
+
+
+# --- the extent of an object over real HTTP ---
+
+
+def test_check_an_object_with_a_radius_that_reaches_a_zone_breaches_it(tmp_path) -> None:
+    far = {"objects": [{"id": "op1", "position": {"x": 50, "y": 50, "z": 50}, "radiusM": 100}]}
+    with running_server() as base:
+        status, body = _post(f"{base}/check", {"zones": _zones(), "detections": far, "observation": _observation()})
+        assert status == 200
+        assert body["state"] == "danger"
+        assert len(body["estopRequests"]) >= 1
+        # the same position as a single point is far from every zone
+        status, body = _post(f"{base}/check", {"zones": _zones(), "detections": _detections(50, 50, 50), "observation": _observation()})
+        assert body["state"] != "danger"
+
+
+def test_check_a_bad_radius_is_a_400_not_a_silent_point(tmp_path) -> None:
+    with running_server() as base:
+        for bad in (-1, "wide", True):
+            payload = {"objects": [{"id": "op1", "position": {"x": 1, "y": 1, "z": 1}, "radiusM": bad}]}
+            status, _ = _post(f"{base}/check", {"zones": _zones(), "detections": payload, "observation": _observation()})
+            assert status == 400, bad

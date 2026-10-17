@@ -10,6 +10,13 @@ by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
 `MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
 hand.
 
+## [0.1.2] - A NaN can no longer switch a zone off, and objects have an extent
+
+- `Point3D` refuses non-finite coordinates: a NaN zone corner made `contains()` always false (a zone that never trips), and a NaN object position was never inside any zone.
+- `velocity_margin_m()` and `AABB.expanded()` refuse a NaN or infinite speed or margin: `min(nan * gain, max)` is NaN and built a box of NaN around every zone when a Python caller passed the speed straight to `evaluate_safety` or `scale_zones_for_velocity`.
+- A `DetectedObject` now has an optional `radius_m` (JSON `radiusM`, default 0, finite and not negative): the object is a sphere and breaches every zone it touches (`AABB.intersects_sphere`, inclusive like `contains()`), so a person whose centre is outside a zone but whose arm reaches into it is a breach. A radius of 0 is exactly the old behaviour.
+- 24 new tests (155 in total), including the real HTTP edge; the 7 READMEs say so, plus a Portuguese README.
+
 ## [0.1.1] - Calibration author recorded
 
 - **Who ran the calibration is now recorded.** A zone set's `calibration`

@@ -93,15 +93,25 @@ def load_zone_set(path: str | Path) -> ZoneSet:
     return parse_zone_set(raw)
 
 
+def _radius(value: object) -> float:
+    """The optional `radiusM` of a detection: a finite number >= 0 (a boolean, a string or NaN is refused)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"radiusM must be a number, got {value!r}")
+    if not math.isfinite(value) or value < 0:
+        raise ValueError(f"radiusM must be finite and non-negative, got {value!r}")
+    return float(value)
+
+
 def parse_detections(raw: dict) -> tuple[DetectedObject, ...]:
     """Parses already-loaded JSON shaped like:
-    ``{"objects": [{"id": "...", "position": {"x", "y", "z"}}, ...]}``.
+    ``{"objects": [{"id": "...", "position": {"x", "y", "z"}, "radiusM": 0.3}, ...]}``.
+    ``radiusM`` is optional (default 0: the object is its one point); with it, an object breaches every zone its sphere touches.
     """
     objects = []
     for entry in raw["objects"]:
         objects.append(
             DetectedObject(
-                object_id=entry["id"], position=_point(entry["position"])
+                object_id=entry["id"], position=_point(entry["position"]), radius_m=_radius(entry.get("radiusM", 0.0))
             )
         )
     return tuple(objects)

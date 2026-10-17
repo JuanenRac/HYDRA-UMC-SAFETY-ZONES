@@ -4,7 +4,7 @@
 
 # 🛡️ HYDRA-UMC-SAFETY-ZONES
 
-<p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | 🇯🇵 <b>日本語</b></p>
+<p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | 🇯🇵 <b>日本語</b> | <a href="README_por.md">🇵🇹 Português</a></p>
 
 ### 🚨 リアルタイム 3D 侵入検知と E-STOP オーケストレーター
 
@@ -35,6 +35,8 @@
 * 🔒 **キャリブレーション鮮度の強制（v0）：** すべてのゾーン集合はオプションの `calibration`（バージョン、ソース、キャリブレーション日、最大許容日数）を持ちます。`evaluate_safety()` は越境ロジックを実行する**前に**それをチェックします——キャリブレーションが全く無いゾーン集合、自身の宣言した `max_age_days` より古いもの、あるいは未来の日付のものは、常に `INHIBITED` に解決され、検知対象がどのゾーンにも近づいていないという理由だけで黙って `READY` に流れ込むことは決してありません。
 * 👁️ **観測者健全性の強制(v0):** `evaluate_safety()` はオプションの `observation` ステータス(有効/無効、最終観測時刻、自身のエラー)も受け付けます—— [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) 参照。観測エビデンスが全くない、観測者が無効化されている、観測者が内部エラーを報告している、または観測が古すぎる場合はすべて、越境ロジックが実行される前に `INHIBITED` に解決されます——キャリブレーション欠如とまったく同じです: クラッシュした検知器や起動直後の状態が、対象が報告されなかったというだけで黙って「確認済みでクリア」と読まれることは決してありません。
 * 🧮 **有限座標フェイルセーフ(v0):** `config.py` はゾーンまたは検知ファイル内の `NaN`/`Infinity`/`-Infinity` の `x`/`y`/`z` を、`evaluate_safety()` が実行される前に拒否し、実在の点を表せない座標で境界評価を行う代わりに直接 `INHIBITED`(終了コード `3`)に解決します。
+* 🧱 **NaN がゾーンを無効にすることはありません（ライブラリでも入力端でも）：** `Point3D` は有限でない座標を拒否します（NaN のゾーン角は `contains()` を常に偽にし、決して作動しないゾーンになっていました）。`AABB.expanded()` と `velocity_margin_m()` は NaN や無限大のマージン・速度を拒否し（NaN の速度はすべてのゾーンの周りに NaN の箱を作っていました）、`DetectedObject` は NaN の位置を持てません。*（実装済み）*
+* 🧍 **物体には大きさがあります：** `DetectedObject.radius_m`（JSON `radiusM`、既定 0）で物体は球になり、球が触れるすべてのゾーンを侵害します。中心がゾーンの外にあっても腕が入り込む人は侵害として扱われます（`AABB.intersects_sphere`。`contains()` と同様に境界を含みます。半径 0 は従来の点の挙動と完全に同じです）。*（実装済み）*
 * 🌐 **JSON/HTTP API(v0.0.7):** `serve` サブコマンドは `check` とまったく同じロジック(`evaluate_safety()`/`check_breaches()`/`request_estop_for()`)を、stdlib の `http.server`(`POST /check`、`GET /stats`)経由でCLI以外の呼び出し元にも公開します。デフォルトはループバックのみで、`systemd/hydra-umc-safety-zones.service` ユニットと同じです。すべての実コマンド・フラグ・終了コードは [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) を参照してください。
 * 📐 **動的オクルージョン（計画中）：** ロボット自身の構造を安全トリガーから自動的にマスクし、ロボットが「自分自身」を侵入として検知しないようにします。
 * 🔍 **異物検知（計画中）：** 作業スペースに残された工具や破片を識別します。
@@ -197,7 +199,7 @@ HYDRA-UMC-SAFETY-ZONES/
 2. **仮想環境** — `.venv/` が存在しない場合は作成し、存在する場合は再利用します。
 3. **Editable インストール（dev エクストラ付き）** — `pip install -e ".[dev]"` により `src/` 下の変更が即座に反映され、`pytest` がインストールされ、`hydra-umc-safety-zones` コンソールエントリポイントが登録されます。
 4. **コンパイルチェック** — `python -m compileall -q src` が `src/` 下の各ファイルをバイトコンパイルし、エコシステム全体にわたる構文エラーを検出します。
-5. **実際のテストスイート** — `pytest tests/` が全 131 件のテストを実行します。
+5. **実際のテストスイート** — `pytest tests/` が全 155 件のテストを実行します。
 
 `set -euo pipefail` は最初に失敗したステップでスクリプトを停止させます。
 ダブルクリックで起動された場合（既に開いているターミナルからではなく）は、
@@ -214,7 +216,7 @@ HYDRA-UMC-SAFETY-ZONES/
 引数なしで呼び出すと名前・バージョン・役割を表示します：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.1.1
+HYDRA-UMC-SAFETY-ZONES v0.1.2
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
@@ -322,7 +324,7 @@ curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {
 `INHIBITED` にフェイルする実際のキャリブレーション鮮度強制
 （`calibration.py`/`safety_state.py`）、構造上検知と執行の境界を守る
 実際の E-STOP *リクエスト*パイプライン（`estop.py`）、ゾーン/検知 JSON
-ファイルに対する実際の CLI サブコマンド `check`、そして通過した 131 件の
+ファイルに対する実際の CLI サブコマンド `check`、そして通過した 155 件の
 テスト——完全な実際のビルド/実行出力は
 [`CHANGELOG.md`](CHANGELOG.md) を参照してください。
 

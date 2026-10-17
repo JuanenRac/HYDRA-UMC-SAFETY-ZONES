@@ -7,6 +7,7 @@
 model described in the README (slowdown vs stop)."""
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from enum import Enum
 
@@ -63,6 +64,9 @@ def velocity_margin_m(tool_velocity_mps: float) -> float:
     `VELOCITY_MARGIN_MAX_M` so a single bad/huge velocity reading can never
     grow a zone without bound.
     """
+    # NaN fails every comparison: min(nan * gain, MAX) is NaN, which builds a box of NaN that contains nothing - every zone would be silently switched off.
+    if not math.isfinite(tool_velocity_mps):
+        raise ValueError(f"tool_velocity_mps must be a finite number, got {tool_velocity_mps!r}")
     if tool_velocity_mps < 0:
         raise ValueError("tool_velocity_mps must be non-negative")
     return min(tool_velocity_mps * VELOCITY_MARGIN_GAIN_M_PER_MPS, VELOCITY_MARGIN_MAX_M)

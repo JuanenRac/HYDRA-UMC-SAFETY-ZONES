@@ -4,7 +4,7 @@
 
 # 🛡️ HYDRA-UMC-SAFETY-ZONES
 
-<p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | 🇨🇳 <b>简体中文</b> | <a href="README_jpn.md">🇯🇵 日本語</a></p>
+<p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | 🇨🇳 <b>简体中文</b> | <a href="README_jpn.md">🇯🇵 日本語</a> | <a href="README_por.md">🇵🇹 Português</a></p>
 
 ### 🚨 实时 3D 入侵检测与 E-STOP 编排器
 
@@ -34,6 +34,8 @@
 * 🔒 **校准新鲜度强制检查（v0）：** 每个区域集合都携带一个可选的 `calibration`（版本、来源、校准日期、最大有效天数）。`evaluate_safety()` 会在执行任何越界逻辑**之前**先检查它——完全没有校准信息的区域集合、比自身声明的 `max_age_days` 更旧的校准、或日期在未来的校准，始终会解析为 `INHIBITED`，绝不会仅因为没有检测对象靠近某个区域就悄悄退回到 `READY`。
 * 👁️ **观测者健康强制检查(v0):** `evaluate_safety()` 还接受一个可选的 `observation` 状态(活动/非活动、最后观测时间、自身错误)——见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。完全没有观测证据、观测者被禁用、观测者报告了内部错误,或观测已过期,都会在任何越界逻辑运行之前解析为 `INHIBITED`——与校准缺失完全一样:崩溃的检测器或刚启动的系统绝不能因为没有报告任何对象就被悄悄读作"确认已清空"。
 * 🧮 **有限坐标故障保护(v0):** `config.py` 会在 `evaluate_safety()` 运行前拒绝区域或检测文件中任何 `NaN`/`Infinity`/`-Infinity` 的 `x`/`y`/`z` 值,直接解析为 `INHIBITED`(退出码 `3`),而不是用一个无法代表真实点的坐标去评估边界。
+* 🧱 **NaN 不会让分区失效（库内和输入边界都一样）：** `Point3D` 拒绝非有限坐标（NaN 的分区角点会让 `contains()` 永远为假：一个永远不会触发的分区），`AABB.expanded()` 和 `velocity_margin_m()` 拒绝 NaN 或无穷大的裕量与速度（NaN 速度会在每个分区周围构造出一个 NaN 的盒子），`DetectedObject` 不能有 NaN 位置。*（已实现）*
+* 🧍 **物体有范围：** `DetectedObject.radius_m`（JSON `radiusM`，默认 0）把物体变成球体：它会侵入球体触及的每个分区，因此中心在分区外但手臂伸入分区的人也算侵入（`AABB.intersects_sphere`，与 `contains()` 一样包含边界；半径 0 与原来的点行为完全一致）。*（已实现）*
 * 🌐 **JSON/HTTP API(v0.0.7):** `serve` 子命令通过 stdlib 的 `http.server`(`POST /check`、`GET /stats`)对外暴露与 `check` 完全相同的逻辑(`evaluate_safety()`/`check_breaches()`/`request_estop_for()`),供非 CLI 调用方使用。默认仅限本地回环,与 `systemd/hydra-umc-safety-zones.service` 单元一致。完整的真实命令、参数和退出码请见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。
 * 📐 **动态遮挡（计划中）：** 自动将机器人自身结构从安全触发中屏蔽，使机器人不会将"自身"检测为入侵。
 * 🔍 **异物检测（计划中）：** 识别遗留在工作空间中的工具或碎屑。
@@ -180,7 +182,7 @@ HYDRA-UMC-SAFETY-ZONES/
 2. **虚拟环境** —— 若 `.venv/` 不存在则创建；否则复用。
 3. **可编辑安装（含 dev 附加依赖）** —— `pip install -e ".[dev]"`，使 `src/` 下的修改立即生效，安装 `pytest`，并注册 `hydra-umc-safety-zones` 控制台入口点。
 4. **编译检查** —— `python -m compileall -q src` 对 `src/` 下每个文件进行字节码编译，在整个生态系统范围内捕获语法错误。
-5. **真实测试套件** —— `pytest tests/` 运行全部 131 个测试。
+5. **真实测试套件** —— `pytest tests/` 运行全部 155 个测试。
 
 `set -euo pipefail` 会在第一个失败步骤处停止脚本；如果是通过双击而非从已
 打开的终端运行的，窗口会保持打开（`Press Enter to close...`）。
@@ -195,7 +197,7 @@ HYDRA-UMC-SAFETY-ZONES/
 无参数调用会打印名称 + 版本 + 角色：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.1.1
+HYDRA-UMC-SAFETY-ZONES v0.1.2
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
@@ -295,7 +297,7 @@ curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {
 （`geometry.py`/`zones.py`/`breach.py`）、在任何越界逻辑之前就安全故障切换
 到 `INHIBITED` 的真实校准新鲜度强制检查（`calibration.py`/`safety_state.py`）、
 一个在设计上就恪守检测与执行边界的真实 E-STOP*请求*流水线（`estop.py`）、
-一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 131 个通过的
+一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 155 个通过的
 测试——完整的真实构建/运行输出见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 **仍待完成的内容（顺序不分先后，无既定时间表）：**

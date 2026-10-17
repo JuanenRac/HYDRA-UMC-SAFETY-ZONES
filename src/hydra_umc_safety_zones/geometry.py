@@ -13,16 +13,25 @@ coordinates get produced - not in whether a point is inside a box.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
 class Point3D:
-    """A point in the robot cell's shared 3D workspace frame, in meters."""
+    """A point in the robot cell's shared 3D workspace frame, in meters.
+
+    Every coordinate must be a finite number. A NaN coordinate makes every comparison false: a zone corner that is NaN would silently switch the zone off (`contains()` is always False),
+    and an object whose position is NaN would never be inside any zone. Both are refused here, so a library caller that builds a point directly is as safe as the JSON edge (`config.py`).
+    """
 
     x: float
     y: float
     z: float
+
+    def __post_init__(self) -> None:
+        if not all(math.isfinite(value) for value in (self.x, self.y, self.z)):
+            raise ValueError(f"a point needs finite coordinates, got ({self.x!r}, {self.y!r}, {self.z!r})")
 
 
 @dataclass(frozen=True)
@@ -63,6 +72,19 @@ class AABB:
             and self.min_corner.z <= point.z <= self.max_corner.z
         )
 
+    def distance_to(self, point: Point3D) -> float:
+        """The distance in meters from `point` to this box (0 when the point is inside or on the boundary)."""
+        dx = max(self.min_corner.x - point.x, 0.0, point.x - self.max_corner.x)
+        dy = max(self.min_corner.y - point.y, 0.0, point.y - self.max_corner.y)
+        dz = max(self.min_corner.z - point.z, 0.0, point.z - self.max_corner.z)
+        return math.sqrt(dx * dx + dy * dy + dz * dz)
+
+    def intersects_sphere(self, center: Point3D, radius: float) -> bool:
+        """Does a sphere of `radius` meters around `center` touch this box? Inclusive, like `contains()`: touching counts. `radius=0` is exactly `contains(center)`."""
+        if not math.isfinite(radius) or radius < 0:
+            raise ValueError(f"radius must be a finite, non-negative number, got {radius!r}")
+        return self.distance_to(center) <= radius
+
     def expanded(self, margin: float) -> "AABB":
         """A new box grown outward by `margin` meters on every axis, same
         center as this one. `margin` must be >= 0 - this can only ever grow
@@ -72,6 +94,8 @@ class AABB:
         `scale_zones_for_velocity`, the one real caller of this today).
         `margin=0` returns an equivalent box, unchanged in extent.
         """
+        if not math.isfinite(margin):
+            raise ValueError(f"margin must be a finite number, got {margin!r} - a NaN margin would build a box that contains nothing")
         if margin < 0:
             raise ValueError("margin must be non-negative - a safety envelope can only grow, never shrink")
         return AABB(

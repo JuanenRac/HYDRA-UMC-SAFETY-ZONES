@@ -4,7 +4,7 @@
 
 # 🛡️ HYDRA-UMC-SAFETY-ZONES
 
-<p align="center"><a href="README.md">🇺🇸 English</a> | 🇪🇸 <b>Español</b> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a></p>
+<p align="center"><a href="README.md">🇺🇸 English</a> | 🇪🇸 <b>Español</b> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a> | <a href="README_por.md">🇵🇹 Português</a></p>
 
 ### 🚨 Detección de Intrusión 3D en Tiempo Real y Orquestador de E-STOP
 
@@ -30,6 +30,8 @@ Este es uno de los 4 hijos de **[HYDRA-UMC-VISION-NODE](https://github.com/Juane
 * 🔒 **Aplicación de frescura de calibración (v0):** todo conjunto de zonas lleva una `calibration` opcional (versión, fuente, fecha de calibración, edad máxima en días). `evaluate_safety()` la comprueba **antes** de ejecutar cualquier lógica de brechas - un conjunto de zonas sin ninguna calibración, uno más viejo que su propio `max_age_days` declarado, o uno fechado en el futuro, siempre resuelve a `INHIBITED`, nunca cae en un `READY` silencioso solo porque ningún objeto detectado está cerca de una zona.
 * 👁️ **Aplicación de salud del observador (v0):** `evaluate_safety()` también acepta un estado `observation` opcional (activo/inactivo, última hora de observación, error propio) - ver [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md). Ninguna evidencia de observación en absoluto, un observador desactivado, un error informado por el observador, o una observación caducada, todos resuelven a `INHIBITED` antes de que se ejecute cualquier lógica de brechas - exactamente igual que una calibración ausente: un detector caído o un arranque reciente nunca deben leerse silenciosamente como "confirmado despejado" solo porque no se informó ningún objeto.
 * 🧮 **Salvaguarda de coordenadas finitas (v0):** `config.py` rechaza cualquier `x`/`y`/`z` `NaN`/`Infinity`/`-Infinity` en un fichero de zonas o detecciones *antes* de que `evaluate_safety()` se ejecute, resolviendo directo a `INHIBITED` (salida `3`) en vez de evaluar un límite con una coordenada que no puede representar un punto real.
+* 🧱 **Ningún NaN apaga una zona, ni en la librería ni en el borde:** `Point3D` rechaza coordenadas no finitas (una esquina NaN hacía que `contains()` fuese siempre falso: una zona que nunca salta), `AABB.expanded()` y `velocity_margin_m()` rechazan un margen o una velocidad NaN o infinitos (una velocidad NaN construía una caja de NaN alrededor de cada zona) y un `DetectedObject` no puede tener una posición NaN. *(implementado)*
+* 🧍 **Los objetos tienen extensión:** `DetectedObject.radius_m` (JSON `radiusM`, por defecto 0) convierte un objeto en una esfera: infringe toda zona que la esfera toque, así que una persona cuyo centro está fuera de una zona pero cuyo brazo entra en ella es una infracción (`AABB.intersects_sphere`, inclusivo como `contains()`; radio 0 es exactamente el comportamiento puntual de antes). *(implementado)*
 * 🌐 **API JSON/HTTP (v0.0.7):** el subcomando `serve` expone la misma lógica exacta de `check` (`evaluate_safety()`/`check_breaches()`/`request_estop_for()`) sobre un `http.server` de la stdlib (`POST /check`, `GET /stats`) para clientes que no son la CLI - solo loopback por defecto, igual que la unidad `systemd/hydra-umc-safety-zones.service`. Ver [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) para cada comando, flag y código de salida real.
 * 📐 **Oclusión Dinámica (previsto):** enmascarar automáticamente la propia estructura del robot de los disparos de seguridad, para que el robot no se "detecte a sí mismo" como intrusión.
 * 🔍 **Detección de Objetos Extraños (previsto):** identificar herramientas o residuos dejados en el espacio de trabajo.
@@ -143,7 +145,7 @@ Sin carpeta `hardware/`, `firmware/`, `os/` ni `models/` - ver "Información Té
 2. **Entorno virtual** - crea `.venv/` si falta; lo reutiliza si ya existe.
 3. **Instalación editable (con extras dev)** - `pip install -e ".[dev]"` para que los cambios en `src/` tengan efecto inmediato, instala `pytest`, y registra el entry point de consola `hydra-umc-safety-zones`.
 4. **Compile-check** - `python -m compileall -q src` compila a bytecode cada archivo bajo `src/`.
-5. **Suite de tests real** - `pytest tests/` ejecuta los 131 tests.
+5. **Suite de tests real** - `pytest tests/` ejecuta los 155 tests.
 
 `set -euo pipefail` detiene el script en el primer paso que falle; la ventana se queda abierta (`Press Enter to close...`) si se ejecutó con doble clic en vez de desde una terminal ya abierta.
 
@@ -156,7 +158,7 @@ Localiza el intérprete dentro de `.venv` y ejecuta `python -m hydra_umc_safety_
 La invocación sin argumentos imprime nombre + versión + rol:
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.1.1
+HYDRA-UMC-SAFETY-ZONES v0.1.2
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
@@ -244,7 +246,7 @@ Ver [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) para la referencia completa
 
 ## 🚀 Estado Actual y Próximos Pasos
 
-**Qué funciona hoy:** definiciones reales de zonas Warning/Danger y comprobación de brechas (`geometry.py`/`zones.py`/`breach.py`), aplicación real de frescura de calibración que falla de forma segura a `INHIBITED` antes de ejecutar cualquier lógica de brechas (`calibration.py`/`safety_state.py`), un pipeline real de *solicitud* de E-STOP que respeta el límite detectar-vs-aplicar por construcción (`estop.py`), un subcomando CLI real `check` sobre ficheros JSON de zonas/detecciones, y 131 tests pasando - ver [`CHANGELOG.md`](CHANGELOG.md) para la salida completa real de build/run.
+**Qué funciona hoy:** definiciones reales de zonas Warning/Danger y comprobación de brechas (`geometry.py`/`zones.py`/`breach.py`), aplicación real de frescura de calibración que falla de forma segura a `INHIBITED` antes de ejecutar cualquier lógica de brechas (`calibration.py`/`safety_state.py`), un pipeline real de *solicitud* de E-STOP que respeta el límite detectar-vs-aplicar por construcción (`estop.py`), un subcomando CLI real `check` sobre ficheros JSON de zonas/detecciones, y 155 tests pasando - ver [`CHANGELOG.md`](CHANGELOG.md) para la salida completa real de build/run.
 
 **Qué sigue abierto, sin orden particular y sin calendario comprometido:**
 
