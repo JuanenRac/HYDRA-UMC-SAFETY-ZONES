@@ -30,6 +30,10 @@ REM
 REM Runs the project entry point from the local venv created by build.bat.
 REM Forwards all arguments (e.g. "run.bat check --zones z.json --detections d.json").
 setlocal
+rem Keep the window open for people, never in automation (CI / HYDRA_UMC_CI).
+set "KEEP_OPEN=pause"
+if defined CI set "KEEP_OPEN=ver >nul"
+if "%HYDRA_UMC_CI%"=="1" set "KEEP_OPEN=ver >nul"
 cd /d "%~dp0"
 
 if exist ".venv\Scripts\python.exe" (
@@ -41,5 +45,5 @@ if exist ".venv\Scripts\python.exe" (
 
 "%VENV_PY%" -m hydra_umc_safety_zones.main %*
 set EXIT_CODE=%errorlevel%
-pause
+%KEEP_OPEN%
 exit /b %EXIT_CODE%
