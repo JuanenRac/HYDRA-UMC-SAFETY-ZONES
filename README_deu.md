@@ -16,6 +16,16 @@
 
 ---
 
+## 📋 Auf einen Blick
+
+| | |
+|---|---|
+| Version | `0.1.3` |
+| Reifegrad | Etabliert |
+| Technik | Python / 3D vision / Hailo-8 |
+| Ziel | Der Raspberry Pi CM5 einer HYDRA-UMC-Zelle |
+| Auf echter Hardware | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |
+
 ## 1. 🛠️ TECHNISCHER ÜBERBLICK
 
 **HYDRA-UMC-SAFETY-ZONES** soll das kritische Sicherheitssubsystem der Vision-AI-Node-Familie werden. Seine Aufgabe ist es, virtuelle 3D-Begrenzungsvolumen um die Roboter zu projizieren und den Arbeitsbereich auf menschliches Eindringen oder Fremdobjekte zu überwachen, unter Nutzung der hochschnellen räumlichen Segmentierung der Hailo-8-NPU, um Verletzungen definierter "Warning"- und "Danger"-Zonen zu erkennen.

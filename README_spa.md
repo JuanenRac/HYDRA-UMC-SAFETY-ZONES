@@ -16,6 +16,16 @@
 
 ---
 
+## 📋 De un vistazo
+
+| | |
+|---|---|
+| Versión | `0.1.3` |
+| Madurez | Establecido |
+| Tecnología | Python / 3D vision / Hailo-8 |
+| Destino | La Raspberry Pi CM5 de una celda HYDRA-UMC |
+| En hardware real | Todavía no: no consta ninguna ejecución en hardware real para esta versión |
+
 ## 1. 🛠️ VISIÓN GENERAL TÉCNICA
 
 **HYDRA-UMC-SAFETY-ZONES** está pensado para ser el subsistema de seguridad crítico de la familia Vision AI Node. Su trabajo es proyectar volúmenes 3D virtuales alrededor de los robots y monitorizar el espacio de trabajo en busca de intrusiones humanas u objetos extraños, usando segmentación espacial de alta velocidad de la NPU Hailo-8 para detectar brechas en zonas "Warning" y "Danger" definidas.

@@ -16,6 +16,16 @@
 
 ---
 
+## 📋 速览
+
+| | |
+|---|---|
+| 版本 | `0.1.3` |
+| 成熟度 | 成熟 |
+| 技术栈 | Python / 3D vision / Hailo-8 |
+| 目标 | HYDRA-UMC 工作单元的 Raspberry Pi CM5 |
+| 真实硬件 | 尚未：此版本没有在真实硬件上运行的记录 |
+
 ## 1. 🛠️ 技术概述
 
 **HYDRA-UMC-SAFETY-ZONES** 旨在成为 Vision AI Node 系列的关键安全子系统。

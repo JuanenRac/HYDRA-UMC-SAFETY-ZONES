@@ -16,6 +16,16 @@
 
 ---
 
+## 📋 ひと目で
+
+| | |
+|---|---|
+| バージョン | `0.1.3` |
+| 成熟度 | 確立 |
+| 技術 | Python / 3D vision / Hailo-8 |
+| 対象 | HYDRA-UMC セルの Raspberry Pi CM5 |
+| 実機での確認 | まだです：このバージョンについて実機での動作記録はありません |
+
 ## 1. 🛠️ 技術概要
 
 **HYDRA-UMC-SAFETY-ZONES** は、Vision AI Node ファミリーの重要な安全サブ
