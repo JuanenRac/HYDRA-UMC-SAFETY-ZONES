@@ -10,6 +10,11 @@ by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
 `MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
 hand.
 
+## [0.1.4]
+
+- Maturity is functional: nothing here has been verified on real hardware yet.
+- The READMEs say, in the eight languages, what is planned and what has only been tested against fakes, emulators or fixtures, and carry a short safety and security status note.
+
 ## [0.1.3] - Bad input can no longer read as a clear cell
 
 - **An observation that never expires is refused.** `maxAgeSeconds` of `NaN` or `Infinity` passed the check (`NaN <= 0` is false) and then `age > NaN` was never true, so a request with an observation from 25 years ago and no objects was answered `READY`. `maxAgeSeconds` must be finite and positive, and `NaN`, `Infinity` and `-Infinity` are refused anywhere in every JSON input, the API body and the files alike.

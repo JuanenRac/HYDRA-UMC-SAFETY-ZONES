@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "ecosystem": "HYDRA-UMC",
   "name": "HYDRA-UMC-SAFETY-ZONES",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "role": "service",
   "stack": "python",
   "technologies": [
@@ -11,7 +11,7 @@
     "Hailo-8"
   ],
   "deployment_target": "cm5",
-  "maturity": "established",
+  "maturity": "functional",
   "family": "Vision AI Node",
   "parent": "HYDRA-UMC-VISION-NODE",
   "build": "python tools/build_test.py",
