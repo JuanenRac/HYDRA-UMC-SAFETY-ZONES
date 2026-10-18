@@ -26,5 +26,6 @@ RUN useradd --system --create-home --home-dir /home/hydra hydra
 USER hydra
 
 EXPOSE 8108
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8108/stats', timeout=2)" || exit 1
 ENTRYPOINT ["hydra-umc-safety-zones"]
 CMD ["serve", "--addr", "0.0.0.0", "--port", "8108"]

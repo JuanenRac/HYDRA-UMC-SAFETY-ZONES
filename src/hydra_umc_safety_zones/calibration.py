@@ -109,10 +109,17 @@ def calibration_age_days(calibration: ZoneCalibration, today: date) -> int:
     return (today - calibration.calibrated_at).days
 
 
+# `calibrated_at` is a calendar date written by hand, in the local time of the
+# plant, and compared with the UTC date: a calibration made just after local
+# midnight east of UTC carries tomorrow's UTC date. A day ahead is that, not an
+# error; further ahead is.
+FUTURE_DATE_TOLERANCE_DAYS = 1
+
+
 def is_calibration_expired(calibration: ZoneCalibration, today: date) -> bool:
     """True when the calibration is too old (age > max_age_days) OR
-    dated in the future (age < 0) - either way, the geometry cannot be
-    trusted as-is, so this is the single check `safety_state.py` relies
-    on to decide whether to trust `zones.py` at all."""
+    dated in the future by more than a day (a wrong date) - either way,
+    the geometry cannot be trusted as-is, so this is the single check
+    `safety_state.py` relies on to decide whether to trust `zones.py` at all."""
     age = calibration_age_days(calibration, today)
-    return age < 0 or age > calibration.max_age_days
+    return age < -FUTURE_DATE_TOLERANCE_DAYS or age > calibration.max_age_days

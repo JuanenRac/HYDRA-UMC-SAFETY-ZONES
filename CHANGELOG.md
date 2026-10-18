@@ -10,6 +10,18 @@ by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
 `MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
 hand.
 
+## [0.1.3] - Bad input can no longer read as a clear cell
+
+- **An observation that never expires is refused.** `maxAgeSeconds` of `NaN` or `Infinity` passed the check (`NaN <= 0` is false) and then `age > NaN` was never true, so a request with an observation from 25 years ago and no objects was answered `READY`. `maxAgeSeconds` must be finite and positive, and `NaN`, `Infinity` and `-Infinity` are refused anywhere in every JSON input, the API body and the files alike.
+- **A time without a time zone is refused.** It used to raise while being compared with the clock: over HTTP the connection closed with no state, and the CLI died with a traceback and exit status 1, which means `WARNING`. Any other failure inside the check now answers `500` with state `inhibited` and SDK state `FAULT`.
+- **The CLI fails closed.** A zones, detections or observation file that is missing, is not JSON, lacks a field or has a bad value is `INHIBITED` with exit status 3, never a traceback with status 1. The exit-code table no longer lists "an exception" under `WARNING`.
+- **Authoring mistakes are errors.** A coordinate that is a boolean or a string, a zone or object id that is empty, not a string or used twice, a `level` that is not lower case and an empty `zones` list were accepted. Zero-thickness zones are still accepted: they can be a deliberate plane.
+- **The server can hold its own rules.** `serve --zones-file PATH` fixes the zones and the calibration on the server (a request that sends its own is refused and every answer carries `configSha256`), `--max-observation-age-seconds` and `--max-calibration-age-days` cap what a request may claim, and `--token` makes `POST /check` demand a bearer token. Without them the caller still decides the zones, and the startup line says so.
+- **A silent client cannot hold the service.** A connection that announces a body and sends nothing is dropped after 10 s, oversized bodies are drained in blocks of 64 KiB instead of one 16 MiB read, and at most 32 connections are served at once.
+- **Clock tolerance.** An observation up to 0.25 s ahead of this machine's clock, and a calibration dated one day ahead (a local date written east of UTC), no longer inhibit the cell.
+- **An object inside several danger zones** produces one stop request that names all of them (`zone_ids`). **An observer that reports an error** is published as SDK state `FAULT`, distinct from a stale or missing one (`INHIBITED`). `check --tool-velocity` matches the API's `toolVelocityMps`. The Docker image has a health check.
+- Documentation: the README example says its dates are only examples, the ISO 13849-1 badge says aspirational and the latency badge (nothing measures it) is gone, the README says the firmware has no E-STOP frame yet, the velocity-envelope bullet is in every language, `docs/CLI_REFERENCE.md` and `CONTRIBUTING.md` describe what exists. 186 tests, including a seeded test that no bad observation produces `READY`.
+
 ## [0.1.2] - A NaN can no longer switch a zone off, and objects have an extent
 
 - `Point3D` refuses non-finite coordinates: a NaN zone corner made `contains()` always false (a zone that never trips), and a NaN object position was never inside any zone.

@@ -102,5 +102,5 @@ def test_load_detections_rejects_non_finite_coordinate(tmp_path, value):
         json.dumps({"objects": [{"id": "op1", "position": {"x": value, "y": 0, "z": 0}}]}),
         encoding="utf-8",
     )
-    with pytest.raises(ConfigError, match="point.x must be finite"):
+    with pytest.raises(ConfigError, match="point.x must be a number"):
         load_detections(path)

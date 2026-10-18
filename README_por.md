@@ -10,8 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20Ready-red.svg" alt="Safety">
-  <img src="https://img.shields.io/badge/Latency-<5ms-green.svg" alt="Latency">
+  <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspiracional-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Functional v0 stage">
 </p>
 
@@ -34,12 +33,13 @@ O **HYDRA-UMC-SAFETY-ZONES** destina-se a ser o subsistema de segurança crític
 * 🧍 **Os objetos têm extensão:** `DetectedObject.radius_m` (JSON `radiusM`, por defeito 0) faz de um objeto uma esfera: viola todas as zonas que a esfera toca, pelo que uma pessoa cujo centro está fora de uma zona mas cujo braço entra nela é uma violação (`AABB.intersects_sphere`, inclusivo como `contains()`; o raio 0 é exatamente o comportamento pontual anterior). *(implementado)*
 * 🌐 **API JSON/HTTP (v0.0.7):** o subcomando `serve` expõe a mesma lógica exata de `evaluate_safety()`/`check_breaches()`/`request_estop_for()` do `check` sobre um `http.server` simples da biblioteca padrão (`POST /check`, `GET /stats`) para chamadores que não são a própria CLI - só em loopback por defeito, em linha com a unidade `systemd/hydra-umc-safety-zones.service`. Veja [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) para cada comando, opção e código de saída reais.
 * 📏 **Envolventes de segurança proporcionais à velocidade (v0.1.0, primeira versão limitada):** `POST /check` aceita um `toolVelocityMps` opcional (velocidade real da cabeça/ferramenta, metros/segundo) - o volume estático de cada zona cresce então por uma margem linear nessa velocidade (`AABB.expanded()`), com um máximo fixo. O volume estático configurado é sempre o piso incondicional: uma velocidade omitida ou nula deixa cada zona igual byte a byte, e a escala só pode fazer crescer uma zona, nunca encolhê-la.
+* 🔐 **O servidor pode ter as suas próprias regras (v0):** `serve --zones-file PATH` fixa as zonas e a calibração no servidor (um pedido que envie as suas próprias zonas é recusado e cada veredicto leva o `configSha256` do ficheiro); `--max-observation-age-seconds` e `--max-calibration-age-days` limitam durante quanto tempo um pedido pode afirmar que a sua evidência continua válida; `--token` / `SAFETY_ZONES_TOKEN` faz o `POST /check` exigir um token bearer; um cliente que anuncia um corpo e não envia nada é descartado ao fim de 10 s. Sem `--zones-file`, quem alcançar a porta decide as zonas: mantenha-a em loopback ou atrás de um token. NaN e Infinity são recusados em toda a entrada JSON, uma hora sem fuso horário é recusada, uma célula sem zonas não é aceite, e tudo o que a CLI não consiga ler é `INHIBITED` (saída `3`), nunca saída `1`. *(implementado)*
 * 📐 **Oclusão dinâmica (planeada):** mascarar automaticamente a própria estrutura do robô dos disparos de segurança, para que o robô não se "detete a si próprio" como intrusão.
 * 🔍 **Deteção de objetos estranhos (planeada):** identificar ferramentas ou resíduos deixados no espaço de trabalho.
 * 🎥 **Mapeamento 3D de ocupação real a partir do Hailo-8 (planeado):** o subcomando `check` da v0 recebe as posições dos objetos detetados de um ficheiro JSON precisamente porque o pipeline real de segmentação espacial do Hailo-8 que as produziria ainda não existe neste ambiente - veja a "Verificação de honestidade" abaixo.
 * 🧩 **Porque existe como projeto próprio:** a lógica de segurança tem um nível de verificação diferente do resto da perceção - isolá-la no seu próprio serviço significa que pode ser testada, auditada e, eventualmente, certificada (veja o distintivo ISO 13849-1 acima, aspiracional nesta fase) independentemente de alterações ao pipeline de câmaras ou à compilação de modelos noutros pontos da família.
 
-**Uma fronteira de desenho crítica, já decidida e agora imposta em código:** este projeto só **deteta e pede** um E-STOP - nunca aciona o sinal de paragem física. A única implementação real de pedidos de `estop.py`, `NullEStopRequester`, regista o que teria enviado sem transmitir nada a lado nenhum - não há ainda um transporte CAN real neste repositório, de propósito. Cortar de facto a potência dos motores por CAN é responsabilidade do [HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC) (do firmware), em hardware construído para esse papel. Manter a fronteira aí significa que um erro neste serviço Python pode falhar em *pedir* uma paragem, mas nunca pode *impedir* o firmware de impor uma de forma independente.
+**Uma fronteira de desenho crítica, já decidida e agora imposta em código:** este projeto só **deteta e pede** um E-STOP - nunca aciona o sinal de paragem física. A única implementação real de pedidos de `estop.py`, `NullEStopRequester`, regista o que teria enviado sem transmitir nada a lado nenhum - não há ainda um transporte CAN real neste repositório, de propósito. Cortar de facto a potência dos motores por CAN é responsabilidade do [HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC) (do firmware), em hardware construído para esse papel. Manter a fronteira aí significa que um erro neste serviço Python pode falhar em *pedir* uma paragem, mas nunca pode *impedir* o firmware de impor uma de forma independente. Hoje o firmware não tem nenhuma trama de E-STOP para receber e o `NullEStopRequester` não transmite nada: esta defesa em profundidade é o desenho e ainda não existe na outra ponta.
 
 **Verificação de honestidade - o que realmente funciona hoje:** o ponto de entrada real (`src/hydra_umc_safety_zones/main.py`) continua a imprimir identidade/versão/função numa chamada simples, mas tem agora também um subcomando real `check --zones PATH --detections PATH [--observation PATH]`: carrega de JSON um conjunto de zonas (zonas + metadados opcionais de calibração), posições de objetos detetados e um estado de observação opcional, verifica primeiro a frescura da calibração, depois a saúde do observador (sem estado de observação, um observador desativado/com erro/antigo falham de forma segura tal como uma calibração em falta), depois executa a verificação real de violações, pede E-STOPs para cada violação de Perigo, e termina com 0 (Pronto) / 1 (Aviso) / 2 (Perigo, E-STOP pedido) / 3 (Inibido - calibração em falta/caducada, ou observador em falta/desativado/antigo/com erro) consoante o resultado. O que genuinamente ainda não é real: a segmentação espacial do Hailo-8 que produziria essas posições de objetos detetados em hardware real, a máscara de autoclusão, o processo observador real cuja vida o `--observation` reporta, e qualquer transporte CAN real para o pedido de E-STOP. Veja o [`CHANGELOG.md`](CHANGELOG.md) para saber exatamente o que já foi entregue, e "Estado atual e próximos passos" abaixo para o que continua em aberto.
 
@@ -146,7 +146,7 @@ Sem pasta `hardware/`, `firmware/`, `os/` nem `models/` - veja "Informação té
 2. **Ambiente virtual** - cria `.venv/` se faltar; reutiliza-o caso contrário.
 3. **Instalação editável (com extras de desenvolvimento)** - `pip install -e ".[dev]"` para que as edições em `src/` tenham efeito de imediato, instala o `pytest` e regista o ponto de entrada de consola `hydra-umc-safety-zones`.
 4. **Verificação de compilação** - `python -m compileall -q src` compila para bytecode cada ficheiro de `src/`, apanhando erros de sintaxe em todo o ecossistema.
-5. **Suite de testes real** - `pytest tests/` executa os 155 testes.
+5. **Suite de testes real** - `pytest tests/` executa os 186 testes.
 
 O `set -euo pipefail` pára o script no primeiro passo que falhe; a janela fica aberta (`Press Enter to close...`) se foi aberta com duplo clique em vez de executada a partir de um terminal já aberto.
 
@@ -159,7 +159,7 @@ Localiza o interpretador dentro de `.venv` (tratando as disposições `.venv` de
 A invocação simples imprime nome + versão + função:
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.1.2
+HYDRA-UMC-SAFETY-ZONES v0.1.3
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
@@ -186,6 +186,8 @@ O subcomando real `check` precisa de um ficheiro de zonas e de um ficheiro de de
 // de um observador ativo e atualizado há pouco
 {"active": true, "observedAt": "2024-01-15T12:00:00Z", "maxAgeSeconds": 5}
 ```
+
+As datas destes exemplos são apenas exemplos: `calibrated_at` tem de ser suficientemente recente para `max_age_days`, e `observedAt` tem de estar dentro de `maxAgeSeconds` de agora (com fuso horário, por exemplo um `Z` final); com as datas mostradas, o resultado hoje é `INHIBITED`, e não o `DANGER` abaixo.
 
 ```bash
 ./run.sh check --zones zones.json --detections detections.json --observation observation.json
@@ -247,7 +249,7 @@ Veja [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) para a referência complet
 
 ## 🚀 Estado atual e próximos passos
 
-**O que funciona hoje:** definições reais de zonas de Aviso/Perigo e verificação de violações (`geometry.py`/`zones.py`/`breach.py`), imposição real da frescura da calibração que falha de forma segura para `INHIBITED` antes de qualquer lógica de violação (`calibration.py`/`safety_state.py`), um pipeline real de *pedido* de E-STOP que respeita a fronteira detetar-vs-impor por construção (`estop.py`), um subcomando de CLI real `check` sobre ficheiros JSON de zonas/deteções, e 155 testes a passar - veja o [`CHANGELOG.md`](CHANGELOG.md) para a saída real completa de compilação/execução.
+**O que funciona hoje:** definições reais de zonas de Aviso/Perigo e verificação de violações (`geometry.py`/`zones.py`/`breach.py`), imposição real da frescura da calibração que falha de forma segura para `INHIBITED` antes de qualquer lógica de violação (`calibration.py`/`safety_state.py`), um pipeline real de *pedido* de E-STOP que respeita a fronteira detetar-vs-impor por construção (`estop.py`), um subcomando de CLI real `check` sobre ficheiros JSON de zonas/deteções, e 186 testes a passar - veja o [`CHANGELOG.md`](CHANGELOG.md) para a saída real completa de compilação/execução.
 
 **O que continua em aberto, sem ordem particular e sem prazo assumido:**
 

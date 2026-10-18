@@ -10,8 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Licencia-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20Ready-red.svg" alt="Safety">
-  <img src="https://img.shields.io/badge/Latency-<5ms-green.svg" alt="Latency">
+  <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Functional v0 stage">
 </p>
 
@@ -37,6 +36,8 @@
 * 🧱 **NaN 不会让分区失效（库内和输入边界都一样）：** `Point3D` 拒绝非有限坐标（NaN 的分区角点会让 `contains()` 永远为假：一个永远不会触发的分区），`AABB.expanded()` 和 `velocity_margin_m()` 拒绝 NaN 或无穷大的裕量与速度（NaN 速度会在每个分区周围构造出一个 NaN 的盒子），`DetectedObject` 不能有 NaN 位置。*（已实现）*
 * 🧍 **物体有范围：** `DetectedObject.radius_m`（JSON `radiusM`，默认 0）把物体变成球体：它会侵入球体触及的每个分区，因此中心在分区外但手臂伸入分区的人也算侵入（`AABB.intersects_sphere`，与 `contains()` 一样包含边界；半径 0 与原来的点行为完全一致）。*（已实现）*
 * 🌐 **JSON/HTTP API(v0.0.7):** `serve` 子命令通过 stdlib 的 `http.server`(`POST /check`、`GET /stats`)对外暴露与 `check` 完全相同的逻辑(`evaluate_safety()`/`check_breaches()`/`request_estop_for()`),供非 CLI 调用方使用。默认仅限本地回环,与 `systemd/hydra-umc-safety-zones.service` 单元一致。完整的真实命令、参数和退出码请见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。
+* 📏 **与速度成比例的安全包络（v0.1.0，首个有上限的版本）：** `POST /check` 接受可选的 `toolVelocityMps`（实际的机头/工具速度，米/秒）——每个区域的静态体积随后按与该速度成线性关系的余量增大，并以固定最大值为上限。配置的静态体积始终是无条件的下限：省略或为零的速度会让每个区域逐字节保持不变，缩放只会扩大区域，绝不会缩小。
+* 🔐 **服务器可以持有自己的规则（v0）：** `serve --zones-file PATH` 在服务器上固定区域和校准（自带区域的请求会被拒绝，每个判定都带有该文件的 `configSha256`）；`--max-observation-age-seconds` 和 `--max-calibration-age-days` 限制请求可声称其证据有效的时长；`--token` / `SAFETY_ZONES_TOKEN` 使 `POST /check` 要求 bearer 令牌；声明了请求体却什么也不发的客户端会在 10 秒后被丢弃。没有 `--zones-file` 时，能访问该端口的人就能决定区域，因此请将其保持在 loopback 或置于令牌之后。所有 JSON 输入都拒绝 NaN 和 Infinity，拒绝不带时区的时间，不接受没有区域的单元，CLI 无法读取的任何内容都是 `INHIBITED`（退出码 `3`），绝不是退出码 `1`。*（已实现）*
 * 📐 **动态遮挡（计划中）：** 自动将机器人自身结构从安全触发中屏蔽，使机器人不会将"自身"检测为入侵。
 * 🔍 **异物检测（计划中）：** 识别遗留在工作空间中的工具或碎屑。
 * 🎥 **基于 Hailo-8 的真实 3D 占用地图（计划中）：** v0 的 `check` 子命令从 JSON 文件读取检测对象位置，正是因为真正会产生这些位置的 Hailo-8 空间分割流水线在本环境中尚不存在——详见下方"诚实说明"。
@@ -47,7 +48,7 @@
 只会记录本应发送的内容，而不会向任何地方发送任何东西——本仓库目前故意
 没有任何真实的 CAN 传输实现。真正通过 CAN 切断电机电源是 [HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)（固件）的职责，运行在为此角色专门构建的硬件上。将边界保持在此处意味着，本
 Python 服务中的一个漏洞可能导致*未能请求*停止，但绝不可能*阻止*固件独立
-执行停止。
+执行停止。 目前固件没有可接收的 E-STOP 帧，`NullEStopRequester` 也不发送任何内容：这种纵深防御只是设计，另一端尚不存在。
 
 **诚实说明——今天实际运行的内容：** 无参数调用时，真正的入口点
 （`src/hydra_umc_safety_zones/main.py`）仍会打印项目名称、已安装的版本号
@@ -182,7 +183,7 @@ HYDRA-UMC-SAFETY-ZONES/
 2. **虚拟环境** —— 若 `.venv/` 不存在则创建；否则复用。
 3. **可编辑安装（含 dev 附加依赖）** —— `pip install -e ".[dev]"`，使 `src/` 下的修改立即生效，安装 `pytest`，并注册 `hydra-umc-safety-zones` 控制台入口点。
 4. **编译检查** —— `python -m compileall -q src` 对 `src/` 下每个文件进行字节码编译，在整个生态系统范围内捕获语法错误。
-5. **真实测试套件** —— `pytest tests/` 运行全部 155 个测试。
+5. **真实测试套件** —— `pytest tests/` 运行全部 186 个测试。
 
 `set -euo pipefail` 会在第一个失败步骤处停止脚本；如果是通过双击而非从已
 打开的终端运行的，窗口会保持打开（`Press Enter to close...`）。
@@ -197,7 +198,7 @@ HYDRA-UMC-SAFETY-ZONES/
 无参数调用会打印名称 + 版本 + 角色：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.1.2
+HYDRA-UMC-SAFETY-ZONES v0.1.3
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
@@ -226,6 +227,8 @@ Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-worki
 // 最近更新过的观测者
 {"active": true, "observedAt": "2024-01-15T12:00:00Z", "maxAgeSeconds": 5}
 ```
+
+这些示例中的日期只是示例：`calibrated_at` 必须足够新以满足 `max_age_days`，`observedAt` 必须在距现在 `maxAgeSeconds` 之内（并带有时区，例如结尾的 `Z`）；按所示日期，今天的结果是 `INHIBITED`，而不是下面的 `DANGER`。
 
 ```bash
 ./run.sh check --zones zones.json --detections detections.json --observation observation.json
@@ -297,7 +300,7 @@ curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {
 （`geometry.py`/`zones.py`/`breach.py`）、在任何越界逻辑之前就安全故障切换
 到 `INHIBITED` 的真实校准新鲜度强制检查（`calibration.py`/`safety_state.py`）、
 一个在设计上就恪守检测与执行边界的真实 E-STOP*请求*流水线（`estop.py`）、
-一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 155 个通过的
+一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 186 个通过的
 测试——完整的真实构建/运行输出见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 **仍待完成的内容（顺序不分先后，无既定时间表）：**

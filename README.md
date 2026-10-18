@@ -10,8 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20Ready-red.svg" alt="Safety">
-  <img src="https://img.shields.io/badge/Latency-<5ms-green.svg" alt="Latency">
+  <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Functional v0 stage">
 </p>
 
@@ -34,12 +33,13 @@ This is one of the 4 children of **[HYDRA-UMC-VISION-NODE](https://github.com/Ju
 * 🧍 **Objects have an extent:** `DetectedObject.radius_m` (JSON `radiusM`, default 0) makes an object a sphere: it breaches every zone the sphere touches, so a person whose centre is outside a zone but whose arm reaches into it is a breach (`AABB.intersects_sphere`, inclusive like `contains()`; radius 0 is exactly the old point behaviour). *(implemented)*
 * 🌐 **JSON/HTTP API (v0.0.7):** the `serve` subcommand exposes `check`'s exact same `evaluate_safety()`/`check_breaches()`/`request_estop_for()` logic over a plain stdlib `http.server` (`POST /check`, `GET /stats`) for callers that aren't the CLI itself - loopback-only by default, matching the `systemd/hydra-umc-safety-zones.service` unit. See [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) for every real command, flag and exit code.
 * 📏 **Velocity-proportional safety envelopes (v0.1.0, first bounded version):** `POST /check` accepts an optional `toolVelocityMps` (real head/tool speed, meters/second) - every zone's static volume then grows by a margin linear in that speed (`AABB.expanded()`), capped at a fixed maximum. The configured static volume is always the unconditional floor: an omitted or zero velocity leaves every zone byte-for-byte unchanged, and the scaling can only ever grow a zone, never shrink one.
+* 🔐 **The server can hold its own rules (v0):** `serve --zones-file PATH` fixes the zones and the calibration on the server (a request that sends its own zones is refused and every verdict carries the file's `configSha256`); `--max-observation-age-seconds` and `--max-calibration-age-days` cap how long a request may claim its evidence stays valid; `--token` / `SAFETY_ZONES_TOKEN` makes `POST /check` demand a bearer token; a client that announces a body and sends nothing is dropped after 10 s. Without `--zones-file`, whoever can reach the port decides the zones, so keep it on loopback or behind a token. NaN and Infinity are refused in every JSON input, a time without a time zone is refused, a cell with no zones is not accepted, and anything the CLI cannot read is `INHIBITED` (exit `3`), never exit `1`. *(implemented)*
 * 📐 **Dynamic Occlusion (planned):** automatically masking the robot's own structure out of safety triggers, so the robot does not "detect itself" as an intrusion.
 * 🔍 **Foreign Object Detection (planned):** identifying tools or debris left in the workspace.
 * 🎥 **Real 3D occupancy mapping from Hailo-8 (planned):** v0's `check` subcommand takes detected-object positions from a JSON file precisely because the real Hailo-8 spatial segmentation pipeline that would produce them doesn't exist yet in this environment - see "Honesty check" below.
 * 🧩 **Why it exists as its own project:** safety logic has a different verification bar than the rest of perception - isolating it in its own service means it can be tested, audited, and eventually certified (see the ISO 13849-1 badge above, aspirational at this stage) independently of camera pipeline or model-compilation changes elsewhere in the family.
 
-**A critical design boundary, already decided and now enforced in code:** this project only ever **detects and requests** an E-STOP - it never asserts the physical stop signal itself. `estop.py`'s only real requester implementation, `NullEStopRequester`, records what it would have sent without transmitting anything anywhere - there is no real CAN transport in this repository yet, on purpose. Actually cutting motor power over CAN is [HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)'s (the firmware's) responsibility, on hardware built for that role. Keeping the boundary there means a bug in this Python service can fail to *request* a stop, but can never *prevent* the firmware from enforcing one independently.
+**A critical design boundary, already decided and now enforced in code:** this project only ever **detects and requests** an E-STOP - it never asserts the physical stop signal itself. `estop.py`'s only real requester implementation, `NullEStopRequester`, records what it would have sent without transmitting anything anywhere - there is no real CAN transport in this repository yet, on purpose. Actually cutting motor power over CAN is [HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)'s (the firmware's) responsibility, on hardware built for that role. Keeping the boundary there means a bug in this Python service can fail to *request* a stop, but can never *prevent* the firmware from enforcing one independently. Today the firmware has no E-STOP frame to receive, and `NullEStopRequester` transmits nothing: this defence in depth is the design, and does not exist at the other end yet.
 
 **Honesty check - what actually runs today:** the real entry point (`src/hydra_umc_safety_zones/main.py`) still prints identity/version/role on a bare call, but now also has a real `check --zones PATH --detections PATH [--observation PATH]` subcommand: it loads a zone set (zones + optional calibration metadata), detected-object positions, and an optional observation status from JSON, checks calibration freshness first, then observer health (no observation status, a disabled/errored/stale observer all fail safe the same way a missing calibration does), then runs real breach checking, requests E-STOPs for every Danger breach, and exits 0 (Ready) / 1 (Warning) / 2 (Danger, E-STOP requested) / 3 (Inhibited - calibration missing/expired, or observer missing/disabled/stale/errored) depending on the outcome. What is genuinely not real yet: the Hailo-8 spatial segmentation that would produce those detected-object positions on real hardware, self-occlusion masking, the real observer process whose liveness `--observation` reports, and any real CAN transport for the E-STOP request. See [`CHANGELOG.md`](CHANGELOG.md) for exactly what has shipped so far, and "Current Status & Next Steps" below for what remains open.
 
@@ -146,7 +146,7 @@ No `hardware/`, `firmware/`, `os/` or `models/` folder - see "Advanced Technical
 2. **Virtual environment** - creates `.venv/` if missing; reuses it otherwise.
 3. **Editable install (with dev extras)** - `pip install -e ".[dev]"` so `src/` edits take effect immediately, pulls in `pytest`, and registers the `hydra-umc-safety-zones` console entry point.
 4. **Compile-check** - `python -m compileall -q src` byte-compiles every file under `src/`, catching syntax errors ecosystem-wide.
-5. **Real test suite** - `pytest tests/` runs all 155 tests.
+5. **Real test suite** - `pytest tests/` runs all 186 tests.
 
 `set -euo pipefail` stops the script at the first failing step; the window stays open (`Press Enter to close...`) if it was double-clicked instead of run from an already-open terminal.
 
@@ -159,7 +159,7 @@ Locates the interpreter inside `.venv` (handling both the POSIX and Windows `.ve
 Bare invocation prints name + version + role:
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.1.2
+HYDRA-UMC-SAFETY-ZONES v0.1.3
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
@@ -186,6 +186,8 @@ The real `check` subcommand needs a zones file and a detections file, both plain
 // from an active, recently-updated observer
 {"active": true, "observedAt": "2024-01-15T12:00:00Z", "maxAgeSeconds": 5}
 ```
+
+The dates in these examples are only examples: `calibrated_at` must be recent enough for `max_age_days`, and `observedAt` must be within `maxAgeSeconds` of now (with a time zone, such as a trailing `Z`); with the dates shown, the result today is `INHIBITED`, not the `DANGER` below.
 
 ```bash
 ./run.sh check --zones zones.json --detections detections.json --observation observation.json
@@ -249,7 +251,7 @@ See [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) for the full command/flag/e
 
 ## 🚀 Current Status & Next Steps
 
-**What works today:** real Warning/Danger zone definitions and breach checking (`geometry.py`/`zones.py`/`breach.py`), real calibration-freshness enforcement that fails safe to `INHIBITED` before any breach logic runs (`calibration.py`/`safety_state.py`), a real E-STOP *requesting* pipeline that respects the detect-vs-enforce boundary by construction (`estop.py`), a real `check` CLI subcommand over JSON zone/detection files, and 155 passing tests - see [`CHANGELOG.md`](CHANGELOG.md) for the full real build/run output.
+**What works today:** real Warning/Danger zone definitions and breach checking (`geometry.py`/`zones.py`/`breach.py`), real calibration-freshness enforcement that fails safe to `INHIBITED` before any breach logic runs (`calibration.py`/`safety_state.py`), a real E-STOP *requesting* pipeline that respects the detect-vs-enforce boundary by construction (`estop.py`), a real `check` CLI subcommand over JSON zone/detection files, and 186 passing tests - see [`CHANGELOG.md`](CHANGELOG.md) for the full real build/run output.
 
 **What is still open, in no particular order and with no committed timeline:**
 

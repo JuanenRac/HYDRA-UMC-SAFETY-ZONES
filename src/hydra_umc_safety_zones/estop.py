@@ -37,8 +37,11 @@ class EStopRequest:
     real motor-power cut is entirely up to the firmware receiving it."""
 
     object_id: str
-    zone_id: str
+    zone_id: str  # the first of `zone_ids`, kept for callers that read one zone
     reason: str
+    # every danger zone the object is inside, sorted - `zone_id` alone lost
+    # all but one when an object stood in several at once
+    zone_ids: tuple[str, ...] = ()
 
 
 class EStopRequester(Protocol):
@@ -69,20 +72,24 @@ def request_estop_for(
     and this function only ever handles the latter.
     """
     worst = worst_level_per_object(breaches)
-    danger_zone_by_object = {
-        b.object_id: b.zone_id
-        for b in breaches
-        if b.level is ZoneLevel.DANGER
-    }
+    danger_zones_by_object: dict[str, set[str]] = {}
+    for b in breaches:
+        if b.level is ZoneLevel.DANGER:
+            danger_zones_by_object.setdefault(b.object_id, set()).add(b.zone_id)
     requests: list[EStopRequest] = []
     for object_id, level in worst.items():
         if level is not ZoneLevel.DANGER:
             continue
-        zone_id = danger_zone_by_object[object_id]
+        zone_ids = tuple(sorted(danger_zones_by_object[object_id]))
+        if len(zone_ids) == 1:
+            reason = f"object '{object_id}' breached danger zone '{zone_ids[0]}'"
+        else:
+            reason = f"object '{object_id}' breached danger zones {', '.join(repr(z) for z in zone_ids)}"
         request = EStopRequest(
             object_id=object_id,
-            zone_id=zone_id,
-            reason=f"object '{object_id}' breached danger zone '{zone_id}'",
+            zone_id=zone_ids[0],
+            reason=reason,
+            zone_ids=zone_ids,
         )
         requester.send(request)
         requests.append(request)

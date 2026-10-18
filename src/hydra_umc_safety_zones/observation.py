@@ -27,6 +27,7 @@ honestly infer that on its own.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -65,8 +66,17 @@ class ObservationStatus:
     error: str | None = None
 
     def __post_init__(self) -> None:
-        if self.max_age_seconds <= 0:
-            raise ObservationError("max_age_seconds must be a positive number")
+        # `NaN <= 0` is False, so a bare `<= 0` check lets NaN through, and
+        # `age > NaN` is then always False: an observation that never
+        # expires, i.e. a dead observer read as a confirmed-clear cell.
+        # Infinity does the same. Both are refused here, for a library
+        # caller as much as for JSON.
+        if not math.isfinite(self.max_age_seconds) or self.max_age_seconds <= 0:
+            raise ObservationError("max_age_seconds must be a finite, positive number")
+        if self.observed_at is not None and self.observed_at.tzinfo is None:
+            raise ObservationError(
+                "observed_at must carry a time zone (e.g. a trailing Z): a naive time cannot be compared with the clock"
+            )
 
 
 def observation_age_seconds(observation: ObservationStatus, now: datetime) -> float | None:
@@ -77,17 +87,24 @@ def observation_age_seconds(observation: ObservationStatus, now: datetime) -> fl
     return (now - observation.observed_at).total_seconds()
 
 
+# An observer on another machine or container never has exactly the same
+# clock as this service: a few tens of milliseconds ahead is normal with NTP
+# and must not read as "timestamped in the future" (permanent INHIBITED).
+# Anything further ahead than this is still treated as bad data.
+CLOCK_SKEW_TOLERANCE_S = 0.25
+
+
 def is_observation_stale(observation: ObservationStatus, now: datetime) -> bool:
     """True when there has never been a real observation yet, the last
-    one is too old, or it's somehow timestamped in the future (clock
-    skew, bad data entry) - any of these means `objects` cannot be
+    one is too old, or it's timestamped in the future by more than the
+    clock-skew tolerance (bad data entry, a wrong clock) - any of these means `objects` cannot be
     trusted as confirmed evidence right now. Mirrors
     is_calibration_expired()'s own real semantics for the exact same
     reason - see that function's own doc comment."""
     age = observation_age_seconds(observation, now)
     if age is None:
         return True
-    return age < 0 or age > observation.max_age_seconds
+    return age < -CLOCK_SKEW_TOLERANCE_S or age > observation.max_age_seconds
 
 
 def parse_observation_status(data: dict) -> ObservationStatus:
@@ -114,6 +131,10 @@ def parse_observation_status(data: dict) -> ObservationStatus:
             raise ObservationError(
                 f"observation.observedAt must be an ISO 8601 datetime: {observed_at_raw!r}"
             ) from exc
+        if observed_at.tzinfo is None:
+            raise ObservationError(
+                f"observation.observedAt must carry a time zone (e.g. a trailing Z): {observed_at_raw!r}"
+            )
 
     if "maxAgeSeconds" not in data:
         raise ObservationError("observation is missing required field: maxAgeSeconds")

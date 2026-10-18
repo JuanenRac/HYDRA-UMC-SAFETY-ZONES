@@ -191,4 +191,4 @@ def test_check_invalid_coordinate_inhibits_instead_of_evaluating_geometry(tmp_pa
     out = capsys.readouterr().out
     assert exit_code == 3
     assert "SAFETY STATE: INHIBITED" in out
-    assert "point.x must be finite" in out
+    assert "point.x must be a number" in out

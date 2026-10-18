@@ -10,8 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Licencia-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20Ready-red.svg" alt="Safety">
-  <img src="https://img.shields.io/badge/Latency-<5ms-green.svg" alt="Latency">
+  <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Functional v0 stage">
 </p>
 
@@ -38,6 +37,8 @@
 * 🧱 **NaN がゾーンを無効にすることはありません（ライブラリでも入力端でも）：** `Point3D` は有限でない座標を拒否します（NaN のゾーン角は `contains()` を常に偽にし、決して作動しないゾーンになっていました）。`AABB.expanded()` と `velocity_margin_m()` は NaN や無限大のマージン・速度を拒否し（NaN の速度はすべてのゾーンの周りに NaN の箱を作っていました）、`DetectedObject` は NaN の位置を持てません。*（実装済み）*
 * 🧍 **物体には大きさがあります：** `DetectedObject.radius_m`（JSON `radiusM`、既定 0）で物体は球になり、球が触れるすべてのゾーンを侵害します。中心がゾーンの外にあっても腕が入り込む人は侵害として扱われます（`AABB.intersects_sphere`。`contains()` と同様に境界を含みます。半径 0 は従来の点の挙動と完全に同じです）。*（実装済み）*
 * 🌐 **JSON/HTTP API(v0.0.7):** `serve` サブコマンドは `check` とまったく同じロジック(`evaluate_safety()`/`check_breaches()`/`request_estop_for()`)を、stdlib の `http.server`(`POST /check`、`GET /stats`)経由でCLI以外の呼び出し元にも公開します。デフォルトはループバックのみで、`systemd/hydra-umc-safety-zones.service` ユニットと同じです。すべての実コマンド・フラグ・終了コードは [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) を参照してください。
+* 📏 **速度に比例する安全エンベロープ（v0.1.0、最初の上限付きバージョン）：** `POST /check` は任意の `toolVelocityMps`（実際のヘッド/ツール速度、メートル/秒）を受け付けます。各ゾーンの静的ボリュームは、その速度に比例する余白だけ拡大され、固定の最大値で頭打ちになります。設定された静的ボリュームは常に無条件の下限です。速度を省略した場合やゼロの場合、各ゾーンはバイト単位で変わらず、スケーリングはゾーンを大きくするだけで、決して小さくしません。
+* 🔐 **サーバーは自分のルールを持てます（v0）：** `serve --zones-file PATH` でゾーンとキャリブレーションをサーバー側に固定します（独自のゾーンを送るリクエストは拒否され、すべての判定にファイルの `configSha256` が付きます）。`--max-observation-age-seconds` と `--max-calibration-age-days` は、リクエストが自らの根拠を有効と主張できる期間に上限を設けます。`--token` / `SAFETY_ZONES_TOKEN` で `POST /check` に bearer トークンを要求できます。本文を予告して何も送らないクライアントは 10 秒後に切断されます。`--zones-file` がなければ、ポートに到達できる者がゾーンを決めるため、loopback に留めるかトークンの背後に置いてください。すべての JSON 入力で NaN と Infinity は拒否され、タイムゾーンのない時刻は拒否され、ゾーンのないセルは受け付けられず、CLI が読めないものはすべて `INHIBITED`（終了コード `3`）で、終了コード `1` にはなりません。*（実装済み）*
 * 📐 **動的オクルージョン（計画中）：** ロボット自身の構造を安全トリガーから自動的にマスクし、ロボットが「自分自身」を侵入として検知しないようにします。
 * 🔍 **異物検知（計画中）：** 作業スペースに残された工具や破片を識別します。
 * 🎥 **Hailo-8 による実際の 3D 占有マッピング（計画中）：** v0 の `check` サブコマンドが検知対象位置を JSON ファイルから取得するのは、まさにそれらを実際に生成する Hailo-8 空間セグメンテーションパイプラインがこの環境にまだ存在しないためです——詳細は下記「正直な現状確認」を参照してください。
@@ -52,7 +53,7 @@
 [HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)（ファームウェア）の責任であり、その役割のために構築されたハード
 ウェア上で行われます。この境界を維持することで、本 Python サービス内の
 バグが停止を*リクエストできない*結果になることはあっても、ファームウェア
-が独立して停止を実行することを*妨げる*ことは決してありません。
+が独立して停止を実行することを*妨げる*ことは決してありません。 現在、ファームウェアには受信すべき E-STOP フレームがなく、`NullEStopRequester` は何も送信しません。この多層防御は設計上のものであり、相手側にはまだ存在しません。
 
 **正直な現状確認 —— 今日実際に動くもの：** 実際のエントリポイント
 （`src/hydra_umc_safety_zones/main.py`）は、引数なしで呼び出された場合は
@@ -199,7 +200,7 @@ HYDRA-UMC-SAFETY-ZONES/
 2. **仮想環境** — `.venv/` が存在しない場合は作成し、存在する場合は再利用します。
 3. **Editable インストール（dev エクストラ付き）** — `pip install -e ".[dev]"` により `src/` 下の変更が即座に反映され、`pytest` がインストールされ、`hydra-umc-safety-zones` コンソールエントリポイントが登録されます。
 4. **コンパイルチェック** — `python -m compileall -q src` が `src/` 下の各ファイルをバイトコンパイルし、エコシステム全体にわたる構文エラーを検出します。
-5. **実際のテストスイート** — `pytest tests/` が全 155 件のテストを実行します。
+5. **実際のテストスイート** — `pytest tests/` が全 186 件のテストを実行します。
 
 `set -euo pipefail` は最初に失敗したステップでスクリプトを停止させます。
 ダブルクリックで起動された場合（既に開いているターミナルからではなく）は、
@@ -216,7 +217,7 @@ HYDRA-UMC-SAFETY-ZONES/
 引数なしで呼び出すと名前・バージョン・役割を表示します：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.1.2
+HYDRA-UMC-SAFETY-ZONES v0.1.3
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
@@ -247,6 +248,8 @@ Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-worki
 // 観測者から得られたものであるという実際のエビデンス
 {"active": true, "observedAt": "2024-01-15T12:00:00Z", "maxAgeSeconds": 5}
 ```
+
+これらの例の日付はあくまで例です。`calibrated_at` は `max_age_days` に収まる新しさで、`observedAt` は現在から `maxAgeSeconds` 以内（末尾の `Z` などのタイムゾーン付き）でなければなりません。示した日付のままでは、今日の結果は下の `DANGER` ではなく `INHIBITED` になります。
 
 ```bash
 ./run.sh check --zones zones.json --detections detections.json --observation observation.json
@@ -324,7 +327,7 @@ curl -s -X POST http://127.0.0.1:8108/check -d '{"zones": {...}, "detections": {
 `INHIBITED` にフェイルする実際のキャリブレーション鮮度強制
 （`calibration.py`/`safety_state.py`）、構造上検知と執行の境界を守る
 実際の E-STOP *リクエスト*パイプライン（`estop.py`）、ゾーン/検知 JSON
-ファイルに対する実際の CLI サブコマンド `check`、そして通過した 155 件の
+ファイルに対する実際の CLI サブコマンド `check`、そして通過した 186 件の
 テスト——完全な実際のビルド/実行出力は
 [`CHANGELOG.md`](CHANGELOG.md) を参照してください。
 

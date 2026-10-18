@@ -32,7 +32,7 @@ Bare invocation (no subcommand) prints identity/version/role and exits `0`:
 
 ```
 $ hydra-umc-safety-zones
-HYDRA-UMC-SAFETY-ZONES v0.0.9
+HYDRA-UMC-SAFETY-ZONES v0.1.3
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
@@ -208,23 +208,30 @@ $ echo $?
 3
 ```
 
-**A real error path** — a missing `--zones` file is not caught and
-turned into a friendly message; it's a real, uncaught `FileNotFoundError`
-with a Python traceback on stderr, exit code `1`:
+**A file that is missing, is not JSON or lacks a field** is as untrustworthy as a stale
+calibration: it is reported as `INHIBITED` and exits `3`, never as a traceback with status `1`
+(which means `WARNING`, "slow down"):
 
 ```
 $ hydra-umc-safety-zones check --zones does-not-exist.json --detections detections-clear.json --observation observation-active.json
-Traceback (most recent call last):
-  ...
-  File ".../src/hydra_umc_safety_zones/config.py", line 55, in load_zone_set
-    raw = json.loads(Path(path).read_text(encoding="utf-8"))
-                     ...
-FileNotFoundError: [Errno 2] No such file or directory: 'does-not-exist.json'
+SAFETY STATE: INHIBITED - invalid safety configuration: FileNotFoundError: [Errno 2] No such file or directory: 'does-not-exist.json'
 $ echo $?
-1
+3
 ```
 
-### `serve [--addr ADDR] [--port PORT]`
+The same holds for `NaN`/`Infinity` anywhere in a file (Python's `json` accepts them by default;
+here they are refused), an `observedAt` without a time zone, a `level` that is not lower case
+(`"danger"`, not `"DANGER"`), an empty `zones` list, a zone or object `id` that is empty or used
+twice, and a coordinate that is a boolean or a string.
+
+`--tool-velocity N` (meters/second, finite and not negative) grows every zone by the same
+velocity-proportional margin the API's `toolVelocityMps` does (`0.15 m` per m/s, capped at `0.5 m`).
+
+Two clock tolerances keep a healthy cell from being inhibited by rounding: an observation
+timestamped up to 0.25 s ahead of this machine's clock is not "in the future", and a calibration
+dated one day ahead (a local date written east of UTC) is not expired. Anything further ahead is.
+
+### `serve [--addr ADDR] [--port PORT] [--zones-file PATH] [--token T] [--max-observation-age-seconds S] [--max-calibration-age-days D]`
 
 ```
 $ hydra-umc-safety-zones serve -h
@@ -271,13 +278,27 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
   {"state": "inhibited", "reason": "tracking observer is disabled - dependent functions are inhibited", "breaches": [], "estopRequests": [], "sdkSafetyState": {"schema_version": "1.0", "state": "INHIBITED", "source": "hydra-umc-safety-zones", "timestamp_utc": "..."}}
   ```
 
-  Responds `200` with `{"state", "reason", "breaches", "estopRequests",
+  An object may carry `"radiusM"` (meters, default `0`): it is then a sphere and breaches every
+  zone it touches. `"toolVelocityMps"` (optional, finite and not negative) grows the zones as above.
+  An observer that reports an `error` is published as SDK state `FAULT` (a broken detector), a stale
+  or missing one as `INHIBITED` (not verified); both keep the internal `state` `"inhibited"`.
+
+  **Who decides the zones.** By default the request brings its own `zones` and calibration, so
+  whoever can reach the port decides them: keep it on loopback, or use the options below.
+  `--zones-file PATH` (or `SAFETY_ZONES_FILE`) loads the zones and calibration once at start and a
+  request that sends `zones` is refused with `400`; every verdict then carries `configSha256`, the
+  hash of that file. `--max-observation-age-seconds` and `--max-calibration-age-days` refuse a request
+  whose evidence claims to stay valid longer. `--token` (or `SAFETY_ZONES_TOKEN`) makes `POST /check`
+  demand `Authorization: Bearer <token>` (`401` otherwise); `GET /stats` stays open.
+
+  Requests are limited: a body over 1 MiB is refused, a client silent for 10 s is dropped, and at most
+  32 connections are served at once (`503` beyond). Responds `200` with `{"state", "reason", "breaches", "estopRequests",
   "sdkSafetyState"}` for a well-formed request (including `"inhibited"`,
   which still reports a normal `200` — inhibition is an expected safety
   outcome, not a request error); responds `400` with `{"error": "..."}`
   for a malformed JSON body, a missing `zones`/`detections` key, an
   invalid safety configuration (a non-finite coordinate, same as the
-  CLI), or a structurally malformed `observation` value:
+  CLI, `NaN`/`Infinity` anywhere, a time without a time zone), or a structurally malformed `observation` value:
 
   ```json
   {"zones": {...}, "detections": {...}, "observation": {"active": "not-a-boolean"}}
@@ -286,17 +307,21 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
   {"error": "invalid safety configuration: observation.active must be a boolean: 'not-a-boolean'"}
   ```
 
+  Any other failure inside the check answers `500` with `"state": "inhibited"` and SDK state `FAULT`,
+  never a closed connection and never a state that could be read as clear.
+
   Never asserts an E-STOP — only ever requests one, same
-  `NullEStopRequester` as the CLI.
+  `NullEStopRequester` as the CLI. An object inside several danger zones produces one request that
+  names all of them (`zone_ids`).
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | `0` | `READY` — no breach, calibration valid, observer active and fresh |
-| `1` | `WARNING` — a warning-zone breach, or an uncaught Python exception (e.g. a missing/malformed `--zones`/`--detections`/`--observation` file — not yet a handled, friendly error) |
+| `1` | `WARNING` — a warning-zone breach. Never an error: an input that cannot be read is `3` |
 | `2` | `DANGER` — a danger-zone breach; E-STOP was requested (not asserted) |
-| `3` | `INHIBITED` — calibration missing/expired, or no observer evidence, a disabled/stale/errored observer, or a malformed `--observation` file; the fail-safe path, checked before any breach logic runs |
+| `3` | `INHIBITED` — calibration missing/expired, or no observer evidence, a disabled/stale/errored observer, or any input file that is missing, malformed or invalid (including `NaN`/`Infinity` and times without a time zone); the fail-safe path, checked before any breach logic runs |
 
 ## Not yet implemented
 

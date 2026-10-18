@@ -26,14 +26,41 @@ class ConfigError(ValueError):
     """Raised when a safety JSON coordinate cannot represent a real point."""
 
 
+def _reject_constant(name: str) -> object:
+    raise ValueError(f"{name} is not a valid number in a safety file")
+
+
+def strict_json_loads(raw: str | bytes) -> object:
+    """`json.loads` that refuses the literals NaN, Infinity and -Infinity,
+    which Python accepts by default. A NaN where a number is expected would
+    silently switch a check off (every comparison with NaN is false), so the
+    one place that reads safety JSON refuses them for the whole document."""
+    return json.loads(raw, parse_constant=_reject_constant)
+
+
+def _read_json_file(path: str | Path) -> object:
+    return strict_json_loads(Path(path).read_text(encoding="utf-8"))
+
+
+def _identifier(value: object, what: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"{what} must be a non-empty string, got {value!r}")
+    return value
+
+
 def _point(data: object) -> Point3D:
     if not isinstance(data, dict):
         raise ConfigError("point must be an object with x, y and z")
     values: dict[str, float] = {}
     for axis in ("x", "y", "z"):
+        raw = data.get(axis)
+        # `float(True)` is 1.0 and `float("0.5")` is 0.5: a boolean or a
+        # string in a coordinate is an authoring mistake, not a position.
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            raise ConfigError(f"point.{axis} must be a number, got {raw!r}")
         try:
-            value = float(data[axis])
-        except (KeyError, TypeError, ValueError) as exc:
+            value = float(raw)
+        except (TypeError, ValueError, OverflowError) as exc:
             raise ConfigError(f"point.{axis} must be numeric") from exc
         if not math.isfinite(value):
             raise ConfigError(f"point.{axis} must be finite")
@@ -51,22 +78,41 @@ def parse_zones(raw: dict) -> tuple[Zone, ...]:
     only ever made sense for the CLI, which runs on the same machine as
     the file.
     """
+    entries = raw["zones"]
+    if not isinstance(entries, list):
+        raise ConfigError("zones must be a list")
+    # No zones at all would read as "nothing to protect": READY for any
+    # object anywhere. A cell with no perimeter is a configuration that has
+    # not been written yet, not a safe cell.
+    if not entries:
+        raise ConfigError("zones must not be empty: a cell with no zones is not a safe cell")
     zones = []
-    for entry in raw["zones"]:
-        zones.append(
-            Zone(
-                zone_id=entry["id"],
-                level=ZoneLevel(entry["level"]),
-                volume=AABB(_point(entry["min"]), _point(entry["max"])),
-            )
-        )
+    seen: set[str] = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ConfigError("each zone must be an object")
+        zone_id = _identifier(entry.get("id"), "zone id")
+        if zone_id in seen:
+            raise ConfigError(f"zone id {zone_id!r} is used more than once")
+        seen.add(zone_id)
+        try:
+            level = ZoneLevel(entry.get("level"))
+        except ValueError as exc:
+            raise ConfigError(
+                f"zone {zone_id!r}: level must be one of {[lv.value for lv in ZoneLevel]} (lower case), got {entry.get('level')!r}"
+            ) from exc
+        try:
+            volume = AABB(_point(entry["min"]), _point(entry["max"]))
+        except KeyError as exc:
+            raise ConfigError(f"zone {zone_id!r} is missing {exc}") from exc
+        zones.append(Zone(zone_id=zone_id, level=level, volume=volume))
     return tuple(zones)
 
 
 def load_zones(path: str | Path) -> tuple[Zone, ...]:
     """Reads `path` and parses it via `parse_zones` - see that function's
     own docstring for the real JSON shape."""
-    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    raw = _read_json_file(path)
     return parse_zones(raw)
 
 
@@ -89,7 +135,7 @@ def parse_zone_set(raw: dict) -> ZoneSet:
 def load_zone_set(path: str | Path) -> ZoneSet:
     """Reads `path` and parses it via `parse_zone_set` - see that
     function's own docstring for the real JSON shape."""
-    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    raw = _read_json_file(path)
     return parse_zone_set(raw)
 
 
@@ -107,20 +153,33 @@ def parse_detections(raw: dict) -> tuple[DetectedObject, ...]:
     ``{"objects": [{"id": "...", "position": {"x", "y", "z"}, "radiusM": 0.3}, ...]}``.
     ``radiusM`` is optional (default 0: the object is its one point); with it, an object breaches every zone its sphere touches.
     """
+    entries = raw["objects"]
+    if not isinstance(entries, list):
+        raise ConfigError("objects must be a list")
     objects = []
-    for entry in raw["objects"]:
-        objects.append(
-            DetectedObject(
-                object_id=entry["id"], position=_point(entry["position"]), radius_m=_radius(entry.get("radiusM", 0.0))
-            )
-        )
+    seen: set[str] = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise ConfigError("each object must be an object")
+        object_id = _identifier(entry.get("id"), "object id")
+        if object_id in seen:
+            raise ConfigError(f"object id {object_id!r} is used more than once: reports and stop requests would be ambiguous")
+        seen.add(object_id)
+        try:
+            position = _point(entry["position"])
+            radius = _radius(entry.get("radiusM", 0.0))
+        except KeyError as exc:
+            raise ConfigError(f"object {object_id!r} is missing {exc}") from exc
+        except ValueError as exc:
+            raise ConfigError(f"object {object_id!r}: {exc}") from exc
+        objects.append(DetectedObject(object_id=object_id, position=position, radius_m=radius))
     return tuple(objects)
 
 
 def load_detections(path: str | Path) -> tuple[DetectedObject, ...]:
     """Reads `path` and parses it via `parse_detections` - see that
     function's own docstring for the real JSON shape."""
-    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    raw = _read_json_file(path)
     return parse_detections(raw)
 
 
@@ -148,5 +207,7 @@ def load_observation_status(path: str | Path) -> ObservationStatus:
     """Reads `path` and parses it via `parse_observation_status`
     (observation.py) - see that function's own docstring for the real
     JSON shape."""
-    raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    raw = _read_json_file(path)
+    if not isinstance(raw, dict):
+        raise ConfigError("an observation file must hold a JSON object")
     return parse_observation_status(raw)

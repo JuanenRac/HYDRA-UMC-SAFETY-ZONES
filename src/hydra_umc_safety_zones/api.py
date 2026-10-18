@@ -18,18 +18,25 @@ be wired to actually assert it (see estop.py's own module docstring).
 """
 from __future__ import annotations
 
+import hmac
 import json
+import threading
 from dataclasses import asdict
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 from .breach import check_breaches
-from .config import ConfigError, parse_detections, parse_tool_velocity, parse_zone_set
+from .config import ConfigError, parse_detections, parse_tool_velocity, parse_zone_set, strict_json_loads
 from .estop import NullEStopRequester, request_estop_for
 from .observation import ObservationError, parse_observation_status
-from .safety_state import SafetyState, evaluate_safety, to_sdk_safety_state
-from .zones import scale_zones_for_velocity
+from .safety_state import SafetyEvaluation, SafetyState, evaluate_safety, to_sdk_safety_state
+from .zones import ZoneSet, scale_zones_for_velocity
+
+# Connections served at the same time. A client that opens many connections
+# and sends nothing must not be able to use up the threads and the memory of
+# a service other things wait on to move.
+MAX_CONNECTIONS = 32
 
 
 def _write_json(handler: BaseHTTPRequestHandler, status: int, payload: object) -> None:
@@ -52,16 +59,23 @@ def _write_error(handler: BaseHTTPRequestHandler, status: int, message: str) -> 
 
 
 MAX_BODY_BYTES = 1024 * 1024
-# How much of an oversized body this drains before responding - a real,
-# reproducible race already found and fixed for this exact class of gap
-# in HYDRA-UMC-ANOMALY-DETECTOR (ecosystem-wide software-improvements
-# audit): rejecting an over-limit request without reading any of it left
-# the client's own send() still in flight when the handler closed the
-# connection, so on a body bigger than the OS socket buffer the client
-# saw a raw ConnectionAbortedError instead of this clean 400. Draining up
-# to this many bytes lets the client finish sending before the response
-# goes out, without ever holding more than one bounded read in memory.
+# How much of an oversized body is drained before responding: rejecting an
+# over-limit request without reading any of it leaves the client's own send()
+# still in flight when the connection closes, so on a body bigger than the OS
+# socket buffer the client saw a raw ConnectionAbortedError instead of the
+# clean 400. The drain is read in blocks of DRAIN_BLOCK_BYTES, so it never
+# holds more than one block in memory, and gives up at DRAIN_CAP_BYTES.
 DRAIN_CAP_BYTES = MAX_BODY_BYTES * 16
+DRAIN_BLOCK_BYTES = 64 * 1024
+
+
+def _drain(handler: BaseHTTPRequestHandler, length: int) -> None:
+    remaining = length
+    while remaining > 0:
+        chunk = handler.rfile.read(min(DRAIN_BLOCK_BYTES, remaining))
+        if not chunk:
+            return
+        remaining -= len(chunk)
 
 
 def _read_json_body(handler: BaseHTTPRequestHandler) -> dict:
@@ -71,14 +85,25 @@ def _read_json_body(handler: BaseHTTPRequestHandler) -> dict:
         raise ValueError("Content-Length must be an integer") from error
     if length < 0 or length > MAX_BODY_BYTES:
         if 0 <= length <= DRAIN_CAP_BYTES:
-            handler.rfile.read(length)
+            _drain(handler, length)
         raise ValueError(f"request body must contain 0-{MAX_BODY_BYTES} bytes")
     raw = handler.rfile.read(length) if length else b"{}"
-    return json.loads(raw)
+    # NaN, Infinity and -Infinity are refused anywhere in the body (Python's
+    # json accepts them by default): a NaN where a number belongs switches a
+    # check off.
+    body = strict_json_loads(raw)
+    if not isinstance(body, dict):
+        raise ValueError("the body must be a JSON object")
+    return body
 
 
 class Handler(BaseHTTPRequestHandler):
     server: "SafetyZonesServer"
+
+    # Seconds a client may stay silent on its connection before the server
+    # drops it: without it a client that announces a body and sends nothing
+    # holds a thread for ever.
+    timeout = 10.0
 
     def log_message(self, format: str, *args: object) -> None:  # noqa: A002
         pass  # quiet by default, same reasoning as this family's other api.py files
@@ -89,21 +114,68 @@ class Handler(BaseHTTPRequestHandler):
         else:
             _write_error(self, 404, "not found")
 
+    def _authorized(self) -> bool:
+        token = self.server.token
+        if not token:
+            return True
+        header = self.headers.get("Authorization", "")
+        if not header.startswith("Bearer "):
+            return False
+        return hmac.compare_digest(header[len("Bearer "):].strip().encode("utf-8"), token.encode("utf-8"))
+
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
+        if path == "/check" and not self._authorized():
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", "Bearer")
+            body = b'{"error": "a valid Authorization: Bearer token is required"}'
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return
         try:
             body = _read_json_body(self)
         except (json.JSONDecodeError, ValueError) as e:
             _write_error(self, 400, f"malformed JSON body: {e}")
             return
-        if path == "/check":
-            self._handle_check(body)
-        else:
+        if path != "/check":
             _write_error(self, 404, "not found")
+            return
+        try:
+            self._handle_check(body)
+        except Exception as e:  # noqa: BLE001 - never a closed socket with no state
+            # The caller must get a verdict it cannot misread as "all clear":
+            # an explicit FAULT, with the cell treated as not verified.
+            evaluation = SafetyEvaluation(SafetyState.INHIBITED, f"internal error: {type(e).__name__}", fault=True)
+            try:
+                _write_json(
+                    self,
+                    500,
+                    {
+                        "error": f"internal error: {type(e).__name__}",
+                        "state": evaluation.state.value,
+                        "reason": evaluation.reason,
+                        "breaches": [],
+                        "estopRequests": [],
+                        "sdkSafetyState": to_sdk_safety_state(evaluation),
+                    },
+                )
+            except OSError:
+                pass
 
     def _handle_check(self, body: dict) -> None:
         try:
-            zone_set = parse_zone_set(body["zones"])
+            if self.server.zone_set is not None:
+                # Authoritative mode: the zones and calibration are the
+                # server's own. A request that brings its own is refused,
+                # not silently ignored, so nobody believes they were used.
+                if "zones" in body:
+                    _write_error(self, 400, "this server holds its own zones (--zones-file): a request must not send zones")
+                    return
+                zone_set = self.server.zone_set
+            else:
+                zone_set = parse_zone_set(body["zones"])
             objects = parse_detections(body["detections"])
             # an "observation" key at all is optional in the request
             # body (a caller not yet updated to send it must not get a
@@ -122,8 +194,13 @@ class Handler(BaseHTTPRequestHandler):
         except KeyError as e:
             _write_error(self, 400, f"missing required field: {e}")
             return
-        except (ConfigError, ObservationError, KeyError, TypeError, ValueError) as e:
+        except (ConfigError, ObservationError, TypeError, ValueError) as e:
             _write_error(self, 400, f"invalid safety configuration: {e}")
+            return
+
+        limit_error = self._limit_violation(zone_set, observation)
+        if limit_error:
+            _write_error(self, 400, limit_error)
             return
 
         today = datetime.now(timezone.utc).date()
@@ -143,6 +220,9 @@ class Handler(BaseHTTPRequestHandler):
             # header comment for why both must keep existing side by side).
             "sdkSafetyState": to_sdk_safety_state(evaluation),
         }
+        if self.server.config_sha256:
+            # which configuration this verdict was reached with
+            response["configSha256"] = self.server.config_sha256
 
         if evaluation.state in (SafetyState.INHIBITED, SafetyState.READY):
             _write_json(self, 200, response)
@@ -165,7 +245,55 @@ class Handler(BaseHTTPRequestHandler):
         _write_json(self, 200, response)
 
 
+    def _limit_violation(self, zone_set: ZoneSet, observation: object) -> str | None:
+        """The server's own ceilings on what a request may claim about how
+        long its evidence stays valid, or None when the request is within them."""
+        cap_seconds = self.server.max_observation_age_seconds
+        max_age = getattr(observation, "max_age_seconds", None)
+        if cap_seconds is not None and max_age is not None and max_age > cap_seconds:
+            return f"observation.maxAgeSeconds {max_age} exceeds the {cap_seconds} this server accepts"
+        cap_days = self.server.max_calibration_age_days
+        calibration = zone_set.calibration
+        if cap_days is not None and calibration is not None and calibration.max_age_days > cap_days:
+            return f"calibration.max_age_days {calibration.max_age_days} exceeds the {cap_days} this server accepts"
+        return None
+
+
 class SafetyZonesServer(ThreadingHTTPServer):
-    def __init__(self, address: tuple[str, int], role: str) -> None:
+    daemon_threads = True
+
+    def __init__(
+        self,
+        address: tuple[str, int],
+        role: str,
+        *,
+        token: str | None = None,
+        zone_set: ZoneSet | None = None,
+        config_sha256: str | None = None,
+        max_observation_age_seconds: float | None = None,
+        max_calibration_age_days: int | None = None,
+    ) -> None:
         super().__init__(address, Handler)
         self.role = role
+        self.token = token or None
+        self.zone_set = zone_set
+        self.config_sha256 = config_sha256
+        self.max_observation_age_seconds = max_observation_age_seconds
+        self.max_calibration_age_days = max_calibration_age_days
+        self._connections = threading.BoundedSemaphore(MAX_CONNECTIONS)
+
+    def process_request(self, request, client_address) -> None:  # type: ignore[no-untyped-def]
+        if not self._connections.acquire(blocking=False):
+            try:
+                request.sendall(b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            except OSError:
+                pass
+            self.shutdown_request(request)
+            return
+        super().process_request(request, client_address)
+
+    def process_request_thread(self, request, client_address) -> None:  # type: ignore[no-untyped-def]
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._connections.release()

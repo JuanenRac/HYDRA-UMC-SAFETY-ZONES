@@ -10,8 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Lizenz-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20Ready-red.svg" alt="Safety">
-  <img src="https://img.shields.io/badge/Latenz-%3C5ms-green.svg" alt="Latenz">
+  <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20angestrebt-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stufe-Funktional%20v0-yellow.svg" alt="Funktionale v0-Stufe">
 </p>
 
@@ -33,12 +32,14 @@ Dies ist eines der 4 Kind-Projekte von **[HYDRA-UMC-VISION-NODE](https://github.
 * 🧱 **Kein NaN schaltet eine Zone ab, weder in der Bibliothek noch am Rand:** `Point3D` weist nicht endliche Koordinaten zurück (eine NaN-Ecke machte `contains()` immer falsch: eine Zone, die nie auslöst), `AABB.expanded()` und `velocity_margin_m()` weisen einen NaN- oder unendlichen Rand bzw. eine solche Geschwindigkeit zurück (eine NaN-Geschwindigkeit baute um jede Zone eine Box aus NaN), und ein `DetectedObject` kann keine NaN-Position haben. *(implementiert)*
 * 🧍 **Objekte haben eine Ausdehnung:** `DetectedObject.radius_m` (JSON `radiusM`, Standard 0) macht ein Objekt zu einer Kugel: Es verletzt jede Zone, die die Kugel berührt, sodass eine Person, deren Mittelpunkt außerhalb einer Zone liegt, deren Arm aber hineinreicht, eine Verletzung ist (`AABB.intersects_sphere`, inklusiv wie `contains()`; Radius 0 ist genau das frühere Punktverhalten). *(implementiert)*
 * 🌐 **JSON/HTTP-API (v0.0.7):** der Subbefehl `serve` stellt exakt dieselbe `check`-Logik (`evaluate_safety()`/`check_breaches()`/`request_estop_for()`) über einen stdlib-`http.server` bereit (`POST /check`, `GET /stats`) für Aufrufer, die nicht die CLI sind - standardmäßig nur Loopback, passend zur `systemd/hydra-umc-safety-zones.service`-Unit. Siehe [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) für jeden echten Befehl, jedes Flag und jeden Exit-Code.
+* 📏 **Geschwindigkeitsproportionale Sicherheitshüllen (v0.1.0, erste begrenzte Version):** `POST /check` akzeptiert ein optionales `toolVelocityMps` (reale Kopf-/Werkzeuggeschwindigkeit, Meter/Sekunde) - das statische Volumen jeder Zone wächst dann um einen in dieser Geschwindigkeit linearen Spielraum (`AABB.expanded()`), begrenzt auf ein festes Maximum. Das konfigurierte statische Volumen ist immer die unbedingte Untergrenze: Eine fehlende oder null Geschwindigkeit lässt jede Zone Byte für Byte unverändert, und die Skalierung kann eine Zone nur vergrößern, nie verkleinern.
+* 🔐 **Der Server kann eigene Regeln halten (v0):** `serve --zones-file PATH` legt Zonen und Kalibrierung auf dem Server fest (eine Anfrage mit eigenen Zonen wird abgelehnt, und jedes Urteil trägt den `configSha256` der Datei); `--max-observation-age-seconds` und `--max-calibration-age-days` begrenzen, wie lange eine Anfrage ihre Belege als gültig ausgeben darf; `--token` / `SAFETY_ZONES_TOKEN` lässt `POST /check` ein Bearer-Token verlangen; ein Client, der einen Body ankündigt und nichts sendet, wird nach 10 s fallen gelassen. Ohne `--zones-file` bestimmt jeder, der den Port erreicht, die Zonen; halte ihn also auf Loopback oder hinter einem Token. NaN und Infinity werden in jeder JSON-Eingabe abgelehnt, eine Zeit ohne Zeitzone wird abgelehnt, eine Zelle ohne Zonen wird nicht akzeptiert, und alles, was die CLI nicht lesen kann, ist `INHIBITED` (Exit `3`), nie Exit `1`. *(implementiert)*
 * 📐 **Dynamische Verdeckung (geplant):** automatisches Ausblenden der eigenen Struktur des Roboters aus Sicherheitsauslösern, damit der Roboter sich nicht selbst als Eindringling "erkennt".
 * 🔍 **Fremdobjekterkennung (geplant):** Identifizierung von im Arbeitsbereich zurückgelassenen Werkzeugen oder Trümmern.
 * 🎥 **Echte 3D-Belegungskartierung von Hailo-8 (geplant):** der `check`-Subbefehl von v0 nimmt erkannte Objektpositionen aus einer JSON-Datei, gerade weil die echte Hailo-8-Segmentierungs-Pipeline, die sie erzeugen würde, in dieser Umgebung noch nicht existiert - siehe "Ehrlichkeitscheck" unten.
 * 🧩 **Warum als eigenes Projekt:** Sicherheitslogik hat eine andere Verifikationsschwelle als der Rest der Wahrnehmung - sie in einem eigenen Dienst zu isolieren erlaubt es, sie unabhängig von Änderungen an der Kamera-Pipeline oder der Modellkompilierung anderswo in der Familie zu testen, zu prüfen und letztlich zu zertifizieren (siehe das ISO-13849-1-Badge oben, in dieser Phase noch angestrebt).
 
-**Eine kritische, bereits getroffene und nun im Code durchgesetzte Design-Grenze:** Dieses Projekt **erkennt und fordert** einen E-STOP nur **an** - es löst nie selbst das physische Stoppsignal aus. Der einzige echte Requester in `estop.py`, `NullEStopRequester`, zeichnet auf, was er gesendet hätte, ohne irgendetwas irgendwohin zu übertragen - es gibt absichtlich noch keinen echten CAN-Transport in diesem Repository. Das tatsächliche Kappen der Motorleistung über CAN ist Aufgabe von [HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC) (der Firmware), auf für diese Rolle gebauter Hardware. Diese Grenze dort zu halten bedeutet, dass ein Fehler in diesem Python-Dienst dazu führen kann, dass ein Stopp nicht *angefordert* wird, aber nie *verhindern* kann, dass die Firmware ihn unabhängig durchsetzt.
+**Eine kritische, bereits getroffene und nun im Code durchgesetzte Design-Grenze:** Dieses Projekt **erkennt und fordert** einen E-STOP nur **an** - es löst nie selbst das physische Stoppsignal aus. Der einzige echte Requester in `estop.py`, `NullEStopRequester`, zeichnet auf, was er gesendet hätte, ohne irgendetwas irgendwohin zu übertragen - es gibt absichtlich noch keinen echten CAN-Transport in diesem Repository. Das tatsächliche Kappen der Motorleistung über CAN ist Aufgabe von [HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC) (der Firmware), auf für diese Rolle gebauter Hardware. Diese Grenze dort zu halten bedeutet, dass ein Fehler in diesem Python-Dienst dazu führen kann, dass ein Stopp nicht *angefordert* wird, aber nie *verhindern* kann, dass die Firmware ihn unabhängig durchsetzt. Heute hat die Firmware keinen E-STOP-Frame zu empfangen, und `NullEStopRequester` sendet nichts: Diese gestaffelte Absicherung ist der Entwurf und existiert am anderen Ende noch nicht.
 
 **Ehrlichkeitscheck - was heute wirklich läuft:** Der reale Einstiegspunkt (`src/hydra_umc_safety_zones/main.py`) gibt bei einem argumentlosen Aufruf weiterhin Identität/Version/Rolle aus, hat jetzt aber auch einen echten `check --zones PFAD --detections PFAD [--observation PFAD]`-Subbefehl: Er lädt eine Zonenmenge (Zonen + optionale Kalibrierungsmetadaten), erkannte Objektpositionen und einen optionalen Beobachtungsstatus aus JSON, prüft zuerst die Kalibrierungsfrische, dann die Beobachter-Gesundheit (fehlender Beobachtungsstatus, ein deaktivierter/fehlerhafter/veralteter Beobachter lösen sich genauso zu `INHIBITED` auf wie eine fehlende Kalibrierung), führt dann eine echte Verletzungsprüfung durch, fordert E-STOPs für jede Danger-Verletzung an und beendet sich mit 0 (Ready) / 1 (Warning) / 2 (Danger, E-STOP angefordert) / 3 (Inhibited - Kalibrierung fehlt/abgelaufen, oder Beobachter fehlt/deaktiviert/veraltet/fehlerhaft) je nach Ergebnis. Was wirklich noch nicht real ist: die Hailo-8-Segmentierung, die diese erkannten Objektpositionen auf echter Hardware erzeugen würde, die Selbstverdeckungsmaskierung, der reale Beobachterprozess, dessen Lebendigkeit `--observation` meldet, und jeglicher echter CAN-Transport für die E-STOP-Anforderung. Siehe [`CHANGELOG.md`](CHANGELOG.md) für genau das, was bisher geliefert wurde, und "Aktueller Status & Nächste Schritte" unten für das, was noch offen ist.
 
@@ -145,7 +146,7 @@ Kein `hardware/`-, `firmware/`-, `os/`- oder `models/`-Ordner - siehe "Erweitert
 2. **Virtuelle Umgebung** - erstellt `.venv/`, falls nicht vorhanden; verwendet es sonst weiter.
 3. **Editierbare Installation (mit Dev-Extras)** - `pip install -e ".[dev]"`, sodass Änderungen unter `src/` sofort wirken, installiert `pytest` und registriert den Konsolen-Einstiegspunkt `hydra-umc-safety-zones`.
 4. **Compile-Check** - `python -m compileall -q src` kompiliert jede Datei unter `src/` zu Bytecode.
-5. **Echte Testsuite** - `pytest tests/` führt alle 155 Tests aus.
+5. **Echte Testsuite** - `pytest tests/` führt alle 186 Tests aus.
 
 `set -euo pipefail` stoppt das Skript beim ersten fehlschlagenden Schritt; das Fenster bleibt geöffnet (`Press Enter to close...`), wenn es per Doppelklick statt aus einem bereits geöffneten Terminal gestartet wurde.
 
@@ -158,7 +159,7 @@ Sucht den Interpreter innerhalb von `.venv` und führt `python -m hydra_umc_safe
 Der argumentlose Aufruf gibt Name + Version + Rolle aus:
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.1.2
+HYDRA-UMC-SAFETY-ZONES v0.1.3
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
@@ -185,6 +186,8 @@ Der echte `check`-Subbefehl braucht eine Zonen- und eine Erkennungsdatei, beide 
 // einem aktiven, kürzlich aktualisierten Beobachter stammen
 {"active": true, "observedAt": "2024-01-15T12:00:00Z", "maxAgeSeconds": 5}
 ```
+
+Die Daten in diesen Beispielen sind nur Beispiele: `calibrated_at` muss für `max_age_days` aktuell genug sein, und `observedAt` muss innerhalb von `maxAgeSeconds` vor jetzt liegen (mit Zeitzone, etwa einem abschließenden `Z`); mit den gezeigten Daten ist das Ergebnis heute `INHIBITED`, nicht das unten gezeigte `DANGER`.
 
 ```bash
 ./run.sh check --zones zones.json --detections detections.json --observation observation.json
@@ -246,7 +249,7 @@ Siehe [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) für die vollständige Be
 
 ## 🚀 Aktueller Status & Nächste Schritte
 
-**Was heute funktioniert:** echte Warning-/Danger-Zonendefinitionen und echte Verletzungsprüfung (`geometry.py`/`zones.py`/`breach.py`), echte Durchsetzung der Kalibrierungsfrische, die vor jeglicher Verletzungslogik sicher zu `INHIBITED` fehlschlägt (`calibration.py`/`safety_state.py`), eine echte E-STOP-*Anforderungs*-Pipeline, die die Erkennen-vs-Durchsetzen-Grenze konstruktionsbedingt respektiert (`estop.py`), ein echter CLI-Subbefehl `check` über JSON-Zonen-/Erkennungsdateien und 155 bestandene Tests - siehe [`CHANGELOG.md`](CHANGELOG.md) für die vollständige echte Build-/Run-Ausgabe.
+**Was heute funktioniert:** echte Warning-/Danger-Zonendefinitionen und echte Verletzungsprüfung (`geometry.py`/`zones.py`/`breach.py`), echte Durchsetzung der Kalibrierungsfrische, die vor jeglicher Verletzungslogik sicher zu `INHIBITED` fehlschlägt (`calibration.py`/`safety_state.py`), eine echte E-STOP-*Anforderungs*-Pipeline, die die Erkennen-vs-Durchsetzen-Grenze konstruktionsbedingt respektiert (`estop.py`), ein echter CLI-Subbefehl `check` über JSON-Zonen-/Erkennungsdateien und 186 bestandene Tests - siehe [`CHANGELOG.md`](CHANGELOG.md) für die vollständige echte Build-/Run-Ausgabe.
 
 **Was noch offen ist, ohne bestimmte Reihenfolge und ohne verbindlichen Zeitplan:**
 

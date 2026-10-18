@@ -47,6 +47,10 @@ class SafetyEvaluation:
 
     state: SafetyState
     reason: str
+    # True when the observer itself reported an internal failure: the SDK
+    # state is then FAULT (an avería), not INHIBITED (not verified), so a
+    # consumer can tell a broken detector from an unconfirmed one.
+    fault: bool = False
 
 
 def evaluate_safety(
@@ -105,6 +109,7 @@ def evaluate_safety(
         return SafetyEvaluation(
             SafetyState.INHIBITED,
             f"observer reported an internal error: {observation.error}",
+            fault=True,
         )
     if not observation.active:
         return SafetyEvaluation(
@@ -190,7 +195,7 @@ def to_sdk_safety_state(evaluation: SafetyEvaluation, source: str = "hydra-umc-s
     """
     return {
         "schema_version": SDK_SAFETY_STATE_SCHEMA_VERSION,
-        "state": _SDK_STATE_BY_INTERNAL_STATE[evaluation.state],
+        "state": "FAULT" if evaluation.fault else _SDK_STATE_BY_INTERNAL_STATE[evaluation.state],
         "source": source,
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
     }
