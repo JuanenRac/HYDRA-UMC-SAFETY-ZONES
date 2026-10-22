@@ -4,7 +4,7 @@ version = "0.1.4"
 description = "Real-time 3D intrusion detection and E-STOP orchestration system for robotic safe-working areas, driven by Hailo-8 spatial segmentation on HYDRA-UMC-VISION-NODE."
 readme = "README.md"
 requires-python = ">=3.10"
-license = { text = "GPL-3.0-only" }
+license = { text = "GPL-3.0-or-later" }
 authors = [{ name = "JuanenRac", email = "electrohobby3d@gmail.com" }]
 # No runtime dependencies yet - v0's zone/breach/E-STOP-request logic is
 # stdlib-only (dataclasses, json, argparse). Planned once real perception
