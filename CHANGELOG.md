@@ -1,14 +1,6 @@
 # Changelog
 
-All notable changes to HYDRA-UMC-SAFETY-ZONES are documented in this file.
-
-Versioning follows the ecosystem-wide `MAJOR.MINOR.PATCH` "odometer" scheme,
-applied automatically on every real build by `bump_version.py` (invoked
-from build.sh/build.bat right before the compile-check): `PATCH` goes up by
-1 per build; once `PATCH` would exceed 9 it resets to 0 and `MINOR` goes up
-by 1 instead (e.g. `0.0.9` -> `0.1.0`), the same carry cascading into
-`MAJOR` if `MINOR` also exceeds 9. `MAJOR` is otherwise only ever bumped by
-hand.
+All notable changes to this project are documented here.
 
 ## [Unreleased]
 
