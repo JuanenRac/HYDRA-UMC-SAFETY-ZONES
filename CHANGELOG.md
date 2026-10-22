@@ -12,6 +12,7 @@ hand.
 
 ## [Unreleased]
 
+- The banner follows the animated style of the ecosystem banners, with the name, the kind and the technologies of the project.
 - **The licence declared in the package metadata is GPL-3.0-or-later,** like the headers of the code and the rest of the ecosystem (it said GPL-3.0-only).
 - Added `tools/hydra_project_tool.py`: the same `validate`, `test`, `version`, `status` and `bump` commands in every repository. The checks run with `HYDRA_UMC_CI=1` and fail if the version changes; only `bump` changes it.
 - 42 new tests (228 in total, branch coverage of the package from 89 % to 94 %) for the paths that must never read as all clear: a body over the limit, a `Content-Length` that is not a size, a crash inside the evaluation (the answer is `inhibited` with a fault, never `ready`), a flood of idle connections (the 33rd is turned away with 503 and the slots come back), every malformed shape of the zones, detections, calibration, tool-velocity and observation inputs, and the `serve` command started for real with a zones file (fixed zones, configuration hash in every verdict, bearer token, a request that brings its own zones is refused).
