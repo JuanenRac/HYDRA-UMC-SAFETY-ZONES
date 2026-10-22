@@ -124,7 +124,7 @@ HYDRA-UMC-SAFETY-ZONES/
 ├── systemd/
 │   └── hydra-umc-safety-zones.service # Unità systemd della API locale di controllo violazioni sulla CM5
 ├── pyproject.toml       # Metadati pacchetto, dipendenze, versione contachilometri
-├── bump_version.py      # Incremento versione nativa tipo contachilometri (build.sh/.bat)
+├── bump_version.py      # Incremento di versione stile contachilometri (eseguito solo dal comando `bump` esplicito)
 ├── bump_manifest_version.py # Sincronizza la versione di hydra-umc.project.json con quella nativa (--sync)
 ├── build.sh / build.bat # venv + installazione editabile (extra dev) + compile-check + test
 ├── build-test.sh / .bat # Verifica di build senza versionamento (non tocca mai version o CHANGELOG)
@@ -154,7 +154,7 @@ Nessuna cartella `hardware/`, `firmware/`, `os/` o `models/` - vedi "Informazion
 ./build.sh
 ```
 
-1. **Incremento versione contachilometri** - esegue `bump_version.py`, incrementando `PATCH` in `pyproject.toml` a ogni build, poi sincronizza `hydra-umc.project.json` di conseguenza.
+1. **Lettura della versione** - legge e stampa la versione del progetto; compilare non la cambia mai (solo `python tools/hydra_project_tool.py bump` la alza).
 2. **Ambiente virtuale** - crea `.venv/` se manca; lo riutilizza altrimenti.
 3. **Installazione editabile (con extra dev)** - `pip install -e ".[dev]"` così le modifiche sotto `src/` hanno effetto immediato, installa `pytest`, e registra l'entry point da console `hydra-umc-safety-zones`.
 4. **Compile-check** - `python -m compileall -q src` compila in bytecode ogni file sotto `src/`.

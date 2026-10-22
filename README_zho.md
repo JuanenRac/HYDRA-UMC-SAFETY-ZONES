@@ -159,7 +159,7 @@ HYDRA-UMC-SAFETY-ZONES/
 ├── systemd/
 │   └── hydra-umc-safety-zones.service # 本地 CM5 区域越界检查 API 的 systemd 单元
 ├── pyproject.toml       # 包元数据、依赖项、里程表版本号
-├── bump_version.py      # 原生版本的里程表式递增（由 build.sh/.bat 运行）
+├── bump_version.py      # 里程表式版本递增（仅由显式 `bump` 命令运行）
 ├── bump_manifest_version.py # 将 hydra-umc.project.json 的版本与原生版本同步(--sync)
 ├── build.sh / build.bat # venv + 可编辑安装（含 dev 附加依赖） + 编译检查 + 测试
 ├── build-test.sh / .bat # 不涉及版本递增的构建检查（从不修改 version 或 CHANGELOG）
@@ -191,7 +191,7 @@ HYDRA-UMC-SAFETY-ZONES/
 ./build.sh
 ```
 
-1. **里程表式版本递增** —— 运行 `bump_version.py`，每次构建时在 `pyproject.toml` 中递增 `PATCH`（按上述规则进位到 `MINOR`/`MAJOR`），随后同步 `hydra-umc.project.json` 以保持一致。
+1. **版本读取** —— 读取并显示项目版本；构建绝不会更改它（只有 `python tools/hydra_project_tool.py bump` 才会提升）。
 2. **虚拟环境** —— 若 `.venv/` 不存在则创建；否则复用。
 3. **可编辑安装（含 dev 附加依赖）** —— `pip install -e ".[dev]"`，使 `src/` 下的修改立即生效，安装 `pytest`，并注册 `hydra-umc-safety-zones` 控制台入口点。
 4. **编译检查** —— `python -m compileall -q src` 对 `src/` 下每个文件进行字节码编译，在整个生态系统范围内捕获语法错误。

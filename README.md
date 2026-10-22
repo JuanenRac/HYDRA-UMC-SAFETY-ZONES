@@ -124,7 +124,7 @@ HYDRA-UMC-SAFETY-ZONES/
 ├── systemd/
 │   └── hydra-umc-safety-zones.service # Local CM5 zone-breach check API systemd unit
 ├── pyproject.toml       # Package metadata, dependencies, odometer version
-├── bump_version.py      # Odometer-style native version bump (run by build.sh/.bat)
+├── bump_version.py      # Odometer-style version bump (run only by the explicit `bump` command)
 ├── bump_manifest_version.py # Syncs hydra-umc.project.json's version to the native one (--sync)
 ├── build.sh / build.bat # venv + editable install (dev extras) + compile-check + tests
 ├── build-test.sh / .bat # Non-versioning build check (never touches version or CHANGELOG)
@@ -154,7 +154,7 @@ No `hardware/`, `firmware/`, `os/` or `models/` folder - see "Advanced Technical
 ./build.sh
 ```
 
-1. **Odometer version bump** - runs `bump_version.py`, incrementing `PATCH` in `pyproject.toml` on every build (carrying into `MINOR`/`MAJOR` per the rule above), then syncs `hydra-umc.project.json` to match.
+1. **Version check** - reads and prints the project version; building never changes it (only `python tools/hydra_project_tool.py bump` raises it).
 2. **Virtual environment** - creates `.venv/` if missing; reuses it otherwise.
 3. **Editable install (with dev extras)** - `pip install -e ".[dev]"` so `src/` edits take effect immediately, pulls in `pytest`, and registers the `hydra-umc-safety-zones` console entry point.
 4. **Compile-check** - `python -m compileall -q src` byte-compiles every file under `src/`, catching syntax errors ecosystem-wide.
