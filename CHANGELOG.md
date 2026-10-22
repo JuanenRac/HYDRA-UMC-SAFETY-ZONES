@@ -201,7 +201,6 @@ check) - not just each side trusting the other's own unit tests.
   repo's own `tests/test_cli.py` fixture shapes) - 57 total.
 
 ## [0.0.4] - established: real calibration-freshness enforcement, fail-safe by default
-### Added
 - `calibration.py` - real `ZoneCalibration` (version, source, `calibrated_at`, `max_age_days`) and `parse_calibration()`, raising `CalibrationError` on any missing/malformed field. `calibration_age_days()`/`is_calibration_expired()` treat a calibration older than its own `max_age_days`, or dated in the future (clock skew/bad data), as invalid - `max_age_days` itself is inclusive (a calibration exactly that many days old is still trusted, one day older is not).
 - `zones.py` - new `ZoneSet` (zones + an optional `ZoneCalibration`); `calibration=None` represents a zones file that never declared one at all, treated identically to an expired one downstream.
 - `config.py` - new `load_zone_set()`, parsing the same file `load_zones()` does plus an optional top-level `"calibration"` object. A missing `"calibration"` key loads successfully with `calibration=None` - deliberately not a load error, since the point of `ZoneSet` is to let the caller fail safe on missing calibration, not fail to load at all.
@@ -212,7 +211,6 @@ check) - not just each side trusting the other's own unit tests.
 - Manifest maturity promoted `functional` -> `established` after the project's vital-improvement gate: versioned geometry, boundary validation, and fail-safe inhibition whenever calibration is missing, malformed, future-dated, or expired.
 
 ## [0.0.3] - Real v0 zone-breach checking and E-STOP requesting
-### Added
 - `geometry.py` - real `Point3D`/`AABB` primitives, inclusive-boundary containment check, hardware-independent by design.
 - `zones.py` - real `ZoneLevel` (WARNING/DANGER) and `Zone` definitions.
 - `breach.py` - `check_breaches()`: real breach detection between detected objects and zones; `worst_level_per_object()` collapses multi-zone breaches to the single worst outcome per object.
@@ -222,7 +220,6 @@ check) - not just each side trusting the other's own unit tests.
 - 21 new real tests (`tests/`) - AABB containment (including boundary and corner-order normalization), breach detection across single/multiple zones and objects, E-STOP requesting for every level combination, JSON config round-trips, and a real end-to-end CLI round-trip for all three exit-code paths.
 - Real verification beyond the test suite: ran `check` against real JSON fixtures for the no-breach, Warning-only and Danger cases, confirming the printed report and exit code for each.
 
-### Fixed
 - `build.sh` called `bump_manifest_version.py` (no `--sync`) as its very first line, before also calling `bump_version.py` later - the same double-bump pattern found in HYDRA-UMC-SYNTHETIC-DATA-GEN's build.sh. Rewritten to bump the native version first, then sync the manifest, matching the rest of the ecosystem's build scripts.
 
 ## [0.0.2]
