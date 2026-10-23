@@ -49,6 +49,7 @@
 * 🧍 **物体有范围：** `DetectedObject.radius_m`（JSON `radiusM`，默认 0）把物体变成球体：它会侵入球体触及的每个分区，因此中心在分区外但手臂伸入分区的人也算侵入（`AABB.intersects_sphere`，与 `contains()` 一样包含边界；半径 0 与原来的点行为完全一致）。*（已实现）*
 * 🌐 **JSON/HTTP API(v0.0.7):** `serve` 子命令通过 stdlib 的 `http.server`(`POST /check`、`GET /stats`)对外暴露与 `check` 完全相同的逻辑(`evaluate_safety()`/`check_breaches()`/`request_estop_for()`),供非 CLI 调用方使用。默认仅限本地回环,与 `systemd/hydra-umc-safety-zones.service` 单元一致。完整的真实命令、参数和退出码请见 [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md)。
 * 📏 **与速度成比例的安全包络（v0.1.0，首个有上限的版本）：** `POST /check` 接受可选的 `toolVelocityMps`（实际的机头/工具速度，米/秒）——每个区域的静态体积随后按与该速度成线性关系的余量增大，并以固定最大值为上限。配置的静态体积始终是无条件的下限：省略或为零的速度会让每个区域逐字节保持不变，缩放只会扩大区域，绝不会缩小。
+* 📐 **可选的 ISO 13855 / ISO 13857 安全距离模型：** 区域文件可以声明 `"separation": {"approach_speed_mps": K, "total_stop_time_s": T, "intrusion_distance_m": C}`（以及可选的 `tool_deceleration_mps2`）。区域随即按 `S = K·T + C` 加上机器停止期间工具仍会移动的距离（`v·T`，给出减速度时还有 `v²/2a`）扩大，上限 10 米。每个数值都来自该单元自身的风险评估，不做任何假设。线性余量仍作为保守的下限，因此模型只会扩大区域；启用模型后，即使不发送速度，区域也会扩大。*(已实现，未声明则关闭)*
 * 🔐 **服务器可以持有自己的规则（v0）：** `serve --zones-file PATH` 在服务器上固定区域和校准（自带区域的请求会被拒绝，每个判定都带有该文件的 `configSha256`）；`--max-observation-age-seconds` 和 `--max-calibration-age-days` 限制请求可声称其证据有效的时长；`--token` / `SAFETY_ZONES_TOKEN` 使 `POST /check` 要求 bearer 令牌；声明了请求体却什么也不发的客户端会在 10 秒后被丢弃。没有 `--zones-file` 时，能访问该端口的人就能决定区域，因此请将其保持在 loopback 或置于令牌之后。所有 JSON 输入都拒绝 NaN 和 Infinity，拒绝不带时区的时间，不接受没有区域的单元，CLI 无法读取的任何内容都是 `INHIBITED`（退出码 `3`），绝不是退出码 `1`。*（已实现）*
 * 📐 **动态遮挡（计划中）：** 自动将机器人自身结构从安全触发中屏蔽，使机器人不会将"自身"检测为入侵。
 * 🔍 **异物检测（计划中）：** 识别遗留在工作空间中的工具或碎屑。

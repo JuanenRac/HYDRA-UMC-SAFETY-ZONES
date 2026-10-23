@@ -41,6 +41,8 @@ class ZoneSet:
 
     zones: tuple[Zone, ...]
     calibration: ZoneCalibration | None
+    # Optional ISO 13855 / ISO 13857 separation-distance model (see SeparationModel); None keeps only the linear margin below.
+    separation: "SeparationModel | None" = None
 
 
 # First real, bounded implementation of a velocity-proportional safety
@@ -58,6 +60,75 @@ VELOCITY_MARGIN_GAIN_M_PER_MPS = 0.15
 VELOCITY_MARGIN_MAX_M = 0.5
 
 
+# Largest margin any model may ask for: a sanity bound so that a mistyped parameter cannot grow a zone without limit.
+SEPARATION_MARGIN_MAX_M = 10.0
+
+
+@dataclass(frozen=True)
+class SeparationModel:
+    """Separation distance in the form of ISO 13855: ``S = K * T + C``, plus the distance the tool itself still travels while the
+    protective function reacts and the machine stops.
+
+    Nothing here is assumed: every figure comes from the installation's own risk assessment (the standard gives K = 2.0 m/s for
+    walking and 1.6 m/s for the reach of a hand, but which applies, the reaction and stopping times measured on the machine, and the
+    intrusion distance C of ISO 13857 depend on the cell). The model is opt-in; the linear margin always stays as the conservative
+    floor, so enabling the model can only grow a zone, never shrink it.
+
+    - ``approach_speed_mps``  K: speed at which a person approaches.
+    - ``total_stop_time_s``   T: reaction time of the detection plus the stopping time of the machine.
+    - ``intrusion_distance_m`` C: distance a body part can reach towards the hazard before it is detected (ISO 13857).
+    - ``tool_deceleration_mps2`` optional: when given, the tool also travels v^2 / (2 a) while it brakes.
+    """
+
+    approach_speed_mps: float
+    total_stop_time_s: float
+    intrusion_distance_m: float
+    tool_deceleration_mps2: float | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("approach_speed_mps", "total_stop_time_s", "intrusion_distance_m"):
+            value = getattr(self, name)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                raise ValueError(f"separation.{name} must be a finite number that is not negative, got {value!r}")
+        if self.approach_speed_mps == 0 and self.total_stop_time_s == 0 and self.intrusion_distance_m == 0:
+            raise ValueError("a separation model with every figure at zero would protect nothing")
+        deceleration = self.tool_deceleration_mps2
+        if deceleration is not None and (
+            isinstance(deceleration, bool) or not isinstance(deceleration, (int, float)) or not math.isfinite(deceleration) or deceleration <= 0
+        ):
+            raise ValueError(f"separation.tool_deceleration_mps2 must be a finite number above zero, got {deceleration!r}")
+
+    def margin_m(self, tool_velocity_mps: float) -> float:
+        """The distance, in meters, the zones must grow by for a tool moving at ``tool_velocity_mps`` (finite, not negative)."""
+        if not math.isfinite(tool_velocity_mps) or tool_velocity_mps < 0:
+            raise ValueError(f"tool_velocity_mps must be a finite number that is not negative, got {tool_velocity_mps!r}")
+        distance = self.approach_speed_mps * self.total_stop_time_s + self.intrusion_distance_m
+        distance += tool_velocity_mps * self.total_stop_time_s
+        if self.tool_deceleration_mps2 is not None:
+            distance += tool_velocity_mps**2 / (2.0 * self.tool_deceleration_mps2)
+        return min(distance, SEPARATION_MARGIN_MAX_M)
+
+
+def parse_separation_model(data: object) -> SeparationModel:
+    """Reads the optional ``"separation"`` object of a zones file: ``{"approach_speed_mps": K, "total_stop_time_s": T,
+    "intrusion_distance_m": C}`` plus an optional ``"tool_deceleration_mps2"``. Anything else in it is refused."""
+    if not isinstance(data, dict):
+        raise ValueError("separation must be a JSON object")
+    allowed = {"approach_speed_mps", "total_stop_time_s", "intrusion_distance_m", "tool_deceleration_mps2"}
+    unknown = sorted(set(data) - allowed)
+    if unknown:
+        raise ValueError(f"separation has unknown field(s): {unknown}")
+    missing = sorted({"approach_speed_mps", "total_stop_time_s", "intrusion_distance_m"} - set(data))
+    if missing:
+        raise ValueError(f"separation is missing field(s): {missing}")
+    return SeparationModel(
+        approach_speed_mps=data["approach_speed_mps"],
+        total_stop_time_s=data["total_stop_time_s"],
+        intrusion_distance_m=data["intrusion_distance_m"],
+        tool_deceleration_mps2=data.get("tool_deceleration_mps2"),
+    )
+
+
 def velocity_margin_m(tool_velocity_mps: float) -> float:
     """The extra margin (in meters) a zone's own static volume grows by for
     a given non-negative tool velocity - linear in speed, capped at
@@ -73,7 +144,7 @@ def velocity_margin_m(tool_velocity_mps: float) -> float:
 
 
 def scale_zones_for_velocity(
-    zones: tuple[Zone, ...], tool_velocity_mps: float | None
+    zones: tuple[Zone, ...], tool_velocity_mps: float | None, separation: SeparationModel | None = None
 ) -> tuple[Zone, ...]:
     """Returns `zones` unchanged when `tool_velocity_mps` is `None` (the
     fail-safe default: a caller that never supplies a real velocity value
@@ -84,8 +155,14 @@ def scale_zones_for_velocity(
     via `AABB.expanded()` - which itself refuses to ever shrink a volume.
     """
     if tool_velocity_mps is None:
-        return zones
+        if separation is None:
+            return zones
+        # the separation distance does not depend on the tool: with a model configured the zones grow even when no velocity is given
+        tool_velocity_mps = 0.0
     margin = velocity_margin_m(tool_velocity_mps)
+    if separation is not None:
+        # the model can only grow the envelope: the linear margin stays as the floor
+        margin = max(margin, separation.margin_m(tool_velocity_mps))
     if margin <= 0:
         return zones
     return tuple(

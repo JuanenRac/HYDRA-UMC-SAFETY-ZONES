@@ -108,7 +108,7 @@ def _run_check(
     if evaluation.state is SafetyState.READY:
         return 0
 
-    breaches = check_breaches(scale_zones_for_velocity(zone_set.zones, tool_velocity_mps), objects)
+    breaches = check_breaches(scale_zones_for_velocity(zone_set.zones, tool_velocity_mps, zone_set.separation), objects)
     for b in breaches:
         print(f"BREACH: object '{b.object_id}' inside {b.level.value} zone '{b.zone_id}'")
 

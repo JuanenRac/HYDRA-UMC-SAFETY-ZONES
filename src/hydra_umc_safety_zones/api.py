@@ -232,7 +232,7 @@ class Handler(BaseHTTPRequestHandler):
         # against internally - recomputing here with the unscaled
         # zone_set.zones would report a DANGER/WARNING state alongside a
         # `breaches` list that doesn't actually explain it.
-        breaches = check_breaches(scale_zones_for_velocity(zone_set.zones, tool_velocity_mps), objects)
+        breaches = check_breaches(scale_zones_for_velocity(zone_set.zones, tool_velocity_mps, zone_set.separation), objects)
         response["breaches"] = [asdict(b) for b in breaches]
 
         if evaluation.state is SafetyState.WARNING:

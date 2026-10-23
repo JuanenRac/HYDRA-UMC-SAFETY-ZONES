@@ -19,7 +19,7 @@ from hydra_umc_safety_zones.breach import DetectedObject
 from hydra_umc_safety_zones.calibration import parse_calibration
 from hydra_umc_safety_zones.geometry import AABB, Point3D
 from hydra_umc_safety_zones.observation import ObservationStatus, parse_observation_status
-from hydra_umc_safety_zones.zones import Zone, ZoneLevel, ZoneSet
+from hydra_umc_safety_zones.zones import SeparationModel, Zone, ZoneLevel, ZoneSet, parse_separation_model
 
 
 class ConfigError(ValueError):
@@ -129,7 +129,9 @@ def parse_zone_set(raw: dict) -> ZoneSet:
     zones = parse_zones(raw)
     calibration_data = raw.get("calibration")
     calibration = parse_calibration(calibration_data) if calibration_data is not None else None
-    return ZoneSet(zones=zones, calibration=calibration)
+    separation_data = raw.get("separation")
+    separation: SeparationModel | None = parse_separation_model(separation_data) if separation_data is not None else None
+    return ZoneSet(zones=zones, calibration=calibration, separation=separation)
 
 
 def load_zone_set(path: str | Path) -> ZoneSet:
