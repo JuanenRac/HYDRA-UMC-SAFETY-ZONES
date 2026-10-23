@@ -21,6 +21,7 @@
     "pattern": "^version\\s*=\\s*\"(\\d+)\\.(\\d+)\\.(\\d+)\""
   },
   "service": {
-    "systemd_unit": "hydra-umc-safety-zones.service"
+    "systemd_unit": "hydra-umc-safety-zones.service",
+    "health_path": "/stats"
   }
 }
