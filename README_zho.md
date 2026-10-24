@@ -22,7 +22,7 @@
 
 | | |
 |---|---|
-| 版本 | `0.1.4` |
+| 版本 | `0.1.5` |
 | 成熟度 | 可用 |
 | 技术栈 | Python / 3D vision / Hailo-8 |
 | 目标 | HYDRA-UMC 工作单元的 Raspberry Pi CM5 |
@@ -211,7 +211,7 @@ HYDRA-UMC-SAFETY-ZONES/
 无参数调用会打印名称 + 版本 + 角色：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.1.4
+HYDRA-UMC-SAFETY-ZONES v0.1.5
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 

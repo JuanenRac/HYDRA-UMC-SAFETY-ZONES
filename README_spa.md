@@ -22,7 +22,7 @@
 
 | | |
 |---|---|
-| Versión | `0.1.4` |
+| Versión | `0.1.5` |
 | Madurez | Funcional |
 | Tecnología | Python / 3D vision / Hailo-8 |
 | Destino | La Raspberry Pi CM5 de una celda HYDRA-UMC |
@@ -172,7 +172,7 @@ Localiza el intérprete dentro de `.venv` y ejecuta `python -m hydra_umc_safety_
 La invocación sin argumentos imprime nombre + versión + rol:
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.1.4
+HYDRA-UMC-SAFETY-ZONES v0.1.5
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 

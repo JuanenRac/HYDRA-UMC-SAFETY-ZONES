@@ -22,7 +22,7 @@
 
 | | |
 |---|---|
-| バージョン | `0.1.4` |
+| バージョン | `0.1.5` |
 | 成熟度 | 機能する |
 | 技術 | Python / 3D vision / Hailo-8 |
 | 対象 | HYDRA-UMC セルの Raspberry Pi CM5 |
@@ -230,7 +230,7 @@ HYDRA-UMC-SAFETY-ZONES/
 引数なしで呼び出すと名前・バージョン・役割を表示します：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.1.4
+HYDRA-UMC-SAFETY-ZONES v0.1.5
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
