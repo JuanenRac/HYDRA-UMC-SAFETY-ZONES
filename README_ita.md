@@ -121,6 +121,7 @@ CM5 + Hailo-8 è hardware già esistente senza una scheda propria da progettare,
 ```text
 HYDRA-UMC-SAFETY-ZONES/
 ├── src/hydra_umc_safety_zones/
+│   ├── __init__.py       # Descrizione e versione del pacchetto
 │   ├── geometry.py       # Vere primitive Point3D/AABB
 │   ├── zones.py          # Vere definizioni ZoneLevel/Zone/ZoneSet
 │   ├── breach.py         # Vero controllo delle violazioni di zona
@@ -144,7 +145,10 @@ HYDRA-UMC-SAFETY-ZONES/
 ├── build-test.sh / .bat # Verifica di build senza versionamento (non tocca mai version o CHANGELOG)
 ├── tools/
 │   ├── build_test.py    # Motore condiviso a cui delegano entrambi i lanciatori build-test
-│   └── ci_validate.py   # Validazione manifest/CHANGELOG/docs usata dalla CI
+│   ├── ci_validate.py   # Validazione manifest/CHANGELOG/docs usata dalla CI
+│   ├── _doc_policy.py   # Regole di documentazione condivise dalla famiglia (copia di quella di HYDRA-UMC-SDK, mantenuta sincronizzata)
+│   ├── _readme_parity.py # Verifica che gli otto README abbiano la stessa struttura (copia di quella di HYDRA-UMC-SDK, mantenuta sincronizzata)
+│   └── hydra_project_tool.py # Gli stessi comandi in ogni repository: validate, test, ci, version, status, bump
 ├── run.sh / run.bat     # Esegue l'entry point dal venv locale (inoltra gli argomenti)
 └── CHANGELOG.md         # Storico versione per versione (schema contachilometri, senza date)
 ```

@@ -156,6 +156,7 @@ Node 系列的其他项目一样——这里不存在 `hardware/`/`firmware/` �
 ```text
 HYDRA-UMC-SAFETY-ZONES/
 ├── src/hydra_umc_safety_zones/
+│   ├── __init__.py       # 包说明与版本
 │   ├── geometry.py       # 真实的 Point3D/AABB 基础类型
 │   ├── zones.py          # 真实的 ZoneLevel/Zone/ZoneSet 定义
 │   ├── breach.py         # 真实的区域越界检查
@@ -179,7 +180,10 @@ HYDRA-UMC-SAFETY-ZONES/
 ├── build-test.sh / .bat # 不涉及版本递增的构建检查（从不修改 version 或 CHANGELOG）
 ├── tools/
 │   ├── build_test.py    # 两个 build-test 启动脚本共同委托的引擎
-│   └── ci_validate.py   # CI 使用的清单/CHANGELOG/文档校验
+│   ├── ci_validate.py   # CI 使用的清单/CHANGELOG/文档校验
+│   ├── _doc_policy.py   # 家族共享的文档规则 (HYDRA-UMC-SDK 的副本,保持同步)
+│   ├── _readme_parity.py # 检查八个 README 结构一致 (HYDRA-UMC-SDK 的副本,保持同步)
+│   └── hydra_project_tool.py # 每个仓库相同的命令: validate、test、ci、version、status、bump
 ├── run.sh / run.bat     # 从本地 venv 运行入口点（转发参数）
 └── CHANGELOG.md         # 逐版本历史（里程表方案，无日期）
 ```
