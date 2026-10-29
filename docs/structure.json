@@ -205,7 +205,7 @@
         {
           "name": "config.py",
           "desc": {
-            "en": "Real JSON loading for",
+            "en": "Real JSON loading",
             "es": "Carga real de JSON para",
             "de": "Echtes JSON-Laden für",
             "fr": "Vrai chargement JSON pour",
@@ -505,7 +505,7 @@
         {
           "name": "bump_manifest_version.py",
           "desc": {
-            "en": "Syncs hydra-umc.project.json's version to",
+            "en": "Syncs hydra-umc.project.json's version",
             "es": "Sincroniza la versión de",
             "de": "Synchronisiert die Version von",
             "fr": "Synchronise la version de",

@@ -247,7 +247,7 @@ section. No behavior change - the bump is this verification build.
 ## [0.0.1]
 
 Real build verification. `build.sh`/`build.bat` run end-to-end for real:
-odometer bump, `.venv` creation, editable install, `python -m compileall`
+version bump, `.venv` creation, editable install, `python -m compileall`
 clean across `src/`. `run.sh`/`run.bat` executed the entry point for real,
 printing name + version + role. No business-logic change - the bump is the
 recorded event.
@@ -257,6 +257,6 @@ recorded event.
 Initial skeleton: `pyproject.toml` (package metadata, no runtime
 dependencies yet), `src/hydra_umc_safety_zones/` (`__init__.py` +
 `main.py` entry point reading its version from installed package
-metadata), `bump_version.py` (odometer-style version bump),
+metadata), `bump_version.py` (version bump),
 `build.sh`/`build.bat` (venv + editable install + compile-check) and
 `run.sh`/`run.bat`.
