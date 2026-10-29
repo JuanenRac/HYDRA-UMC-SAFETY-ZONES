@@ -1,0 +1,172 @@
+{
+  "repo": "HYDRA-UMC-SAFETY-ZONES",
+  "ecosystem": "hydra",
+  "tagline": "Fail-safe zone checks: a stale calibration or a blind observer inhibits before any breach is judged.",
+  "description": "HYDRA-UMC-SAFETY-ZONES loads zones, detections and observer status from JSON, refuses non-finite numbers, checks calibration and observer health first, then judges breaches and requests an emergency stop for Danger.",
+  "columns": [
+    "WHO CALLS IT",
+    "THIS REPOSITORY",
+    "WHAT IT HANDS OVER"
+  ],
+  "nodes": [
+    {
+      "id": "cli",
+      "column": 0,
+      "level": "tested",
+      "title": "CLI check",
+      "lines": [
+        "zones, detections and",
+        "observation JSON files"
+      ],
+      "code": [
+        "src/hydra_umc_safety_zones/main.py"
+      ]
+    },
+    {
+      "id": "http",
+      "column": 0,
+      "level": "tested",
+      "title": "HTTP API",
+      "lines": [
+        "POST /check, GET /stats;",
+        "port 8108 on loopback"
+      ],
+      "code": [
+        "src/hydra_umc_safety_zones/api.py"
+      ]
+    },
+    {
+      "id": "can",
+      "column": 2,
+      "level": "untested",
+      "title": "Controller E-STOP",
+      "lines": [
+        "the real stop is in the",
+        "controller hardware"
+      ]
+    },
+    {
+      "id": "det",
+      "column": 2,
+      "level": "untested",
+      "title": "Detection source",
+      "lines": [
+        "object positions from the",
+        "vision pipeline; not run"
+      ]
+    },
+    {
+      "id": "cfg",
+      "column": 1,
+      "level": "tested",
+      "title": "config.py",
+      "lines": [
+        "loads JSON, refuses NaN",
+        "and infinite numbers"
+      ],
+      "code": [
+        "src/hydra_umc_safety_zones/config.py"
+      ]
+    },
+    {
+      "id": "cal",
+      "column": 1,
+      "level": "tested",
+      "title": "calibration.py",
+      "lines": [
+        "checks the age of the",
+        "zone geometry first"
+      ],
+      "code": [
+        "src/hydra_umc_safety_zones/calibration.py",
+        "src/hydra_umc_safety_zones/observation.py"
+      ]
+    },
+    {
+      "id": "sta",
+      "column": 1,
+      "level": "tested",
+      "title": "safety_state.py",
+      "lines": [
+        "READY, WARNING, DANGER",
+        "or INHIBITED"
+      ],
+      "code": [
+        "src/hydra_umc_safety_zones/safety_state.py"
+      ]
+    },
+    {
+      "id": "zon",
+      "column": 1,
+      "level": "tested",
+      "title": "zones.py + breach.py",
+      "lines": [
+        "boxes, Warning and Danger,",
+        "sphere objects, margins"
+      ],
+      "code": [
+        "src/hydra_umc_safety_zones/zones.py",
+        "src/hydra_umc_safety_zones/breach.py",
+        "src/hydra_umc_safety_zones/geometry.py"
+      ]
+    },
+    {
+      "id": "est",
+      "column": 1,
+      "level": "tested",
+      "title": "estop.py",
+      "lines": [
+        "builds an E-STOP request;",
+        "never asserts the stop"
+      ],
+      "code": [
+        "src/hydra_umc_safety_zones/estop.py"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "cli",
+      "to": "cfg",
+      "level": "tested"
+    },
+    {
+      "from": "http",
+      "to": "cfg",
+      "level": "tested"
+    },
+    {
+      "from": "cfg",
+      "to": "cal",
+      "level": "tested"
+    },
+    {
+      "from": "cal",
+      "to": "zon",
+      "level": "tested"
+    },
+    {
+      "from": "zon",
+      "to": "sta",
+      "level": "tested"
+    },
+    {
+      "from": "sta",
+      "to": "est",
+      "level": "tested"
+    },
+    {
+      "from": "est",
+      "to": "can",
+      "level": "untested",
+      "label": "request only"
+    },
+    {
+      "from": "det",
+      "to": "cfg",
+      "level": "untested",
+      "label": "positions"
+    }
+  ],
+  "footer": "Tried with files and with the HTTP API on a computer; no camera, no Hailo-8 and no controller were connected."
+}

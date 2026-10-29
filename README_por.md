@@ -1,22 +1,33 @@
+<!-- =============================================================================
+HYDRA-UMC-SAFETY-ZONES - Safety zones and E-STOP requests for the Vision AI Node
+Copyright (C) JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+GPL-3.0-or-later - see LICENSE
+============================================================================= -->
+
 <p align="center">
   <img src="images/HYDRA_UMC_BANNER.svg" alt="HYDRA-UMC-SAFETY-ZONES banner" width="100%">
 </p>
 
-# 🛡️ HYDRA-UMC-SAFETY-ZONES
+# 🛑 HYDRA-UMC-SAFETY-ZONES
 
 <p align="center"><a href="README.md">🇺🇸 English</a> | <a href="README_spa.md">🇪🇸 Español</a> | <a href="README_fra.md">🇫🇷 Français</a> | <a href="README_ita.md">🇮🇹 Italiano</a> | <a href="README_deu.md">🇩🇪 Deutsch</a> | <a href="README_zho.md">🇨🇳 简体中文</a> | <a href="README_jpn.md">🇯🇵 日本語</a> | 🇵🇹 <b>Português</b></p>
 
 ### 🚨 Lógica de violação de zonas e pedido de E-STOP (v0: ainda sem detetor nem E-STOP físico)
 
 <p align="center">
-  <img src="https://img.shields.io/badge/License-GPL%203.0-blue.svg" alt="GPL 3.0">
-  <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspiracional-red.svg" alt="Safety">
-  <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Functional v0 stage">
+  <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
+  <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
+  <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
+  <img src="https://img.shields.io/badge/Tests-244%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Version-0.1.5-0f6cbd.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
 
 ---
 
 > **Estado de segurança (safety e security):** este ecossistema não é um sistema de segurança certificado. Ainda não existe um caminho de E-STOP por hardware, nem limites ou interlocks impostos pelo firmware, nem um comando de movimento verificado; as imagens de firmware são verificadas com CRC32 e um HMAC-SHA256 de chave partilhada, não com uma assinatura assimétrica; TLS e TLS mútuo são opcionais e estão desativados por defeito; nenhuma placa própria foi ainda montada ou testada. Leia a [base de segurança](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md) e o [modelo de ameaças](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md) antes de confiar em qualquer afirmação aqui para a segurança de uma pessoa.
+
+---
 
 ## 📋 Num relance
 
@@ -24,9 +35,12 @@
 |---|---|
 | Versão | `0.1.5` |
 | Maturidade | Funcional |
+| Testes | 244 (`python -m pytest -q tests`) |
 | Tecnologia | Python / 3D vision / Hailo-8 |
 | Destino | O Raspberry Pi CM5 de uma célula HYDRA-UMC |
 | Em hardware real | Ainda não: não há registo de execução em hardware real para esta versão |
+
+**Ir para:** [Visão geral](#-visão-geral) · [Arquitetura](#-arquitetura) · [Segurança e proteção](#-segurança-e-proteção) · [Configuração](#-configuração) · [Início rápido](#-início-rápido) · [Testes](#-testes) · [Resolução de problemas](#-resolução-de-problemas) · [Estrutura do repositório](#-estrutura-do-repositório) · [Projetos relacionados](#-projetos-relacionados)
 
 ## 🚦 Estado do projeto
 
@@ -37,11 +51,11 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. É 
 | Área | Estado | O que significa aqui |
 |---|---|---|
 | Software | 🟡 | Funciona para o seu propósito principal; a verificação de honestidade acima lista o que ainda falta |
-| Testes | 🟠 | Ainda não há registo do número de testes deste repositório |
+| Testes | 🟢 | 244 testes automáticos, executados a cada alteração |
 | Hardware real | 🔴 | Ainda não: não há registo de execução em hardware real para esta versão |
 | Documentação | 🟢 | README em oito idiomas, verificado contra o manifesto a cada alteração |
 
-## 1. 🛠️ VISÃO TÉCNICA GERAL
+## 🎯 Visão geral
 
 O **HYDRA-UMC-SAFETY-ZONES** destina-se a ser o subsistema de segurança crítico da família Vision AI Node. A sua função prevista é projetar volumes 3D virtuais à volta dos robôs e vigiar o espaço de trabalho à procura de intrusões humanas ou objetos estranhos, usando a segmentação espacial de alta velocidade do NPU Hailo-8 (prevista: esse pipeline ainda não existe) para detetar violações nas zonas definidas de "Aviso" e "Perigo".
 
@@ -69,11 +83,18 @@ O **HYDRA-UMC-SAFETY-ZONES** destina-se a ser o subsistema de segurança crític
 
 **Verificação de honestidade - o que realmente funciona hoje:** o ponto de entrada real (`src/hydra_umc_safety_zones/main.py`) continua a imprimir identidade/versão/função numa chamada simples, mas tem agora também um subcomando real `check --zones PATH --detections PATH [--observation PATH]`: carrega de JSON um conjunto de zonas (zonas + metadados opcionais de calibração), posições de objetos detetados e um estado de observação opcional, verifica primeiro a frescura da calibração, depois a saúde do observador (sem estado de observação, um observador desativado/com erro/antigo falham de forma segura tal como uma calibração em falta), depois executa a verificação real de violações, pede E-STOPs para cada violação de Perigo, e termina com 0 (Pronto) / 1 (Aviso) / 2 (Perigo, E-STOP pedido) / 3 (Inibido - calibração em falta/caducada, ou observador em falta/desativado/antigo/com erro) consoante o resultado. O que genuinamente ainda não é real: a segmentação espacial do Hailo-8 que produziria essas posições de objetos detetados em hardware real, a máscara de autoclusão, o processo observador real cuja vida o `--observation` reporta, e qualquer transporte CAN real para o pedido de E-STOP. Veja o [`CHANGELOG.md`](CHANGELOG.md) para saber exatamente o que já foi entregue, e "Estado atual e próximos passos" abaixo para o que continua em aberto.
 
----
+## 🧩 Papel no HYDRA-UMC
 
-## 2. 🔄 FLUXO LÓGICO DE SEGURANÇA PRETENDIDO
+O **HYDRA-UMC-SAFETY-ZONES** é o subsistema de segurança da família Vision AI Node: compara as posições dos objetos detetados com volumes de aviso e de perigo à volta dos robôs e responde READY, WARNING, DANGER ou INHIBITED. Só pede uma paragem de emergência; a paragem física continua no hardware do controlador.
 
-O diagrama abaixo é o fluxo de dados de destino para que este projeto está a ser construído. `CAL` (verificação da calibração), `OBS` (verificação da saúde do observador), `ZONE` (verificação de zonas) e a divisão Aviso/Perigo que se segue são reais hoje, impulsionados por `evaluate_safety()` (que envolve `check_breaches()`/`request_estop_for()`), dadas posições de objetos detetados a partir de um ficheiro JSON. Tudo o que está a montante de `CAL`/`OBS`/`ZONE` (o pipeline real do Hailo-8 e o processo observador real cuja vida o `OBS` verifica) e a jusante de `STOP` (o transporte CAN real) continua a ser trabalho futuro.
+## 🏛️ Arquitetura
+
+<p align="center">
+  <img src="images/architecture.svg" alt="HYDRA-UMC-SAFETY-ZONES architecture" width="100%">
+</p>
+
+<details>
+<summary>Versão em texto do diagrama (Mermaid)</summary>
 
 ```mermaid
 flowchart TB
@@ -90,9 +111,13 @@ flowchart TB
     STOP --> CAN
 ```
 
----
+</details>
 
-## 3. 🧠 INFORMAÇÃO TÉCNICA AVANÇADA
+### FLUXO LÓGICO DE SEGURANÇA PRETENDIDO
+
+O diagrama abaixo é o fluxo de dados de destino para que este projeto está a ser construído. `CAL` (verificação da calibração), `OBS` (verificação da saúde do observador), `ZONE` (verificação de zonas) e a divisão Aviso/Perigo que se segue são reais hoje, impulsionados por `evaluate_safety()` (que envolve `check_breaches()`/`request_estop_for()`), dadas posições de objetos detetados a partir de um ficheiro JSON. Tudo o que está a montante de `CAL`/`OBS`/`ZONE` (o pipeline real do Hailo-8 e o processo observador real cuja vida o `OBS` verifica) e a jusante de `STOP` (o transporte CAN real) continua a ser trabalho futuro.
+
+### INFORMAÇÃO TÉCNICA AVANÇADA
 
 ### A fronteira detetar-vs-impor, e porque importa aqui em particular
 
@@ -105,7 +130,7 @@ O CM5 + Hailo-8 é hardware de prateleira sem placa própria a desenhar, pelo qu
 ### Decisões de desenho já tomadas
 
 * **Versão lida dos metadados do pacote instalado, não escrita no código** - o `main.py` chama `importlib.metadata.version("hydra-umc-safety-zones")` em vez de uma segunda cadeia `__version__`, pelo que o `bump_version.py` só tem um sítio onde editar.
-* **O odómetro só toca automaticamente em `PATCH`/`MINOR`** - o `bump_version.py` transporta `PATCH` para `MINOR` depois do 9 e `MINOR` para `MAJOR` depois do 9, mas nunca sobe o próprio `MAJOR`; a mesma convenção do `bump_version.py` do `HYDRA-UMC-EDITOR-URDF` e do `HYDRA-UMC-SUITE`.
+
 * **Zonas AABB, não malhas nem envolventes convexas** - o volume mais simples que ainda permite ao `check_breaches()` ser exato e rápido; um perímetro real é muito frequentemente próximo de uma caixa na prática, e pode acrescentar-se mais tarde uma forma mais rica atrás da mesma interface `Zone`/`AABB.contains()` sem tocar em `breach.py` nem `estop.py`.
 * **A contenção na fronteira da zona é inclusiva, não exclusiva** - o `AABB.contains()` trata um ponto exatamente no bordo como dentro. Num perímetro de segurança, é a direção conservadora de errar: só pode causar um relatório de violação mais cedo, nunca uma violação falhada.
 * **O `NullEStopRequester` é o único pedidor neste repositório** - não um marcador à espera de ser trocado de ânimo leve, mas a materialização honesta da própria fronteira detetar-vs-impor: aqui não há transporte CAN real, e não deve acrescentar-se um sem cuidado mais tarde (veja "Uma fronteira de desenho crítica" acima e a docstring do módulo `estop.py`).
@@ -114,50 +139,48 @@ O CM5 + Hailo-8 é hardware de prateleira sem placa própria a desenhar, pelo qu
 * **Uma chave `"calibration"` em falta carrega com sucesso, apenas significa `INHIBITED`** - o `load_zone_set()` nunca levanta erro só porque um ficheiro de zonas é anterior a esta funcionalidade ou foi escrito à mão sem metadados de calibração; falha de forma segura por desenho na avaliação em vez de falhar ao carregar.
 * **`--observation`/`"observation"` é opcional ao nível da interface, não ao nível da segurança** - um chamador que nunca o passa recebe sempre um `INHIBITED` honesto, nunca uma falha e nunca um `READY` silencioso; isto mantém a camada de análise compatível com chamadores ainda por atualizar e fecha, ao mesmo tempo, a lacuna real em que uma lista `objects` vazia era indistinguível de um observador real e ativo a confirmar a célula livre.
 
----
+## 🔒 Segurança e proteção
 
-## 📂 ESTRUTURA DE DIRETÓRIOS
+| Ameaça | Defesa | Onde |
+|---|---|---|
+| Uma calibração caducada ou em falta deixa uma zona calada | `evaluate_safety()` verifica a calibração antes de qualquer lógica de violação e responde INHIBITED se faltar ou for demasiado antiga | `calibration.py`, `safety_state.py` |
+| Um observador desligado ou mudo faz uma cena vazia parecer segura | Sem prova de um observador ativo e recente a resposta é INHIBITED, nunca READY | `observation.py` |
+| Um NaN ou um número infinito cria uma zona que nunca dispara | `Point3D` e o carregador de JSON recusam números não finitos; a linha de comandos termina com o código 3 e INHIBITED | `geometry.py`, `config.py` |
+| Um cliente que afrouxa o perímetro enviando as suas próprias zonas | Com `--zones-file` o servidor guarda as zonas e recusa um pedido que traga as suas; um token Bearer (`SAFETY_ZONES_TOKEN`) é comparado em tempo constante, os corpos ficam limitados a 1 MiB e servem-se 32 ligações em simultâneo | `api.py`, `main.py` |
 
-```text
-HYDRA-UMC-SAFETY-ZONES/
-├── src/hydra_umc_safety_zones/
-│   ├── __init__.py       # Descrição e versão do pacote
-│   ├── geometry.py       # Primitivas reais Point3D/AABB
-│   ├── zones.py          # Definições reais ZoneLevel/Zone/ZoneSet
-│   ├── breach.py         # Verificação real de violações de zonas
-│   ├── calibration.py    # Acompanhamento real da frescura da calibração
-│   ├── observation.py    # Acompanhamento real da saúde do observador - espelha calibration.py
-│   ├── safety_state.py   # Decisão real de falha segura: READY/WARNING/DANGER/INHIBITED
-│   ├── estop.py          # Pedido real de E-STOP (nunca o aciona)
-│   ├── config.py         # Carregamento JSON real de zonas/deteções/observação
-│   ├── api.py             # Superfície JSON/HTTP simples (stdlib http.server) sobre a lógica real de `check`
-│   └── main.py            # Ponto de entrada + subcomando real `check`
-├── tests/                # Testes reais: geometria, violações, calibração, observação, safety_state, estop, config, api, CLI, finitude/extensão
-├── docs/                # Documentação e normas de segurança
-├── build/               # Saída de compilação (o .venv local também vive aqui)
-├── images/              # Multimédia e diagramas
-├── systemd/
-│   └── hydra-umc-safety-zones.service # Unidade systemd local do CM5 para a API de verificação de violações de zonas
-├── pyproject.toml       # Metadados do pacote, dependências, versão em odómetro
-├── bump_version.py      # Subida de versão ao estilo conta-quilómetros (executada só pelo comando `bump` explícito)
-├── bump_manifest_version.py # Sincroniza a versão de hydra-umc.project.json com a nativa (--sync)
-├── build.sh / build.bat # venv + instalação editável (extras de desenvolvimento) + verificação de compilação + testes
-├── build-test.sh / .bat # Verificação de compilação sem versão (nunca toca na versão nem no CHANGELOG)
-├── tools/
-│   ├── build_test.py    # Motor partilhado a que ambos os lançadores build-test delegam
-│   ├── ci_validate.py   # Validação de manifesto/CHANGELOG/docs usada pelo CI
-│   ├── _doc_policy.py   # Regras de documentação partilhadas pela família (cópia da de HYDRA-UMC-SDK, mantida em sincronia)
-│   ├── _readme_parity.py # Verificação de que os oito README partilham a mesma estrutura (cópia da de HYDRA-UMC-SDK, mantida em sincronia)
-│   └── hydra_project_tool.py # Os mesmos comandos em todos os repositórios: validate, test, ci, version, status, bump
-├── run.sh / run.bat     # Executa o ponto de entrada a partir do venv local (reencaminha argumentos)
-└── CHANGELOG.md         # Histórico versão a versão (esquema de odómetro, sem datas)
+**O que nunca faz:** acionar a paragem física nem dar READY por suposição.
+
+## ⚙️ Configuração
+
+O serviço HTTP configura-se com opções; duas delas podem vir também do ambiente.
+
+| Variável | Predefinição | O que define |
+|---|---|---|
+| `--addr` | `127.0.0.1` | endereço onde a API escuta |
+| `--port` | `8108` | porta da API |
+| `--zones-file` / `SAFETY_ZONES_FILE` | nenhum | zonas e calibração que o servidor mantém fixas |
+| `--token` / `SAFETY_ZONES_TOKEN` | nenhum | token Bearer exigido por POST /check |
+| `--max-observation-age-seconds` | nenhum | limite da idade que um pedido pode declarar para a sua observação |
+| `--max-calibration-age-days` | nenhum | limite da idade máxima da calibração em dias |
+
+## 🚀 Início rápido
+
+Requer Python 3.10 ou superior.
+
+```bash
+./build.sh  # Linux, macOS (build.bat on Windows)
+./run.sh
+./run.sh check --zones zones.json --detections detections.json --observation observation.json
+./run.sh serve --zones-file zones.json --port 8108
 ```
 
-Sem pasta `hardware/`, `firmware/`, `os/` nem `models/` - veja "Informação técnica avançada" acima para saber porquê. O `os/` e o `models/` vivem só no pai de integração, o [HYDRA-UMC-VISION-NODE](https://github.com/JuanenRac/HYDRA-UMC-VISION-NODE).
+## 🧪 Testes
 
----
+244 testes automáticos correm com `python -m pytest -q tests`. Não precisam de hardware nem de nada fora desta máquina.
 
-## 🏗️ GUIA DE COMPILAÇÃO E EXECUÇÃO
+A CI executa `HYDRA_UMC_CI=1 python tools/ci_validate.py`, que verifica o manifesto, os documentos, os oito README e as imagens.
+
+## 🏗️ Compilação e publicação
 
 ### Pré-requisitos
 
@@ -176,7 +199,7 @@ Sem pasta `hardware/`, `firmware/`, `os/` nem `models/` - veja "Informação té
 2. **Ambiente virtual** - cria `.venv/` se faltar; reutiliza-o caso contrário.
 3. **Instalação editável (com extras de desenvolvimento)** - `pip install -e ".[dev]"` para que as edições em `src/` tenham efeito de imediato, instala o `pytest` e regista o ponto de entrada de consola `hydra-umc-safety-zones`.
 4. **Verificação de compilação** - `python -m compileall -q src` compila para bytecode cada ficheiro de `src/`, apanhando erros de sintaxe em todo o ecossistema.
-5. **Suite de testes real** - `pytest tests/` executa os 228 testes.
+5. **Suite de testes real** - `pytest tests/` executa os 244 testes.
 
 O `set -euo pipefail` pára o script no primeiro passo que falhe; a janela fica aberta (`Press Enter to close...`) se foi aberta com duplo clique em vez de executada a partir de um terminal já aberto.
 
@@ -275,11 +298,61 @@ Veja [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) para a referência complet
 * **Instalação editável antiga** - apague o `.venv/` e recompile; raramente é preciso.
 * **`check` termina com código diferente de zero** - é comportamento real e correto, não uma falha: `1` significa que se encontrou uma violação só de Aviso, `2` significa que uma violação de Perigo pediu um E-STOP, `3` significa que a calibração do conjunto de zonas falta/caducou ou que o estado do observador falta/está desativado/antigo/com erro (falha segura, verificada antes de qualquer lógica de violação). Só um traceback de Python ou um erro de JSON malformado é um erro a sério.
 
----
+## 🩺 Resolução de problemas
 
-## 🚀 Estado atual e próximos passos
+| Vê | Porque | Faça |
+|---|---|---|
+| `SAFETY STATE: INHIBITED` + exit code 3 | Falta a calibração ou a observação, ou está demasiado antiga, ou um número nos ficheiros não é finito | Leia a mensagem, renove a calibração ou o ficheiro de observação e execute `check` outra vez |
+| HTTP 401 | O servidor tem um token e o pedido não traz nenhum ou traz o errado | Envie `Authorization: Bearer <token>` |
 
-**O que funciona hoje:** definições reais de zonas de Aviso/Perigo e verificação de violações (`geometry.py`/`zones.py`/`breach.py`), imposição real da frescura da calibração que falha de forma segura para `INHIBITED` antes de qualquer lógica de violação (`calibration.py`/`safety_state.py`), um pipeline real de *pedido* de E-STOP que respeita a fronteira detetar-vs-impor por construção (`estop.py`), um subcomando de CLI real `check` sobre ficheiros JSON de zonas/deteções, e 228 testes a passar - veja o [`CHANGELOG.md`](CHANGELOG.md) para a saída real completa de compilação/execução.
+## 📂 Estrutura do repositório
+
+<p align="center">
+  <img src="images/repository-structure.svg" alt="Repository structure of HYDRA-UMC-SAFETY-ZONES" width="100%">
+</p>
+
+<details>
+<summary>Versão em texto da árvore</summary>
+
+```text
+HYDRA-UMC-SAFETY-ZONES/
+├── src/hydra_umc_safety_zones/   código-fonte
+│   ├── __init__.py               Descrição e versão do pacote
+│   ├── geometry.py               Primitivas reais Point3D/AABB
+│   ├── zones.py                  Definições reais ZoneLevel/Zone/ZoneSet
+│   ├── breach.py                 Verificação real de violações de zonas
+│   ├── calibration.py            Acompanhamento real da frescura da calibração
+│   ├── observation.py            Acompanhamento real da saúde do observador - espelha calibration.py
+│   ├── safety_state.py           Decisão real de falha segura: READY/WARNING/DANGER/INHIBITED
+│   ├── estop.py                  Pedido real de E-STOP (nunca o aciona)
+│   ├── config.py                 Carregamento JSON real de zonas/deteções/observação
+│   ├── api.py                    Superfície JSON/HTTP simples (stdlib http.server) sobre a lógica real de `check`
+│   └── main.py                   Ponto de entrada + subcomando real `check`
+├── tests/                        Testes reais: geometria, violações, calibração, observação, safety_state, estop, config, api, CLI, finitude/extensão
+├── docs/                         Documentação e normas de segurança
+├── images/                       Multimédia e diagramas
+├── systemd/                      unidade de serviço
+├── tools/                        ferramentas do projeto e verificações da CI
+├── .github/                      fluxo de CI e modelos de problemas
+├── pyproject.toml                metadados do pacote
+├── bump_version.py               Subida de versão ao estilo conta-quilómetros (executada só pelo comando `bump` explícito)
+├── bump_manifest_version.py      Sincroniza a versão de hydra-umc.project.json com a nativa (--sync)
+├── build.sh / build.bat          venv + instalação editável (extras de desenvolvimento) + verificação de compilação + testes
+├── run.sh / run.bat              Executa o ponto de entrada a partir do venv local (reencaminha argumentos)
+├── CHANGELOG.md                  o que mudou em cada versão
+├── Dockerfile                    imagem de contentor
+├── build-test.sh                 verificação de compilação sem alterações
+├── hydra-umc.project.json        manifesto: versão, maturidade, família
+└── test.sh                       executa os testes
+```
+
+</details>
+
+## 🗺️ Roteiro e limites conhecidos
+
+**Limites conhecidos hoje**
+
+**O que funciona hoje:** definições reais de zonas de Aviso/Perigo e verificação de violações (`geometry.py`/`zones.py`/`breach.py`), imposição real da frescura da calibração que falha de forma segura para `INHIBITED` antes de qualquer lógica de violação (`calibration.py`/`safety_state.py`), um pipeline real de *pedido* de E-STOP que respeita a fronteira detetar-vs-impor por construção (`estop.py`), um subcomando de CLI real `check` sobre ficheiros JSON de zonas/deteções, e 244 testes a passar - veja o [`CHANGELOG.md`](CHANGELOG.md) para a saída real completa de compilação/execução.
 
 **O que continua em aberto, sem ordem particular e sem prazo assumido:**
 
@@ -288,7 +361,9 @@ Veja [`docs/CLI_REFERENCE.md`](docs/CLI_REFERENCE.md) para a referência complet
 * Um transporte CAN real que implemente `EStopRequester` em direção ao [HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC) - o `estop.py` já define a interface que uma implementação real teria de cumprir.
 * Qualquer trabalho real de certificação de segurança (o distintivo ISO 13849-1 acima declara uma aspiração, não uma certificação concluída).
 
----
+## 🌍 Idiomas
+
+Este README e os documentos do repositório existem em oito idiomas: inglês, espanhol, alemão, francês, italiano, japonês, chinês e português (Portugal). São escritos em conjunto e a CI verifica que os oito ficheiros têm as mesmas secções e as mesmas ligações. Este repositório não tem ecrã nem catálogo de mensagens próprios, por isso não há textos de interface para traduzir.
 
 ## 🔗 Projetos relacionados
 
@@ -381,21 +456,26 @@ Este projeto faz parte do ecossistema de robótica HYDRA-UMC do mesmo autor (Jua
 - **[HYDRA-UMC-OPS-AGENT](https://github.com/JuanenRac/HYDRA-UMC-OPS-AGENT)** — coordenador de incidentes de manutenção: um papel de borda de poucos privilégios recolhe um inventário/estado higienizado, um papel de plano de controlo mostra-o só de leitura e pede a um fornecedor de IA que sugira um diagnóstico; nunca aplica um patch nem implanta nada.
 - **[HYDRA-UMC-DEV-SERVER](https://github.com/JuanenRac/HYDRA-UMC-DEV-SERVER)** — anfitrião de desenvolvimento reproduzível (Raspberry Pi 5 / CM5) que guarda o código-fonte do ecossistema e executa tarefas limitadas de compilação/teste numa fila durável; um papel de desenvolvimento dedicado, explicitamente não um CM5 operacional.
 
----
+## 📚 Documentação
 
-## 📚 Documentação e comunidade
+Onde ler mais:
 
-- **[CONTRIBUTING.md](CONTRIBUTING.md)** — pilha tecnológica e diretrizes de código para um pull request.
-- **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — as normas de comportamento esperadas nesta comunidade.
-- **[SECURITY.md](SECURITY.md)** — como comunicar uma vulnerabilidade e as áreas de segurança em que este projeto se concentra.
-- **[SUPPORT.md](SUPPORT.md)** — onde fazer perguntas e comunicar erros.
-- **[LICENSE.md](LICENSE.md)** — a licença deste projeto.
+* [Base de segurança do ecossistema](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md)
+* [Modelo de ameaças do ecossistema](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md)
+* [Registo de alterações deste repositório](CHANGELOG.md)
+* [Licença deste repositório](LICENSE.md)
+
+## 🤝 Contribuir e comunidade
+
+* Antes de um pull request execute `HYDRA_UMC_CI=1 py -3 tools/ci_validate.py` (ou `HYDRA_UMC_CI=1 python3 tools/ci_validate.py`): tem de imprimir `CI_VALIDATION=PASS`. Não execute `build.sh` nem `build.bat` para esta verificação; compilar não é verificar.
+* Os oito README são escritos a partir de uma única fonte em HYDRA-UMC-DOCS; não os edite à mão. Altere a fonte e escreva-os de novo com `tools/make_readmes.py`.
+* Não afirme num README o que não foi executado: diga «simulado» ou «não testado em hardware» quando for a verdade.
+* Consulte [CONTRIBUTING.md](CONTRIBUTING.md), o [código de conduta](CODE_OF_CONDUCT.md), [SECURITY.md](SECURITY.md) e [SUPPORT.md](SUPPORT.md).
 
 ## 👤 AUTOR
-**JuanenRac** (Electro Hobby 3D)
-📧 electrohobby3d@gmail.com
-📺 [youtube.com/@electrohobby3d](https://youtube.com/@electrohobby3d)
+
+**JuanenRac (Electro Hobby 3D)** · electrohobby3d@gmail.com
 
 ## 📜 LICENÇA
-GPL-3.0 - consulte LICENSE para mais detalhes.
 
+GPL-3.0-or-later - [LICENSE](LICENSE).

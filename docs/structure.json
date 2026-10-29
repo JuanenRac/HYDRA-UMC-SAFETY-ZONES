@@ -1,0 +1,652 @@
+{
+  "repo": "HYDRA-UMC-SAFETY-ZONES",
+  "ecosystem": "hydra",
+  "svg": "en",
+  "exempt": [
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "SUPPORT.md",
+    "LICENSE",
+    "LICENSE.md",
+    "build-test.bat",
+    "test.bat"
+  ],
+  "cards": [
+    {
+      "name": "src/hydra_umc_safety_zones/",
+      "span": 3,
+      "accent": "a",
+      "rows": [
+        {
+          "name": "__init__.py",
+          "desc": {
+            "en": "Package description and version",
+            "es": "Descripción y versión del paquete",
+            "de": "Paketbeschreibung und Version",
+            "fr": "Description et version du paquet",
+            "it": "Descrizione e versione del pacchetto",
+            "ja": "パッケージの説明とバージョン",
+            "zh": "包说明与版本",
+            "pt": "Descrição e versão do pacote"
+          },
+          "tree_desc": {
+            "en": "Package description and version",
+            "es": "Descripción y versión del paquete",
+            "de": "Paketbeschreibung und Version",
+            "fr": "Description et version du paquet",
+            "it": "Descrizione e versione del pacchetto",
+            "ja": "パッケージの説明とバージョン",
+            "zh": "包说明与版本",
+            "pt": "Descrição e versão do pacote"
+          }
+        },
+        {
+          "name": "geometry.py",
+          "desc": {
+            "en": "Real Point3D/AABB primitives",
+            "es": "Primitivas reales Point3D/AABB",
+            "de": "Echte Point3D/AABB-Primitive",
+            "fr": "Vraies primitives Point3D/AABB",
+            "it": "Vere primitive Point3D/AABB",
+            "ja": "実際の Point3D/AABB プリミティ",
+            "zh": "真实的 Point3D/AABB 基础类型",
+            "pt": "Primitivas reais Point3D/AABB"
+          },
+          "tree_desc": {
+            "en": "Real Point3D/AABB primitives",
+            "es": "Primitivas reales Point3D/AABB",
+            "de": "Echte Point3D/AABB-Primitive",
+            "fr": "Vraies primitives Point3D/AABB",
+            "it": "Vere primitive Point3D/AABB",
+            "ja": "実際の Point3D/AABB プリミティブ",
+            "zh": "真实的 Point3D/AABB 基础类型",
+            "pt": "Primitivas reais Point3D/AABB"
+          }
+        },
+        {
+          "name": "zones.py",
+          "desc": {
+            "en": "Real ZoneLevel/Zone/ZoneSet definitions",
+            "es": "Definiciones reales ZoneLevel/Zone/ZoneSet",
+            "de": "Echte ZoneLevel/Zone/ZoneSet-Definitionen",
+            "fr": "Vraies définitions ZoneLevel/Zone/ZoneSet",
+            "it": "Vere definizioni ZoneLevel/Zone/ZoneSet",
+            "ja": "実際の ZoneLevel/Zone/Zon",
+            "zh": "真实的 ZoneLevel/Zone/Zon",
+            "pt": "Definições reais ZoneLevel/Zone/ZoneSet"
+          },
+          "tree_desc": {
+            "en": "Real ZoneLevel/Zone/ZoneSet definitions",
+            "es": "Definiciones reales ZoneLevel/Zone/ZoneSet",
+            "de": "Echte ZoneLevel/Zone/ZoneSet-Definitionen",
+            "fr": "Vraies définitions ZoneLevel/Zone/ZoneSet",
+            "it": "Vere definizioni ZoneLevel/Zone/ZoneSet",
+            "ja": "実際の ZoneLevel/Zone/ZoneSet 定義",
+            "zh": "真实的 ZoneLevel/Zone/ZoneSet 定义",
+            "pt": "Definições reais ZoneLevel/Zone/ZoneSet"
+          }
+        },
+        {
+          "name": "breach.py",
+          "desc": {
+            "en": "Real zone-breach checking",
+            "es": "Comprobación real de brechas de zona",
+            "de": "Echte Zonenverletzungsprüfung",
+            "fr": "Vraie vérification des franchissements de",
+            "it": "Vero controllo delle violazioni di zona",
+            "ja": "実際のゾーン越境チェック",
+            "zh": "真实的区域越界检查",
+            "pt": "Verificação real de violações de zonas"
+          },
+          "tree_desc": {
+            "en": "Real zone-breach checking",
+            "es": "Comprobación real de brechas de zona",
+            "de": "Echte Zonenverletzungsprüfung",
+            "fr": "Vraie vérification des franchissements de zone",
+            "it": "Vero controllo delle violazioni di zona",
+            "ja": "実際のゾーン越境チェック",
+            "zh": "真实的区域越界检查",
+            "pt": "Verificação real de violações de zonas"
+          }
+        },
+        {
+          "name": "calibration.py",
+          "desc": {
+            "en": "Real calibration-freshness tracking",
+            "es": "Seguimiento real de frescura de calibración",
+            "de": "Echte Verfolgung der Kalibrierungsfrische",
+            "fr": "Vrai suivi de la fraîcheur de calibration",
+            "it": "Vero tracciamento della freschezza di",
+            "ja": "実際のキャリブレーション鮮度追跡",
+            "zh": "真实的校准新鲜度跟踪",
+            "pt": "Acompanhamento real da frescura da"
+          },
+          "tree_desc": {
+            "en": "Real calibration-freshness tracking",
+            "es": "Seguimiento real de frescura de calibración",
+            "de": "Echte Verfolgung der Kalibrierungsfrische",
+            "fr": "Vrai suivi de la fraîcheur de calibration",
+            "it": "Vero tracciamento della freschezza di calibrazione",
+            "ja": "実際のキャリブレーション鮮度追跡",
+            "zh": "真实的校准新鲜度跟踪",
+            "pt": "Acompanhamento real da frescura da calibração"
+          }
+        },
+        {
+          "name": "observation.py",
+          "desc": {
+            "en": "Real observer-health tracking",
+            "es": "Seguimiento real de salud del observador",
+            "de": "Echte Beobachter-Gesundheitsverfolgung",
+            "fr": "Vrai suivi de la santé de l'observateur",
+            "it": "Vero tracciamento della salute",
+            "ja": "実際の観測者健全性追跡 —— calibra",
+            "zh": "真实的观测者健康跟踪 - 镜像 calibr",
+            "pt": "Acompanhamento real da saúde do observador"
+          },
+          "tree_desc": {
+            "en": "Real observer-health tracking - mirrors calibration.py",
+            "es": "Seguimiento real de salud del observador - refleja calibration.py",
+            "de": "Echte Beobachter-Gesundheitsverfolgung - spiegelt calibration.py",
+            "fr": "Vrai suivi de la santé de l'observateur - reflète calibration.py",
+            "it": "Vero tracciamento della salute dell'osservatore - rispecchia calibration.py",
+            "ja": "実際の観測者健全性追跡 —— calibration.py を反映",
+            "zh": "真实的观测者健康跟踪 - 镜像 calibration.py",
+            "pt": "Acompanhamento real da saúde do observador - espelha calibration.py"
+          }
+        },
+        {
+          "name": "safety_state.py",
+          "desc": {
+            "en": "Real fail-safe decision",
+            "es": "Decisión real de fallo seguro",
+            "de": "Echte Fail-Safe-Entscheidung",
+            "fr": "Vraie décision de sécurité intrinsèque",
+            "it": "Vera decisione di sicurezza intrinseca",
+            "ja": "実際のフェイルセーフ判定：READY/WAR",
+            "zh": "真实的故障安全决策：READY/WARNIN",
+            "pt": "Decisão real de falha segura"
+          },
+          "tree_desc": {
+            "en": "Real fail-safe decision: READY/WARNING/DANGER/INHIBITED",
+            "es": "Decisión real de fallo seguro: READY/WARNING/DANGER/INHIBITED",
+            "de": "Echte Fail-Safe-Entscheidung: READY/WARNING/DANGER/INHIBITED",
+            "fr": "Vraie décision de sécurité intrinsèque : READY/WARNING/DANGER/INHIBITED",
+            "it": "Vera decisione di sicurezza intrinseca: READY/WARNING/DANGER/INHIBITED",
+            "ja": "実際のフェイルセーフ判定：READY/WARNING/DANGER/INHIBITED",
+            "zh": "真实的故障安全决策：READY/WARNING/DANGER/INHIBITED",
+            "pt": "Decisão real de falha segura: READY/WARNING/DANGER/INHIBITED"
+          }
+        },
+        {
+          "name": "estop.py",
+          "desc": {
+            "en": "Real E-STOP requesting (never asserting)",
+            "es": "Solicitud real de E-STOP (nunca lo dispara)",
+            "de": "Echte E-STOP-Anforderung (nie Auslösung)",
+            "fr": "Vraie demande d'E-STOP",
+            "it": "Vera richiesta E-STOP (mai attivazione)",
+            "ja": "実際の E-STOP リクエスト",
+            "zh": "真实的 E-STOP 请求（从不执行）",
+            "pt": "Pedido real de E-STOP (nunca o aciona)"
+          },
+          "tree_desc": {
+            "en": "Real E-STOP requesting (never asserting)",
+            "es": "Solicitud real de E-STOP (nunca lo dispara)",
+            "de": "Echte E-STOP-Anforderung (nie Auslösung)",
+            "fr": "Vraie demande d'E-STOP (jamais de déclenchement)",
+            "it": "Vera richiesta E-STOP (mai attivazione)",
+            "ja": "実際の E-STOP リクエスト（実行は決してしない）",
+            "zh": "真实的 E-STOP 请求（从不执行）",
+            "pt": "Pedido real de E-STOP (nunca o aciona)"
+          }
+        },
+        {
+          "name": "config.py",
+          "desc": {
+            "en": "Real JSON loading for",
+            "es": "Carga real de JSON para",
+            "de": "Echtes JSON-Laden für",
+            "fr": "Vrai chargement JSON pour",
+            "it": "Vero caricamento JSON per",
+            "ja": "ゾーン/検知/観測データの実際の JSON",
+            "zh": "真实的区域/检测/观测 JSON 加载",
+            "pt": "Carregamento JSON real de"
+          },
+          "tree_desc": {
+            "en": "Real JSON loading for zones/detections/observation",
+            "es": "Carga real de JSON para zonas/detecciones/observación",
+            "de": "Echtes JSON-Laden für Zonen/Erkennungen/Beobachtung",
+            "fr": "Vrai chargement JSON pour zones/détections/observation",
+            "it": "Vero caricamento JSON per zone/rilevamenti/osservazione",
+            "ja": "ゾーン/検知/観測データの実際の JSON 読み込み",
+            "zh": "真实的区域/检测/观测 JSON 加载",
+            "pt": "Carregamento JSON real de zonas/deteções/observação"
+          }
+        },
+        {
+          "name": "api.py",
+          "desc": {
+            "en": "Plain JSON/HTTP surface",
+            "es": "Superficie JSON/HTTP plana",
+            "de": "Einfache JSON/HTTP-Oberfläche",
+            "fr": "Surface JSON/HTTP simple",
+            "it": "Superficie JSON/HTTP semplice",
+            "ja": "シンプルなJSON/HTTPサーフェス(st",
+            "zh": "简洁的 JSON/HTTP 接口(基于 st",
+            "pt": "Superfície JSON/HTTP simples"
+          },
+          "tree_desc": {
+            "en": "Plain JSON/HTTP surface (stdlib http.server) over the real `check` logic",
+            "es": "Superficie JSON/HTTP plana (http.server de stdlib) sobre la lógica real de `check`",
+            "de": "Einfache JSON/HTTP-Oberfläche (stdlib http.server) über die echte `check`-Logik",
+            "fr": "Surface JSON/HTTP simple (http.server de stdlib) sur la vraie logique `check`",
+            "it": "Superficie JSON/HTTP semplice (http.server di stdlib) sulla vera logica `check`",
+            "ja": "シンプルなJSON/HTTPサーフェス(stdlibのhttp.server)。実際の`check`ロジックを橋渡し",
+            "zh": "简洁的 JSON/HTTP 接口(基于 stdlib http.server),桥接真实的 `check` 逻辑",
+            "pt": "Superfície JSON/HTTP simples (stdlib http.server) sobre a lógica real de `check`"
+          }
+        },
+        {
+          "name": "main.py",
+          "desc": {
+            "en": "Entry point + real `check` subcommand",
+            "es": "Entry point + subcomando real `check`",
+            "de": "Einstiegspunkt + echter `check`-Subbefehl",
+            "fr": "Point d'entrée + vrai sous-commande `check`",
+            "it": "Entry point + vero sottocomando `check`",
+            "ja": "エントリポイント + 実際の `check`",
+            "zh": "入口点 + 真实的 `check` 子命令",
+            "pt": "Ponto de entrada + subcomando real `check`"
+          },
+          "tree_desc": {
+            "en": "Entry point + real `check` subcommand",
+            "es": "Entry point + subcomando real `check`",
+            "de": "Einstiegspunkt + echter `check`-Subbefehl",
+            "fr": "Point d'entrée + vrai sous-commande `check`",
+            "it": "Entry point + vero sottocomando `check`",
+            "ja": "エントリポイント + 実際の `check` サブコマンド",
+            "zh": "入口点 + 真实的 `check` 子命令",
+            "pt": "Ponto de entrada + subcomando real `check`"
+          }
+        }
+      ],
+      "tree_head": {
+        "en": "source code",
+        "es": "código fuente",
+        "de": "Quellcode",
+        "fr": "code source",
+        "it": "codice sorgente",
+        "ja": "ソースコード",
+        "zh": "源代码",
+        "pt": "código-fonte"
+      },
+      "sub": {
+        "en": "source code",
+        "es": "código fuente",
+        "de": "Quellcode",
+        "fr": "code source",
+        "it": "codice sorgente",
+        "ja": "ソースコード",
+        "zh": "源代码",
+        "pt": "código-fonte"
+      },
+      "columns": 2
+    },
+    {
+      "name": {
+        "en": "folders",
+        "es": "carpetas",
+        "de": "Ordner",
+        "fr": "dossiers",
+        "it": "cartelle",
+        "ja": "フォルダ",
+        "zh": "文件夹",
+        "pt": "pastas"
+      },
+      "kind": "group",
+      "span": 3,
+      "accent": "b",
+      "columns": 2,
+      "rows": [
+        {
+          "name": "tests/",
+          "desc": {
+            "en": "Real tests: geometry",
+            "es": "Tests reales: geometría",
+            "de": "Echte Tests: Geometrie",
+            "fr": "Vrais tests : géométrie",
+            "it": "Test veri: geometria",
+            "ja": "実際のテスト：幾何、越境、キャリブレーション",
+            "zh": "真实测试：几何、越界、校准、观测、safet",
+            "pt": "Testes reais: geometria"
+          },
+          "tree_desc": {
+            "en": "Real tests: geometry, breach, calibration, observation, safety_state, estop, config, api, CLI",
+            "es": "Tests reales: geometría, brechas, calibración, observación, safety_state, estop, config, api, CLI",
+            "de": "Echte Tests: Geometrie, Verletzungen, Kalibrierung, Beobachtung, safety_state, estop, Config, api, CLI",
+            "fr": "Vrais tests : géométrie, franchissements, calibration, observation, safety_state, estop, config, api, CLI",
+            "it": "Test veri: geometria, violazioni, calibrazione, osservazione, safety_state, estop, config, api, CLI",
+            "ja": "実際のテスト：幾何、越境、キャリブレーション、観測、safety_state、estop、設定、api、CLI",
+            "zh": "真实测试：几何、越界、校准、观测、safety_state、estop、配置、api、CLI",
+            "pt": "Testes reais: geometria, violações, calibração, observação, safety_state, estop, config, api, CLI, finitude/extensão"
+          }
+        },
+        {
+          "name": "docs/",
+          "desc": {
+            "en": "Documentation and safety standards",
+            "es": "Documentación y estándares de seguridad",
+            "de": "Dokumentation und Sicherheitsnormen",
+            "fr": "Documentation et normes de sécurité",
+            "it": "Documentazione e standard di sicurezza",
+            "ja": "ドキュメントと安全基準",
+            "zh": "文档与安全标准",
+            "pt": "Documentação e normas de segurança"
+          },
+          "tree_desc": {
+            "en": "Documentation and safety standards",
+            "es": "Documentación y estándares de seguridad",
+            "de": "Dokumentation und Sicherheitsnormen",
+            "fr": "Documentation et normes de sécurité",
+            "it": "Documentazione e standard di sicurezza",
+            "ja": "ドキュメントと安全基準",
+            "zh": "文档与安全标准",
+            "pt": "Documentação e normas de segurança"
+          }
+        },
+        {
+          "name": "images/",
+          "desc": {
+            "en": "Media and diagrams",
+            "es": "Medios y diagramas",
+            "de": "Medien und Diagramme",
+            "fr": "Médias et diagrammes",
+            "it": "Media e diagrammi",
+            "ja": "メディアと図表",
+            "zh": "媒体与图表",
+            "pt": "Multimédia e diagramas"
+          },
+          "tree_desc": {
+            "en": "Media and diagrams",
+            "es": "Medios y diagramas",
+            "de": "Medien und Diagramme",
+            "fr": "Médias et diagrammes",
+            "it": "Media e diagrammi",
+            "ja": "メディアと図表",
+            "zh": "媒体与图表",
+            "pt": "Multimédia e diagramas"
+          }
+        },
+        {
+          "name": "systemd/",
+          "desc": {
+            "en": "service unit",
+            "es": "unidad de servicio",
+            "de": "Dienst-Unit",
+            "fr": "unité de service",
+            "it": "unità di servizio",
+            "ja": "サービスユニット",
+            "zh": "服务单元",
+            "pt": "unidade de serviço"
+          },
+          "tree_desc": {
+            "en": "service unit",
+            "es": "unidad de servicio",
+            "de": "Dienst-Unit",
+            "fr": "unité de service",
+            "it": "unità di servizio",
+            "ja": "サービスユニット",
+            "zh": "服务单元",
+            "pt": "unidade de serviço"
+          }
+        },
+        {
+          "name": "tools/",
+          "desc": {
+            "en": "project tools and CI checks",
+            "es": "herramientas del proyecto y comprobaciones",
+            "de": "Projektwerkzeuge und CI-Prüfungen",
+            "fr": "outils du projet et vérifications de la CI",
+            "it": "strumenti del progetto e controlli della CI",
+            "ja": "プロジェクトのツールと CI の検査",
+            "zh": "项目工具和 CI 检查",
+            "pt": "ferramentas do projeto e verificações da CI"
+          },
+          "tree_desc": {
+            "en": "project tools and CI checks",
+            "es": "herramientas del proyecto y comprobaciones del CI",
+            "de": "Projektwerkzeuge und CI-Prüfungen",
+            "fr": "outils du projet et vérifications de la CI",
+            "it": "strumenti del progetto e controlli della CI",
+            "ja": "プロジェクトのツールと CI の検査",
+            "zh": "项目工具和 CI 检查",
+            "pt": "ferramentas do projeto e verificações da CI"
+          }
+        },
+        {
+          "name": ".github/",
+          "desc": {
+            "en": "CI workflow and issue templates",
+            "es": "flujo de CI y plantillas de incidencias",
+            "de": "CI-Workflow und Issue-Vorlagen",
+            "fr": "workflow de CI et modèles de tickets",
+            "it": "workflow di CI e modelli di segnalazione",
+            "ja": "CI ワークフローと Issue テンプレート",
+            "zh": "CI 工作流和 Issue 模板",
+            "pt": "fluxo de CI e modelos de problemas"
+          }
+        }
+      ]
+    },
+    {
+      "name": {
+        "en": "project files",
+        "es": "ficheros del proyecto",
+        "de": "Projektdateien",
+        "fr": "fichiers du projet",
+        "it": "file del progetto",
+        "ja": "プロジェクトのファイル",
+        "zh": "项目文件",
+        "pt": "ficheiros do projeto"
+      },
+      "kind": "group",
+      "span": 3,
+      "accent": "c",
+      "columns": 2,
+      "rows": [
+        {
+          "name": "pyproject.toml",
+          "desc": {
+            "en": "package metadata",
+            "es": "Metadatos del paquete",
+            "de": "Paketmetadaten",
+            "fr": "Métadonnées du paquet",
+            "it": "Metadati pacchetto",
+            "ja": "パッケージのメタデータ",
+            "zh": "包的元数据",
+            "pt": "metadados do pacote"
+          },
+          "tree_desc": {
+            "en": "package metadata",
+            "es": "Metadatos del paquete, dependencias, versión cuentakilómetros",
+            "de": "Paketmetadaten",
+            "fr": "Métadonnées du paquet, dépendances, version compteur kilométrique",
+            "it": "Metadati pacchetto, dipendenze, versione contachilometri",
+            "ja": "パッケージのメタデータ",
+            "zh": "包的元数据",
+            "pt": "metadados do pacote"
+          }
+        },
+        {
+          "name": "bump_version.py",
+          "desc": {
+            "en": "explicit version bump",
+            "es": "Incremento de versión tipo cuentakilómetros",
+            "de": "ausdrückliche Versionserhöhung",
+            "fr": "Incrément de version type compteur",
+            "it": "Incremento di versione stile contachilometri",
+            "ja": "明示的なバージョン更新",
+            "zh": "显式提升版本",
+            "pt": "Subida de versão ao estilo conta-quilómetros"
+          },
+          "tree_desc": {
+            "en": "explicit version bump",
+            "es": "Incremento de versión tipo cuentakilómetros (solo lo ejecuta el comando `bump` explícito)",
+            "de": "ausdrückliche Versionserhöhung",
+            "fr": "Incrément de version type compteur kilométrique (exécuté seulement par la commande `bump` explicite)",
+            "it": "Incremento di versione stile contachilometri (eseguito solo dal comando `bump` esplicito)",
+            "ja": "明示的なバージョン更新",
+            "zh": "显式提升版本",
+            "pt": "Subida de versão ao estilo conta-quilómetros (executada só pelo comando `bump` explícito)"
+          }
+        },
+        {
+          "name": "bump_manifest_version.py",
+          "desc": {
+            "en": "Syncs hydra-umc.project.json's version to",
+            "es": "Sincroniza la versión de",
+            "de": "Synchronisiert die Version von",
+            "fr": "Synchronise la version de",
+            "it": "Sincronizza la versione di",
+            "ja": "hydra-umc.project.json",
+            "zh": "将 hydra-umc.project.js",
+            "pt": "Sincroniza a versão de"
+          },
+          "tree_desc": {
+            "en": "Syncs hydra-umc.project.json's version to the native one (--sync)",
+            "es": "Sincroniza la versión de hydra-umc.project.json con la nativa (--sync)",
+            "de": "Synchronisiert die Version von hydra-umc.project.json mit der nativen (--sync)",
+            "fr": "Synchronise la version de hydra-umc.project.json avec la version native (--sync)",
+            "it": "Sincronizza la versione di hydra-umc.project.json con quella nativa (--sync)",
+            "ja": "hydra-umc.project.json のバージョンをネイティブ版と同期(--sync)",
+            "zh": "将 hydra-umc.project.json 的版本与原生版本同步(--sync)",
+            "pt": "Sincroniza a versão de hydra-umc.project.json com a nativa (--sync)"
+          }
+        },
+        {
+          "name": "build.sh / build.bat",
+          "desc": {
+            "en": "venv + editable install",
+            "es": "venv + instalación editable",
+            "de": "venv + editierbare Installation",
+            "fr": "venv + installation éditable",
+            "it": "venv + installazione editabile",
+            "ja": "venv + editable インストール",
+            "zh": "venv + 可编辑安装（含 dev 附加依",
+            "pt": "venv + instalação editável"
+          },
+          "tree_desc": {
+            "en": "venv + editable install (dev extras) + compile-check + tests",
+            "es": "venv + instalación editable (extras dev) + compile-check + tests",
+            "de": "venv + editierbare Installation (Dev-Extras) + Compile-Check + Tests",
+            "fr": "venv + installation éditable (extras dev) + compile-check + tests",
+            "it": "venv + installazione editabile (extra dev) + compile-check + test",
+            "ja": "venv + editable インストール（dev エクストラ付き） + コンパイルチェック + テスト",
+            "zh": "venv + 可编辑安装（含 dev 附加依赖） + 编译检查 + 测试",
+            "pt": "venv + instalação editável (extras de desenvolvimento) + verificação de compilação + testes"
+          }
+        },
+        {
+          "name": "run.sh / run.bat",
+          "desc": {
+            "en": "Runs the entry point from the local venv",
+            "es": "Ejecuta el entry point desde el venv local",
+            "de": "Führt den Einstiegspunkt aus dem lokalen",
+            "fr": "Exécute le point d'entrée depuis le venv",
+            "it": "Esegue l'entry point dal venv locale",
+            "ja": "ローカル venv からエントリポイントを実",
+            "zh": "从本地 venv 运行入口点（转发参数）",
+            "pt": "Executa o ponto de entrada a partir do venv"
+          },
+          "tree_desc": {
+            "en": "Runs the entry point from the local venv (forwards args)",
+            "es": "Ejecuta el entry point desde el venv local (reenvía argumentos)",
+            "de": "Führt den Einstiegspunkt aus dem lokalen venv aus (leitet Argumente weiter)",
+            "fr": "Exécute le point d'entrée depuis le venv local (relaie les arguments)",
+            "it": "Esegue l'entry point dal venv locale (inoltra gli argomenti)",
+            "ja": "ローカル venv からエントリポイントを実行（引数を転送）",
+            "zh": "从本地 venv 运行入口点（转发参数）",
+            "pt": "Executa o ponto de entrada a partir do venv local (reencaminha argumentos)"
+          }
+        },
+        {
+          "name": "CHANGELOG.md",
+          "desc": {
+            "en": "what changed in each version",
+            "es": "Historial versión a versión",
+            "de": "was sich in jeder Version geändert hat",
+            "fr": "Historique version par version",
+            "it": "Storico versione per versione",
+            "ja": "各バージョンの変更点",
+            "zh": "每个版本的变更",
+            "pt": "o que mudou em cada versão"
+          },
+          "tree_desc": {
+            "en": "what changed in each version",
+            "es": "Historial versión a versión (esquema cuentakilómetros, sin fechas)",
+            "de": "was sich in jeder Version geändert hat",
+            "fr": "Historique version par version (schéma compteur kilométrique, sans dates)",
+            "it": "Storico versione per versione (schema contachilometri, senza date)",
+            "ja": "各バージョンの変更点",
+            "zh": "每个版本的变更",
+            "pt": "o que mudou em cada versão"
+          }
+        },
+        {
+          "name": "Dockerfile",
+          "desc": {
+            "en": "container image",
+            "es": "imagen de contenedor",
+            "de": "Container-Image",
+            "fr": "image de conteneur",
+            "it": "immagine del container",
+            "ja": "コンテナイメージ",
+            "zh": "容器镜像",
+            "pt": "imagem de contentor"
+          }
+        },
+        {
+          "name": "build-test.sh",
+          "desc": {
+            "en": "non-mutating build check",
+            "es": "comprobación de compilación sin cambios",
+            "de": "Build-Prüfung ohne Änderungen",
+            "fr": "vérification de build sans modification",
+            "it": "controllo di build senza modifiche",
+            "ja": "変更を伴わないビルド確認",
+            "zh": "不修改内容的构建检查",
+            "pt": "verificação de compilação sem alterações"
+          }
+        },
+        {
+          "name": "hydra-umc.project.json",
+          "desc": {
+            "en": "manifest: version, maturity, family",
+            "es": "manifiesto: versión, madurez, familia",
+            "de": "Manifest: Version, Reifegrad, Familie",
+            "fr": "manifeste : version, maturité, famille",
+            "it": "manifesto: versione, maturità, famiglia",
+            "ja": "マニフェスト：バージョン、成熟度、ファミリー",
+            "zh": "清单：版本、成熟度、系列",
+            "pt": "manifesto: versão, maturidade, família"
+          }
+        },
+        {
+          "name": "test.sh",
+          "desc": {
+            "en": "runs the tests",
+            "es": "ejecuta las pruebas",
+            "de": "führt die Tests aus",
+            "fr": "lance les tests",
+            "it": "esegue i test",
+            "ja": "テストを実行",
+            "zh": "运行测试",
+            "pt": "executa os testes"
+          }
+        }
+      ]
+    }
+  ]
+}
