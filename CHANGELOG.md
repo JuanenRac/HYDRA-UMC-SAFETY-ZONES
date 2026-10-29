@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented here.
 
+## [Unreleased]
+
+- **The layout of the README is checked in the CI:** the validator runs `tools/universal_readme_check.py` and lists, as a warning, what differs from the universal layout of the README.
+
 ## [0.1.5] - Optional ISO 13855 / ISO 13857 separation model and the licence declared in the package metadata is GPL-3.0-or-later,
 
 - **Optional ISO 13855 / ISO 13857 separation model.** A zones file may declare `separation` with the approach speed K, the total stopping time T and the intrusion distance C (and optionally the tool deceleration). The zones then grow by `K*T + C` plus the distance the tool still travels while the machine stops, capped at 10 m; every figure is the installation's own and nothing is assumed. The linear velocity margin stays as the conservative floor, so the model only ever grows a zone; with a model the zones grow even when no velocity is sent. Off unless declared.
