@@ -351,3 +351,24 @@ def test_check_a_bad_radius_is_a_400_not_a_silent_point(tmp_path) -> None:
             payload = {"objects": [{"id": "op1", "position": {"x": 1, "y": 1, "z": 1}, "radiusM": bad}]}
             status, _ = _post(f"{base}/check", {"zones": _zones(), "detections": payload, "observation": _observation()})
             assert status == 400, bad
+
+
+def test_the_decision_log_gets_one_line_per_verdict_and_is_off_by_default(tmp_path) -> None:
+    log = tmp_path / "decisions.jsonl"
+    server = SafetyZonesServer(("127.0.0.1", 0), "test role", decision_log=str(log))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        _post(f"{base}/check", {"zones": _zones(), "detections": _detections(50, 50, 50), "observation": _observation()})
+        _post(f"{base}/check", {"zones": _zones(), "detections": _detections(50, 50, 50)})
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+    lines = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+    assert [line["state"] for line in lines] == ["ready", "inhibited"]
+    assert all({"at", "reason", "sdkSafetyState", "breaches", "estopRequests"} <= set(line) for line in lines)
+    with running_server() as base:
+        _post(f"{base}/check", {"zones": _zones(), "detections": _detections(50, 50, 50), "observation": _observation()})
+    assert len(log.read_text(encoding="utf-8").splitlines()) == 2

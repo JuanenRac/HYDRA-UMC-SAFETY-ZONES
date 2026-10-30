@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-244%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-245%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.5-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | Versión | `0.1.5` |
 | Madurez | Funcional |
-| Tests | 244 (`python -m pytest -q tests`) |
+| Tests | 245 (`python -m pytest -q tests`) |
 | Tecnología | Python / 3D vision / Hailo-8 |
 | Destino | La Raspberry Pi CM5 de una celda HYDRA-UMC |
 | En hardware real | Todavía no: no consta ninguna ejecución en hardware real para esta versión |
@@ -51,7 +51,7 @@ Cada línea es una parte de este repositorio y la luz dice hasta dónde llega ho
 | Área | Estado | Qué significa aquí |
 |---|---|---|
 | Software | 🟡 | Funciona para su propósito principal; la comprobación de honestidad de arriba lista lo que aún falta |
-| Pruebas | 🟢 | 244 pruebas automáticas, ejecutadas en cada cambio |
+| Pruebas | 🟢 | 245 pruebas automáticas, ejecutadas en cada cambio |
 | Hardware real | 🔴 | Todavía no: no consta ninguna ejecución en hardware real para esta versión |
 | Documentación | 🟢 | README en ocho idiomas, comprobado contra el manifiesto en cada cambio |
 
@@ -162,6 +162,7 @@ El servicio HTTP se configura con opciones; dos de ellas pueden venir también d
 | `--token` / `SAFETY_ZONES_TOKEN` | ninguno | token Bearer que exige POST /check |
 | `--max-observation-age-seconds` | ninguno | tope para la antigüedad que una petición puede declarar para su observación |
 | `--max-calibration-age-days` | ninguno | tope para la antigüedad máxima de la calibración en días |
+| `--decision-log` / `SAFETY_ZONES_DECISION_LOG` | desactivado | registrar cada veredicto de POST /check en una línea JSON en un fichero (`-` para el error estándar) |
 
 ## 🚀 Inicio rápido
 
@@ -176,7 +177,7 @@ Requiere Python 3.10 o superior.
 
 ## 🧪 Pruebas
 
-244 pruebas automáticas se ejecutan con `python -m pytest -q tests`. No necesitan hardware ni nada fuera de esta máquina.
+245 pruebas automáticas se ejecutan con `python -m pytest -q tests`. No necesitan hardware ni nada fuera de esta máquina.
 
 El CI ejecuta `HYDRA_UMC_CI=1 python tools/ci_validate.py`, que comprueba el manifiesto, los documentos, los ocho README y las imágenes.
 
@@ -199,7 +200,7 @@ El CI ejecuta `HYDRA_UMC_CI=1 python tools/ci_validate.py`, que comprueba el man
 2. **Entorno virtual** - crea `.venv/` si falta; lo reutiliza si ya existe.
 3. **Instalación editable (con extras dev)** - `pip install -e ".[dev]"` para que los cambios en `src/` tengan efecto inmediato, instala `pytest`, y registra el entry point de consola `hydra-umc-safety-zones`.
 4. **Compile-check** - `python -m compileall -q src` compila a bytecode cada archivo bajo `src/`.
-5. **Suite de tests real** - `pytest tests/` ejecuta los 244 tests.
+5. **Suite de tests real** - `pytest tests/` ejecuta los 245 tests.
 
 `set -euo pipefail` detiene el script en el primer paso que falle; la ventana se queda abierta (`Press Enter to close...`) si se ejecutó con doble clic en vez de desde una terminal ya abierta.
 
@@ -352,7 +353,7 @@ HYDRA-UMC-SAFETY-ZONES/
 
 **Límites conocidos hoy**
 
-**Qué funciona hoy:** definiciones reales de zonas Warning/Danger y comprobación de brechas (`geometry.py`/`zones.py`/`breach.py`), aplicación real de frescura de calibración que falla de forma segura a `INHIBITED` antes de ejecutar cualquier lógica de brechas (`calibration.py`/`safety_state.py`), un pipeline real de *solicitud* de E-STOP que respeta el límite detectar-vs-aplicar por construcción (`estop.py`), un subcomando CLI real `check` sobre ficheros JSON de zonas/detecciones, y 244 tests pasando - ver [`CHANGELOG.md`](CHANGELOG.md) para la salida completa real de build/run.
+**Qué funciona hoy:** definiciones reales de zonas Warning/Danger y comprobación de brechas (`geometry.py`/`zones.py`/`breach.py`), aplicación real de frescura de calibración que falla de forma segura a `INHIBITED` antes de ejecutar cualquier lógica de brechas (`calibration.py`/`safety_state.py`), un pipeline real de *solicitud* de E-STOP que respeta el límite detectar-vs-aplicar por construcción (`estop.py`), un subcomando CLI real `check` sobre ficheros JSON de zonas/detecciones, y 245 tests pasando - ver [`CHANGELOG.md`](CHANGELOG.md) para la salida completa real de build/run.
 
 **Qué sigue abierto, sin orden particular y sin calendario comprometido:**
 

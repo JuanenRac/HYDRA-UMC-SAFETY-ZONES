@@ -231,7 +231,7 @@ Two clock tolerances keep a healthy cell from being inhibited by rounding: an ob
 timestamped up to 0.25 s ahead of this machine's clock is not "in the future", and a calibration
 dated one day ahead (a local date written east of UTC) is not expired. Anything further ahead is.
 
-### `serve [--addr ADDR] [--port PORT] [--zones-file PATH] [--token T] [--max-observation-age-seconds S] [--max-calibration-age-days D]`
+### `serve [--addr ADDR] [--port PORT] [--zones-file PATH] [--token T] [--max-observation-age-seconds S] [--max-calibration-age-days D] [--decision-log FILE]`
 
 ```
 $ hydra-umc-safety-zones serve -h
@@ -290,6 +290,9 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
   hash of that file. `--max-observation-age-seconds` and `--max-calibration-age-days` refuse a request
   whose evidence claims to stay valid longer. `--token` (or `SAFETY_ZONES_TOKEN`) makes `POST /check`
   demand `Authorization: Bearer <token>` (`401` otherwise); `GET /stats` stays open.
+  `--decision-log FILE` (or `SAFETY_ZONES_DECISION_LOG`; `-` is standard error) appends one JSON line per
+  verdict: `at`, `state`, `sdkSafetyState`, `reason`, `configSha256`, `breaches`, `estopRequests`. It is off
+  unless given, and a log that cannot be written never changes the verdict.
 
   Requests are limited: a body over 1 MiB is refused, a client silent for 10 s is dropped, and at most
   32 connections are served at once (`503` beyond). Responds `200` with `{"state", "reason", "breaches", "estopRequests",

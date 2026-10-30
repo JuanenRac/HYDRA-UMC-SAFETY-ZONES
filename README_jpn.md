@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-244%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-245%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.5-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | バージョン | `0.1.5` |
 | 成熟度 | 機能する |
-| テスト | 244 (`python -m pytest -q tests`) |
+| テスト | 245 (`python -m pytest -q tests`) |
 | 技術 | Python / 3D vision / Hailo-8 |
 | 対象 | HYDRA-UMC セルの Raspberry Pi CM5 |
 | 実機での確認 | まだです：このバージョンについて実機での動作記録はありません |
@@ -51,7 +51,7 @@ GPL-3.0-or-later - see LICENSE
 | 領域 | 状態 | ここでの意味 |
 |---|---|---|
 | ソフトウェア | 🟡 | 主な目的では動作します。足りない点は上の正直さの確認に書かれています |
-| テスト | 🟢 | 自動テスト 244 件。変更のたびに実行されます |
+| テスト | 🟢 | 自動テスト 245 件。変更のたびに実行されます |
 | 実機 | 🔴 | まだです：このバージョンについて実機での動作記録はありません |
 | ドキュメント | 🟢 | 8 言語の README。変更のたびにマニフェストと照合されます |
 
@@ -214,6 +214,7 @@ HTTP サービスはオプションで設定します。うち 2 つは環境変
 | `--token` / `SAFETY_ZONES_TOKEN` | なし | POST /check が要求する Bearer トークン |
 | `--max-observation-age-seconds` | なし | リクエストが観測について申告できる経過時間の上限 |
 | `--max-calibration-age-days` | なし | 校正の最大経過日数の上限 |
+| `--decision-log` / `SAFETY_ZONES_DECISION_LOG` | オフ | POST /check の判定を 1 件ずつ JSON 1 行としてファイルに記録（`-` は標準エラー出力） |
 
 ## 🚀 クイックスタート
 
@@ -228,7 +229,7 @@ Python 3.10 以上が必要です。
 
 ## 🧪 テスト
 
-`python -m pytest -q tests` で自動テスト 244 件を実行します。 ハードウェアも、このマシンの外にあるものも必要ありません。
+`python -m pytest -q tests` で自動テスト 245 件を実行します。 ハードウェアも、このマシンの外にあるものも必要ありません。
 
 CI は `HYDRA_UMC_CI=1 python tools/ci_validate.py` を実行し、マニフェスト、文書、8 つの README、図を検査します。
 
@@ -251,7 +252,7 @@ CI は `HYDRA_UMC_CI=1 python tools/ci_validate.py` を実行し、マニフェ�
 2. **仮想環境** — `.venv/` が存在しない場合は作成し、存在する場合は再利用します。
 3. **Editable インストール（dev エクストラ付き）** — `pip install -e ".[dev]"` により `src/` 下の変更が即座に反映され、`pytest` がインストールされ、`hydra-umc-safety-zones` コンソールエントリポイントが登録されます。
 4. **コンパイルチェック** — `python -m compileall -q src` が `src/` 下の各ファイルをバイトコンパイルし、エコシステム全体にわたる構文エラーを検出します。
-5. **実際のテストスイート** — `pytest tests/` が全 244 件のテストを実行します。
+5. **実際のテストスイート** — `pytest tests/` が全 245 件のテストを実行します。
 
 `set -euo pipefail` は最初に失敗したステップでスクリプトを停止させます。
 ダブルクリックで起動された場合（既に開いているターミナルからではなく）は、
@@ -428,7 +429,7 @@ HYDRA-UMC-SAFETY-ZONES/
 `INHIBITED` にフェイルする実際のキャリブレーション鮮度強制
 （`calibration.py`/`safety_state.py`）、構造上検知と執行の境界を守る
 実際の E-STOP *リクエスト*パイプライン（`estop.py`）、ゾーン/検知 JSON
-ファイルに対する実際の CLI サブコマンド `check`、そして通過した 244 件の
+ファイルに対する実際の CLI サブコマンド `check`、そして通過した 245 件の
 テスト——完全な実際のビルド/実行出力は
 [`CHANGELOG.md`](CHANGELOG.md) を参照してください。
 

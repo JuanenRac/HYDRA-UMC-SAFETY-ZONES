@@ -145,6 +145,7 @@ def _run_serve(args: argparse.Namespace) -> int:
             config_sha256=config_sha256,
             max_observation_age_seconds=args.max_observation_age_seconds,
             max_calibration_age_days=args.max_calibration_age_days,
+            decision_log=args.decision_log or None,
         )
     except OSError as exc:
         print(f"[safety-zones] fatal: could not start the HTTP API on {addr}:{port}: {exc}", file=sys.stderr)
@@ -157,6 +158,8 @@ def _run_serve(args: argparse.Namespace) -> int:
         print("[safety-zones] WARNING: zones and calibration come from each request: whoever reaches this port decides them (use --zones-file)")
     if args.token:
         print("[safety-zones] POST /check requires a bearer token")
+    if args.decision_log:
+        print(f"[safety-zones] every verdict is logged as a JSON line to {'standard error' if args.decision_log == '-' else args.decision_log}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -223,6 +226,12 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="server ceiling for the calibration's max_age_days: a larger one is refused",
+    )
+
+    serve_parser.add_argument(
+        "--decision-log",
+        default=os.environ.get("SAFETY_ZONES_DECISION_LOG", ""),
+        help="log every verdict of POST /check as one JSON line to this file, or to standard error with '-' (default: off)",
     )
 
     return parser

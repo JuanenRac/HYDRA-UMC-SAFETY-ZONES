@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hmac
 import json
+import sys
 import threading
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -225,6 +226,7 @@ class Handler(BaseHTTPRequestHandler):
             response["configSha256"] = self.server.config_sha256
 
         if evaluation.state in (SafetyState.INHIBITED, SafetyState.READY):
+            self.server.log_decision(response)
             _write_json(self, 200, response)
             return
 
@@ -236,12 +238,14 @@ class Handler(BaseHTTPRequestHandler):
         response["breaches"] = [asdict(b) for b in breaches]
 
         if evaluation.state is SafetyState.WARNING:
+            self.server.log_decision(response)
             _write_json(self, 200, response)
             return
 
         requester = NullEStopRequester()
         requests = request_estop_for(breaches, requester)
         response["estopRequests"] = [asdict(r) for r in requests]
+        self.server.log_decision(response)
         _write_json(self, 200, response)
 
 
@@ -272,6 +276,7 @@ class SafetyZonesServer(ThreadingHTTPServer):
         config_sha256: str | None = None,
         max_observation_age_seconds: float | None = None,
         max_calibration_age_days: int | None = None,
+        decision_log: str | None = None,
     ) -> None:
         super().__init__(address, Handler)
         self.role = role
@@ -281,6 +286,35 @@ class SafetyZonesServer(ThreadingHTTPServer):
         self.max_observation_age_seconds = max_observation_age_seconds
         self.max_calibration_age_days = max_calibration_age_days
         self._connections = threading.BoundedSemaphore(MAX_CONNECTIONS)
+        # Off unless a destination is given: "-" is standard error, anything else a file that lines are appended to.
+        self._decision_log = decision_log or None
+        self._decision_lock = threading.Lock()
+
+    def log_decision(self, response: dict) -> None:
+        """Append one JSON line with the verdict of a /check (state, reason, configuration hash, counts); never raises."""
+        if self._decision_log is None:
+            return
+        line = json.dumps(
+            {
+                "at": datetime.now(timezone.utc).isoformat(timespec="milliseconds"),
+                "state": response.get("state"),
+                "sdkSafetyState": response.get("sdkSafetyState"),
+                "reason": response.get("reason"),
+                "configSha256": response.get("configSha256"),
+                "breaches": len(response.get("breaches", [])),
+                "estopRequests": len(response.get("estopRequests", [])),
+            },
+            sort_keys=True,
+        )
+        try:
+            with self._decision_lock:
+                if self._decision_log == "-":
+                    print(line, file=sys.stderr, flush=True)
+                else:
+                    with open(self._decision_log, "a", encoding="utf-8") as handle:
+                        handle.write(line + "\n")
+        except OSError:
+            pass  # a log that cannot be written must never change the verdict
 
     def process_request(self, request, client_address) -> None:  # type: ignore[no-untyped-def]
         if not self._connections.acquire(blocking=False):

@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-244%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-245%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.5-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | Version | `0.1.5` |
 | Maturity | Functional |
-| Tests | 244 (`python -m pytest -q tests`) |
+| Tests | 245 (`python -m pytest -q tests`) |
 | Stack | Python / 3D vision / Hailo-8 |
 | Target | The Raspberry Pi CM5 of a HYDRA-UMC cell |
 | On real hardware | Not yet: no run on real hardware is recorded for this version |
@@ -51,7 +51,7 @@ Each line is one part of this repository and the light says how far it is today.
 | Area | State | What it means here |
 |---|---|---|
 | Software | 🟡 | Works for its main purpose; the honesty check above lists what is still missing |
-| Tests | 🟢 | 244 automated tests, run on every change |
+| Tests | 🟢 | 245 automated tests, run on every change |
 | Real hardware | 🔴 | Not yet: no run on real hardware is recorded for this version |
 | Documentation | 🟢 | README in eight languages, checked against the manifest on every change |
 
@@ -162,6 +162,7 @@ The HTTP service is configured with flags; two of them can also come from the en
 | `--token` / `SAFETY_ZONES_TOKEN` | none | Bearer token that POST /check requires |
 | `--max-observation-age-seconds` | none | ceiling for the age a request may declare for its observation |
 | `--max-calibration-age-days` | none | ceiling for the calibration's maximum age in days |
+| `--decision-log` / `SAFETY_ZONES_DECISION_LOG` | off | log every verdict of POST /check as one JSON line to a file (`-` for standard error) |
 
 ## 🚀 Quick start
 
@@ -176,7 +177,7 @@ Requires Python 3.10 or newer.
 
 ## 🧪 Testing
 
-244 automated tests run with `python -m pytest -q tests`. They need no hardware and nothing outside this machine.
+245 automated tests run with `python -m pytest -q tests`. They need no hardware and nothing outside this machine.
 
 The CI runs `HYDRA_UMC_CI=1 python tools/ci_validate.py`, which checks the manifest, the documents, the eight READMEs and the pictures.
 
@@ -199,7 +200,7 @@ The CI runs `HYDRA_UMC_CI=1 python tools/ci_validate.py`, which checks the manif
 2. **Virtual environment** - creates `.venv/` if missing; reuses it otherwise.
 3. **Editable install (with dev extras)** - `pip install -e ".[dev]"` so `src/` edits take effect immediately, pulls in `pytest`, and registers the `hydra-umc-safety-zones` console entry point.
 4. **Compile-check** - `python -m compileall -q src` byte-compiles every file under `src/`, catching syntax errors ecosystem-wide.
-5. **Real test suite** - `pytest tests/` runs all 244 tests.
+5. **Real test suite** - `pytest tests/` runs all 245 tests.
 
 `set -euo pipefail` stops the script at the first failing step; the window stays open (`Press Enter to close...`) if it was double-clicked instead of run from an already-open terminal.
 
@@ -354,7 +355,7 @@ HYDRA-UMC-SAFETY-ZONES/
 
 **Known limits today**
 
-**What works today:** real Warning/Danger zone definitions and breach checking (`geometry.py`/`zones.py`/`breach.py`), real calibration-freshness enforcement that fails safe to `INHIBITED` before any breach logic runs (`calibration.py`/`safety_state.py`), a real E-STOP *requesting* pipeline that respects the detect-vs-enforce boundary by construction (`estop.py`), a real `check` CLI subcommand over JSON zone/detection files, and 244 passing tests - see [`CHANGELOG.md`](CHANGELOG.md) for the full real build/run output.
+**What works today:** real Warning/Danger zone definitions and breach checking (`geometry.py`/`zones.py`/`breach.py`), real calibration-freshness enforcement that fails safe to `INHIBITED` before any breach logic runs (`calibration.py`/`safety_state.py`), a real E-STOP *requesting* pipeline that respects the detect-vs-enforce boundary by construction (`estop.py`), a real `check` CLI subcommand over JSON zone/detection files, and 245 passing tests - see [`CHANGELOG.md`](CHANGELOG.md) for the full real build/run output.
 
 **What is still open, in no particular order and with no committed timeline:**
 

@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-244%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-245%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.5-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | 版本 | `0.1.5` |
 | 成熟度 | 可用 |
-| 测试 | 244 (`python -m pytest -q tests`) |
+| 测试 | 245 (`python -m pytest -q tests`) |
 | 技术栈 | Python / 3D vision / Hailo-8 |
 | 目标 | HYDRA-UMC 工作单元的 Raspberry Pi CM5 |
 | 真实硬件 | 尚未：此版本没有在真实硬件上运行的记录 |
@@ -51,7 +51,7 @@ GPL-3.0-or-later - see LICENSE
 | 领域 | 状态 | 在这里的含义 |
 |---|---|---|
 | 软件 | 🟡 | 主要用途可用；上面的诚实性检查列出了仍然缺少的内容 |
-| 测试 | 🟢 | 244 项自动测试，每次变更都会运行 |
+| 测试 | 🟢 | 245 项自动测试，每次变更都会运行 |
 | 真实硬件 | 🔴 | 尚未：此版本没有在真实硬件上运行的记录 |
 | 文档 | 🟢 | 八种语言的 README，每次变更都会与清单核对 |
 
@@ -197,6 +197,7 @@ HTTP 服务通过选项配置；其中两项也可以来自环境变量。
 | `--token` / `SAFETY_ZONES_TOKEN` | 无 | POST /check 所需的 Bearer 令牌 |
 | `--max-observation-age-seconds` | 无 | 请求可为其观察声明的时效上限 |
 | `--max-calibration-age-days` | 无 | 校准最长有效天数的上限 |
+| `--decision-log` / `SAFETY_ZONES_DECISION_LOG` | 关闭 | 将 POST /check 的每个判定记录为一行 JSON，写入文件（`-` 表示标准错误） |
 
 ## 🚀 快速开始
 
@@ -211,7 +212,7 @@ HTTP 服务通过选项配置；其中两项也可以来自环境变量。
 
 ## 🧪 测试
 
-运行 `python -m pytest -q tests` 会执行 244 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
+运行 `python -m pytest -q tests` 会执行 245 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
 
 CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档、八个 README 和图片。
 
@@ -234,7 +235,7 @@ CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档�
 2. **虚拟环境** —— 若 `.venv/` 不存在则创建；否则复用。
 3. **可编辑安装（含 dev 附加依赖）** —— `pip install -e ".[dev]"`，使 `src/` 下的修改立即生效，安装 `pytest`，并注册 `hydra-umc-safety-zones` 控制台入口点。
 4. **编译检查** —— `python -m compileall -q src` 对 `src/` 下每个文件进行字节码编译，在整个生态系统范围内捕获语法错误。
-5. **真实测试套件** —— `pytest tests/` 运行全部 244 个测试。
+5. **真实测试套件** —— `pytest tests/` 运行全部 245 个测试。
 
 `set -euo pipefail` 会在第一个失败步骤处停止脚本；如果是通过双击而非从已
 打开的终端运行的，窗口会保持打开（`Press Enter to close...`）。
@@ -401,7 +402,7 @@ HYDRA-UMC-SAFETY-ZONES/
 （`geometry.py`/`zones.py`/`breach.py`）、在任何越界逻辑之前就安全故障切换
 到 `INHIBITED` 的真实校准新鲜度强制检查（`calibration.py`/`safety_state.py`）、
 一个在设计上就恪守检测与执行边界的真实 E-STOP*请求*流水线（`estop.py`）、
-一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 244 个通过的
+一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 245 个通过的
 测试——完整的真实构建/运行输出见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 **仍待完成的内容（顺序不分先后，无既定时间表）：**
