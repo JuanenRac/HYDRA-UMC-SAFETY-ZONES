@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import sys
 from datetime import datetime, timezone
@@ -37,6 +38,7 @@ from hydra_umc_safety_zones.config import (
 )
 from hydra_umc_safety_zones.estop import NullEStopRequester, request_estop_for
 from hydra_umc_safety_zones.observation import ObservationError
+from hydra_umc_safety_zones.obstacles import DEFAULT_CELL_M, LEVEL_CHOICES, export_obstacles
 from hydra_umc_safety_zones.safety_state import SafetyState, evaluate_safety
 from hydra_umc_safety_zones.zones import scale_zones_for_velocity
 
@@ -122,6 +124,24 @@ def _run_check(
     return 2
 
 
+def _run_obstacles(args: argparse.Namespace) -> int:
+    """Writes the zones as sphere obstacles for a path planner (JSON on standard output, or to --output)."""
+    try:
+        zone_set = load_zone_set(args.zones)
+        velocity = parse_tool_velocity(args.tool_velocity) if args.tool_velocity is not None else None
+        exported = export_obstacles(zone_set.zones, args.level, args.cell, velocity, zone_set.separation)
+    except Exception as exc:  # noqa: BLE001 - nothing is exported from a file that could not be read
+        print(f"obstacles: could not export the zones: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return EXIT_INVALID_INPUT
+    text = json.dumps(exported, indent=2)
+    if args.output:
+        Path(args.output).write_text(text + "\n", encoding="utf-8")
+        print(f"obstacles: {len(exported['obstacles'])} spheres written to {args.output}")
+    else:
+        print(text)
+    return 0
+
+
 def _run_serve(args: argparse.Namespace) -> int:
     addr, port = args.addr, args.port
     zone_set = None
@@ -196,6 +216,16 @@ def build_parser() -> argparse.ArgumentParser:
              "a silent READY - see evaluate_safety()'s own fail-safe default.",
     )
 
+    obstacles_parser = subparsers.add_parser(
+        "obstacles",
+        help="Export the zones as sphere obstacles (the scenario format of a path planner) that cover every zone completely.",
+    )
+    obstacles_parser.add_argument("--zones", required=True, help="Path to a zones JSON file.")
+    obstacles_parser.add_argument("--level", choices=LEVEL_CHOICES, default="all", help="which zones to export (default: all)")
+    obstacles_parser.add_argument("--cell", type=float, default=DEFAULT_CELL_M, help="side in meters of the cubes each zone is cut into (default: 0.5)")
+    obstacles_parser.add_argument("--tool-velocity", type=float, default=None, help="grow the zones for this tool speed in m/s, as check does")
+    obstacles_parser.add_argument("--output", default="", help="write the JSON to this file instead of standard output")
+
     serve_parser = subparsers.add_parser(
         "serve",
         help="Run 'check' as a JSON/HTTP API (POST /check) - the exact same "
@@ -252,6 +282,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_check(args.zones, args.detections, args.observation, velocity)
     if args.command == "serve":
         return _run_serve(args)
+    if args.command == "obstacles":
+        return _run_obstacles(args)
 
     # Bare invocation: unchanged identity/version/role report.
     print(f"{PROJECT_NAME} v{get_version()}")

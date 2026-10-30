@@ -14,12 +14,14 @@ against real fixture JSON files — not written from memory.
 
 ```
 $ hydra-umc-safety-zones -h
-usage: hydra-umc-safety-zones [-h] {check,serve} ...
+usage: hydra-umc-safety-zones [-h] {check,obstacles,serve} ...
 
 positional arguments:
-  {check,serve}
+  {check,obstacles,serve}
     check       Check detected objects against zones and request E-STOP for
                 Danger breaches.
+    obstacles   Export the zones as sphere obstacles (the scenario format of
+                a path planner) that cover every zone completely.
     serve       Run 'check' as a JSON/HTTP API (POST /check) - the exact
                 same evaluate_safety()/check_breaches()/request_estop_for()
                 functions the CLI already runs.
@@ -319,6 +321,10 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
   Never asserts an E-STOP — only ever requests one, same
   `NullEStopRequester` as the CLI. An object inside several danger zones produces one request that
   names all of them (`zone_ids`).
+
+### `obstacles --zones PATH [--level all|danger|warning] [--cell M] [--tool-velocity V] [--output FILE]`
+
+Exports the zones as sphere obstacles, in the `obstacles` format of a path-planner scenario (`{"obstacles": [{"center": {"x", "y", "z"}, "radius": r}]}`), so a planner that only knows spheres can route around the zones. Each box is cut into cubes of side `--cell` (default `0.5` m) and every cube is covered by its circumscribed sphere, so the spheres always contain the whole zone: the export can over-cover a zone but never leaves a corner free. A smaller cell hugs the box more tightly with more spheres; more than 5000 spheres is refused. With `--tool-velocity` (or a `separation` model in the zones file) the zones first grow by the same margin `check` applies. The JSON goes to standard output, or to `--output`. A file that cannot be read exits `3` and writes nothing.
 
 ## Exit codes
 

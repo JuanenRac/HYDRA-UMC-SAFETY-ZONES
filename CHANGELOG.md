@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **`obstacles` command:** exports the zones as sphere obstacles in the scenario format of a path planner. Each box is cut into cubes (`--cell`, default 0.5 m) covered by their circumscribed spheres, so the spheres always contain the whole zone; `--level` picks danger, warning or all, `--tool-velocity` and the separation model grow the zones as `check` does, and more than 5000 spheres is refused. 11 new tests.
+
 - **`GET /state`:** returns the latest verdict of `POST /check` as the SDK SafetyState with the time it was reached (`404` before the first one; same bearer token as `POST /check`). Kept in memory only. It lets a consumer such as the visual servoing service ask for the state instead of trusting a caller. 3 new tests.
 
 - **Optional decision log:** `serve --decision-log FILE` (or `SAFETY_ZONES_DECISION_LOG`; `-` for standard error) writes one JSON line per `POST /check` verdict with the time, the state, the reason, the hash of the configuration and the number of breaches and stop requests. Off unless given; a log that cannot be written never changes the verdict.
