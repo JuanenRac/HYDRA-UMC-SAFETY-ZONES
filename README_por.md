@@ -40,7 +40,7 @@ GPL-3.0-or-later - see LICENSE
 | Destino | O Raspberry Pi CM5 de uma célula HYDRA-UMC |
 | Em hardware real | Ainda não: não há registo de execução em hardware real para esta versão |
 
-**Ir para:** [Visão geral](#-visão-geral) · [Arquitetura](#-arquitetura) · [Segurança e proteção](#-segurança-e-proteção) · [Configuração](#-configuração) · [Início rápido](#-início-rápido) · [Testes](#-testes) · [Resolução de problemas](#-resolução-de-problemas) · [Estrutura do repositório](#-estrutura-do-repositório) · [Projetos relacionados](#-projetos-relacionados)
+**Ir para:** [Visão geral](#-visão-geral) · [Arquitetura](#-arquitetura) · [Segurança e proteção](#-segurança-e-proteção) · [Interfaces](#-interfaces) · [Configuração](#-configuração) · [Início rápido](#-início-rápido) · [Testes](#-testes) · [Resolução de problemas](#-resolução-de-problemas) · [Estrutura do repositório](#-estrutura-do-repositório) · [Projetos relacionados](#-projetos-relacionados)
 
 ## 🚦 Estado do projeto
 
@@ -150,6 +150,10 @@ O CM5 + Hailo-8 é hardware de prateleira sem placa própria a desenhar, pelo qu
 
 **O que nunca faz:** acionar a paragem física nem dar READY por suposição.
 
+## 🔌 Interfaces
+
+`serve --decision-log FICHEIRO` (ou `SAFETY_ZONES_DECISION_LOG`; `-` para o erro padrão) escreve uma linha JSON por cada veredito de `POST /check` com a hora, o estado, o motivo, o hash da configuração e o número de violações e pedidos de paragem. Está desligado a menos que seja indicado, e um registo que não possa ser escrito nunca altera o veredito.
+
 ## ⚙️ Configuração
 
 O serviço HTTP configura-se com opções; duas delas podem vir também do ambiente.
@@ -162,7 +166,6 @@ O serviço HTTP configura-se com opções; duas delas podem vir também do ambie
 | `--token` / `SAFETY_ZONES_TOKEN` | nenhum | token Bearer exigido por POST /check |
 | `--max-observation-age-seconds` | nenhum | limite da idade que um pedido pode declarar para a sua observação |
 | `--max-calibration-age-days` | nenhum | limite da idade máxima da calibração em dias |
-| `--decision-log` / `SAFETY_ZONES_DECISION_LOG` | desativado | registar cada veredicto de POST /check numa linha JSON num ficheiro (`-` para o erro padrão) |
 
 ## 🚀 Início rápido
 

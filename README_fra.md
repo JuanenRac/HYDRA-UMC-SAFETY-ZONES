@@ -40,7 +40,7 @@ GPL-3.0-or-later - see LICENSE
 | Cible | Le Raspberry Pi CM5 d'une cellule HYDRA-UMC |
 | Sur matériel réel | Pas encore : aucune exécution sur du matériel réel n'est consignée pour cette version |
 
-**Aller à :** [Présentation](#-présentation) · [Architecture](#-architecture) · [Sécurité et protection](#-sécurité-et-protection) · [Configuration](#-configuration) · [Démarrage rapide](#-démarrage-rapide) · [Tests](#-tests) · [Dépannage](#-dépannage) · [Structure du dépôt](#-structure-du-dépôt) · [Projets liés](#-projets-liés)
+**Aller à :** [Présentation](#-présentation) · [Architecture](#-architecture) · [Sécurité et protection](#-sécurité-et-protection) · [Interfaces](#-interfaces) · [Configuration](#-configuration) · [Démarrage rapide](#-démarrage-rapide) · [Tests](#-tests) · [Dépannage](#-dépannage) · [Structure du dépôt](#-structure-du-dépôt) · [Projets liés](#-projets-liés)
 
 ## 🚦 État du projet
 
@@ -150,6 +150,10 @@ CM5 + Hailo-8 est du matériel existant sur étagère sans carte propre à conce
 
 **Ce qu'il ne fait jamais :** déclencher l'arrêt physique ou annoncer READY sur une supposition.
 
+## 🔌 Interfaces
+
+`serve --decision-log FICHIER` (ou `SAFETY_ZONES_DECISION_LOG` ; `-` pour la sortie d'erreur) écrit une ligne JSON par verdict de `POST /check` avec l'heure, l'état, la raison, le hachage de la configuration et le nombre de franchissements et de demandes d'arrêt. Désactivé sauf demande, et un journal qui ne peut pas être écrit ne change jamais le verdict.
+
 ## ⚙️ Configuration
 
 Le service HTTP se règle par options ; deux d'entre elles peuvent aussi venir de l'environnement.
@@ -162,7 +166,6 @@ Le service HTTP se règle par options ; deux d'entre elles peuvent aussi venir d
 | `--token` / `SAFETY_ZONES_TOKEN` | aucun | jeton Bearer exigé par POST /check |
 | `--max-observation-age-seconds` | aucun | plafond de l'âge qu'une requête peut déclarer pour son observation |
 | `--max-calibration-age-days` | aucun | plafond de l'âge maximal de l'étalonnage en jours |
-| `--decision-log` / `SAFETY_ZONES_DECISION_LOG` | désactivé | journaliser chaque verdict de POST /check en une ligne JSON dans un fichier (`-` pour l'erreur standard) |
 
 ## 🚀 Démarrage rapide
 

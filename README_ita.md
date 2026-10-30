@@ -40,7 +40,7 @@ GPL-3.0-or-later - see LICENSE
 | Destinazione | Il Raspberry Pi CM5 di una cella HYDRA-UMC |
 | Su hardware reale | Non ancora: per questa versione non risulta alcuna esecuzione su hardware reale |
 
-**Vai a:** [Panoramica](#-panoramica) · [Architettura](#-architettura) · [Sicurezza e protezione](#-sicurezza-e-protezione) · [Configurazione](#-configurazione) · [Avvio rapido](#-avvio-rapido) · [Test](#-test) · [Risoluzione dei problemi](#-risoluzione-dei-problemi) · [Struttura del repository](#-struttura-del-repository) · [Progetti correlati](#-progetti-correlati)
+**Vai a:** [Panoramica](#-panoramica) · [Architettura](#-architettura) · [Sicurezza e protezione](#-sicurezza-e-protezione) · [Interfacce](#-interfacce) · [Configurazione](#-configurazione) · [Avvio rapido](#-avvio-rapido) · [Test](#-test) · [Risoluzione dei problemi](#-risoluzione-dei-problemi) · [Struttura del repository](#-struttura-del-repository) · [Progetti correlati](#-progetti-correlati)
 
 ## 🚦 Stato del progetto
 
@@ -150,6 +150,10 @@ CM5 + Hailo-8 è hardware già esistente senza una scheda propria da progettare,
 
 **Cosa non fa mai:** attivare l'arresto fisico o dichiarare READY per supposizione.
 
+## 🔌 Interfacce
+
+`serve --decision-log FILE` (o `SAFETY_ZONES_DECISION_LOG`; `-` per lo standard error) scrive una riga JSON per ogni verdetto di `POST /check` con l'ora, lo stato, il motivo, l'hash della configurazione e il numero di violazioni e richieste di arresto. È spento salvo indicazione, e un registro che non può essere scritto non cambia mai il verdetto.
+
 ## ⚙️ Configurazione
 
 Il servizio HTTP si configura con opzioni; due possono arrivare anche dall'ambiente.
@@ -162,7 +166,6 @@ Il servizio HTTP si configura con opzioni; due possono arrivare anche dall'ambie
 | `--token` / `SAFETY_ZONES_TOKEN` | nessuno | token Bearer richiesto da POST /check |
 | `--max-observation-age-seconds` | nessuno | tetto per l'età che una richiesta può dichiarare per la sua osservazione |
 | `--max-calibration-age-days` | nessuno | tetto per l'età massima della calibrazione in giorni |
-| `--decision-log` / `SAFETY_ZONES_DECISION_LOG` | disattivato | registrare ogni verdetto di POST /check come una riga JSON in un file (`-` per lo standard error) |
 
 ## 🚀 Avvio rapido
 

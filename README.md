@@ -40,7 +40,7 @@ GPL-3.0-or-later - see LICENSE
 | Target | The Raspberry Pi CM5 of a HYDRA-UMC cell |
 | On real hardware | Not yet: no run on real hardware is recorded for this version |
 
-**Jump to:** [Overview](#-overview) · [Architecture](#-architecture) · [Security & Safety](#-security--safety) · [Configuration](#-configuration) · [Quick start](#-quick-start) · [Testing](#-testing) · [Troubleshooting](#-troubleshooting) · [Repository Structure](#-repository-structure) · [Related Projects](#-related-projects)
+**Jump to:** [Overview](#-overview) · [Architecture](#-architecture) · [Security & Safety](#-security--safety) · [Interfaces](#-interfaces) · [Configuration](#-configuration) · [Quick start](#-quick-start) · [Testing](#-testing) · [Troubleshooting](#-troubleshooting) · [Repository Structure](#-repository-structure) · [Related Projects](#-related-projects)
 
 ## 🚦 Project status
 
@@ -150,6 +150,10 @@ CM5 + Hailo-8 is off-the-shelf hardware with no board of its own to design, so -
 
 **What it never does:** assert the physical stop, or report READY on a guess.
 
+## 🔌 Interfaces
+
+`serve --decision-log FILE` (or `SAFETY_ZONES_DECISION_LOG`; `-` for standard error) writes one JSON line per `POST /check` verdict with the time, the state, the reason, the hash of the configuration and the number of breaches and stop requests. It is off unless given, and a log that cannot be written never changes the verdict.
+
 ## ⚙️ Configuration
 
 The HTTP service is configured with flags; two of them can also come from the environment.
@@ -162,7 +166,6 @@ The HTTP service is configured with flags; two of them can also come from the en
 | `--token` / `SAFETY_ZONES_TOKEN` | none | Bearer token that POST /check requires |
 | `--max-observation-age-seconds` | none | ceiling for the age a request may declare for its observation |
 | `--max-calibration-age-days` | none | ceiling for the calibration's maximum age in days |
-| `--decision-log` / `SAFETY_ZONES_DECISION_LOG` | off | log every verdict of POST /check as one JSON line to a file (`-` for standard error) |
 
 ## 🚀 Quick start
 
