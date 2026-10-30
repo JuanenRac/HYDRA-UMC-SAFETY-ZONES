@@ -372,3 +372,41 @@ def test_the_decision_log_gets_one_line_per_verdict_and_is_off_by_default(tmp_pa
     with running_server() as base:
         _post(f"{base}/check", {"zones": _zones(), "detections": _detections(50, 50, 50), "observation": _observation()})
     assert len(log.read_text(encoding="utf-8").splitlines()) == 2
+
+
+def test_state_has_no_verdict_before_the_first_check() -> None:
+    with running_server() as base:
+        status, body = _get(f"{base}/state")
+        assert status == 404
+        assert "state" not in body
+
+
+def test_state_returns_the_last_verdict_with_the_time_it_was_reached() -> None:
+    with running_server() as base:
+        _post(f"{base}/check", {"zones": _zones(), "detections": _detections(50, 50, 50), "observation": _observation()})
+        status, body = _get(f"{base}/state")
+        assert status == 200
+        assert body["sdkSafetyState"]["state"] == "READY"
+        assert body["sdkSafetyState"]["timestamp_utc"]
+        _post(f"{base}/check", {"zones": _zones(), "detections": _detections(1, 1, 1), "observation": _observation()})
+        status, body = _get(f"{base}/state")
+        assert status == 200
+        assert body["sdkSafetyState"]["state"] != "READY"
+
+
+def test_state_needs_the_token_when_one_is_configured() -> None:
+    server = SafetyZonesServer(("127.0.0.1", 0), "test role", token="s3cret-token")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        url = f"http://127.0.0.1:{server.server_address[1]}/state"
+        assert _get(url)[0] == 401
+        req = urllib.request.Request(url, headers={"Authorization": "Bearer s3cret-token"})
+        try:
+            urllib.request.urlopen(req, timeout=5)
+        except urllib.error.HTTPError as e:
+            assert e.code == 404  # authorised, but no verdict yet
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)

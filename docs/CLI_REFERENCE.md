@@ -251,6 +251,9 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
 `systemd/hydra-umc-safety-zones.service` unit.
 
 * **`GET /stats`** — `{"role": "..."}`, a liveness/identity check.
+* **`GET /state`** — the latest verdict of `POST /check`: `{"sdkSafetyState": {schema_version, state, source, timestamp_utc}, "reason": ..., "configSha256": ...}`, `200`;
+  `404` before the first verdict. Needs the bearer token when one is configured. A consumer judges the age of
+  `timestamp_utc` itself.
 * **`POST /check`** — body `{"zones": {...}, "detections": {...}, "observation": {...}}`,
   using the exact same shapes as the `--zones`/`--detections`/
   `--observation` files above. `"observation"` is an optional key (a

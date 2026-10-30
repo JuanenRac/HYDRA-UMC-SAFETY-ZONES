@@ -110,8 +110,19 @@ class Handler(BaseHTTPRequestHandler):
         pass  # quiet by default, same reasoning as this family's other api.py files
 
     def do_GET(self) -> None:  # noqa: N802
-        if urlparse(self.path).path == "/stats":
+        path = urlparse(self.path).path
+        if path == "/stats":
             _write_json(self, 200, {"role": self.server.role})
+        elif path == "/state":
+            if not self._authorized():
+                self._write_unauthorized()
+                return
+            verdict = self.server.last_verdict()
+            if verdict is None:
+                # No verdict yet: a consumer must read this as "not confirmed safe", never as READY.
+                _write_json(self, 404, {"error": "no safety verdict has been reached yet"})
+            else:
+                _write_json(self, 200, verdict)
         else:
             _write_error(self, 404, "not found")
 
@@ -124,16 +135,19 @@ class Handler(BaseHTTPRequestHandler):
             return False
         return hmac.compare_digest(header[len("Bearer "):].strip().encode("utf-8"), token.encode("utf-8"))
 
+    def _write_unauthorized(self) -> None:
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", "Bearer")
+        body = b'{"error": "a valid Authorization: Bearer token is required"}'
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
         if path == "/check" and not self._authorized():
-            self.send_response(401)
-            self.send_header("WWW-Authenticate", "Bearer")
-            body = b'{"error": "a valid Authorization: Bearer token is required"}'
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            self._write_unauthorized()
             return
         try:
             body = _read_json_body(self)
@@ -289,9 +303,27 @@ class SafetyZonesServer(ThreadingHTTPServer):
         # Off unless a destination is given: "-" is standard error, anything else a file that lines are appended to.
         self._decision_log = decision_log or None
         self._decision_lock = threading.Lock()
+        self._last_verdict: dict | None = None
+        self._verdict_lock = threading.Lock()
+
+    def last_verdict(self) -> dict | None:
+        """The most recent verdict of /check as the SDK SafetyState with the time it was reached, or None before the first one."""
+        with self._verdict_lock:
+            return None if self._last_verdict is None else dict(self._last_verdict)
+
+    def _remember_verdict(self, response: dict) -> None:
+        sdk = response.get("sdkSafetyState")
+        if not isinstance(sdk, dict):
+            return
+        record = {"sdkSafetyState": dict(sdk), "reason": response.get("reason")}
+        if response.get("configSha256"):
+            record["configSha256"] = response["configSha256"]
+        with self._verdict_lock:
+            self._last_verdict = record
 
     def log_decision(self, response: dict) -> None:
-        """Append one JSON line with the verdict of a /check (state, reason, configuration hash, counts); never raises."""
+        """Remember the verdict for GET /state and, when a destination is set, append one JSON line (state, reason, configuration hash, counts); never raises."""
+        self._remember_verdict(response)
         if self._decision_log is None:
             return
         line = json.dumps(
