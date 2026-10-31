@@ -5,6 +5,7 @@ All notable changes to this project are documented here.
 ## [Unreleased]
 
 - **Oriented boxes, cylinders and capsules (optional):** a zones file that declares `"geometry": {"shapes": true}` may use zones of shape `obb`, `cylinder` or `capsule` next to the boxes. The shapes are off by default: without the switch a zone that names one makes the whole file invalid, and box files behave exactly as before. Every shape over-estimates and never under-estimates (distances reduced by one nanometre, margins grow shapes outward, `"mode": "bounding"` replaces each shape by the box that contains it); the velocity and separation margins and the `obstacles` export work with them. A mesh harness checks the rule on 75 seeded random shapes. See `docs/GEOMETRY.md` for the model, the assumptions and what it does not cover. Not tried with a real robot.
+- **Fix: the verdict now uses the separation model.** `evaluate_safety` grew the zones by the tool-velocity margin only, while the list of breaches also used the ISO 13855 separation model, so with a model configured an object inside the model's margin but outside the linear one read as READY. The verdict and the breaches now agree. Files without a `separation` object are not affected.
 - A zone that names an unknown `shape` is now refused (a stray `shape` key on a box used to be ignored).
 
 ## [0.1.6] - An obstacles command, a state route, an optional decision log and the universal README

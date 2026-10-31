@@ -129,7 +129,7 @@ def evaluate_safety(
             f"last real observation is {stale_age:.1f}s old, exceeds max_age_seconds={observation.max_age_seconds}",
         )
 
-    breaches = check_breaches(scale_zones_for_velocity(zone_set.zones, tool_velocity_mps), objects)
+    breaches = check_breaches(scale_zones_for_velocity(zone_set.zones, tool_velocity_mps, zone_set.separation), objects)
     worst = worst_level_per_object(breaches)
 
     danger_objects = sorted(oid for oid, level in worst.items() if level is ZoneLevel.DANGER)

@@ -99,3 +99,23 @@ def test_a_malformed_model_in_the_file_is_refused():
     for bad in ("1.6", [1], {"approach_speed_mps": 1.6}, {"approach_speed_mps": 1.6, "total_stop_time_s": 0.4, "intrusion_distance_m": 0.2, "k": 1}):
         with pytest.raises(ValueError):
             parse_separation_model(bad)
+
+
+def test_the_verdict_itself_uses_the_separation_model_not_only_the_list_of_breaches():
+    """The state returned by evaluate_safety must agree with the breaches the API and the CLI list: a zone grown by the model."""
+    from datetime import datetime, timezone
+
+    from hydra_umc_safety_zones.breach import DetectedObject
+    from hydra_umc_safety_zones.calibration import ZoneCalibration
+    from hydra_umc_safety_zones.observation import ObservationStatus
+    from hydra_umc_safety_zones.safety_state import SafetyState, evaluate_safety
+    from hydra_umc_safety_zones.zones import ZoneSet
+
+    now = datetime.now(timezone.utc)
+    calibration = ZoneCalibration(version="c", source="manual", calibrated_at=now.date(), max_age_days=30)
+    observation = ObservationStatus(active=True, observed_at=now, max_age_seconds=60)
+    near = (DetectedObject("o", Point3D(2.5, 1, 1)),)  # 0.5 m outside the zone, inside the 0.9 m the model asks for
+    without = ZoneSet(zones=(DANGER,), calibration=calibration)
+    with_model = ZoneSet(zones=(DANGER,), calibration=calibration, separation=MODEL)
+    assert evaluate_safety(without, near, now.date(), observation).state is SafetyState.READY
+    assert evaluate_safety(with_model, near, now.date(), observation).state is SafetyState.DANGER
