@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
   <img src="https://img.shields.io/badge/Tests-718%20passing-2ea44f.svg" alt="Tests">
-  <img src="https://img.shields.io/badge/Version-0.1.6-0f6cbd.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-0.1.7-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
 
@@ -33,7 +33,7 @@ GPL-3.0-or-later - see LICENSE
 
 | | |
 |---|---|
-| Version | `0.1.6` |
+| Version | `0.1.7` |
 | Maturity | Functional |
 | Tests | 718 (`python -m pytest -q tests`) |
 | Stack | Python / 3D vision / Hailo-8 |
@@ -222,7 +222,7 @@ Locates the interpreter inside `.venv` (handling both the POSIX and Windows `.ve
 Bare invocation prints name + version + role:
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.1.6
+HYDRA-UMC-SAFETY-ZONES v0.1.7
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
