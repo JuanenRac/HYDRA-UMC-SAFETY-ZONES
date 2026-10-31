@@ -28,7 +28,6 @@ from pathlib import Path
 
 from hydra_umc_safety_zones.api import SafetyZonesServer
 from hydra_umc_safety_zones.breach import check_breaches
-from hydra_umc_safety_zones.calibration import CalibrationError
 from hydra_umc_safety_zones.config import (
     ConfigError,
     load_detections,
@@ -37,7 +36,6 @@ from hydra_umc_safety_zones.config import (
     parse_tool_velocity,
 )
 from hydra_umc_safety_zones.estop import NullEStopRequester, request_estop_for
-from hydra_umc_safety_zones.observation import ObservationError
 from hydra_umc_safety_zones.obstacles import DEFAULT_CELL_M, LEVEL_CHOICES, export_obstacles
 from hydra_umc_safety_zones.safety_state import SafetyState, evaluate_safety
 from hydra_umc_safety_zones.zones import scale_zones_for_velocity

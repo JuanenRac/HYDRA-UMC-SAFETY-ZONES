@@ -118,15 +118,15 @@ def evaluate_safety(
         )
     effective_now = now if now is not None else datetime.now(timezone.utc)
     if is_observation_stale(observation, effective_now):
-        age = observation_age_seconds(observation, effective_now)
-        if age is None:
+        stale_age = observation_age_seconds(observation, effective_now)
+        if stale_age is None:
             return SafetyEvaluation(
                 SafetyState.INHIBITED,
                 "no real observation has been received yet this session - a prior safe state is never reused without a new one",
             )
         return SafetyEvaluation(
             SafetyState.INHIBITED,
-            f"last real observation is {age:.1f}s old, exceeds max_age_seconds={observation.max_age_seconds}",
+            f"last real observation is {stale_age:.1f}s old, exceeds max_age_seconds={observation.max_age_seconds}",
         )
 
     breaches = check_breaches(scale_zones_for_velocity(zone_set.zones, tool_velocity_mps), objects)

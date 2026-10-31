@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import math
 from pathlib import Path
+from typing import Any
 
 from hydra_umc_safety_zones.breach import DetectedObject
 from hydra_umc_safety_zones.calibration import parse_calibration
@@ -38,7 +39,7 @@ def strict_json_loads(raw: str | bytes) -> object:
     return json.loads(raw, parse_constant=_reject_constant)
 
 
-def _read_json_file(path: str | Path) -> object:
+def _read_json_file(path: str | Path) -> Any:
     return strict_json_loads(Path(path).read_text(encoding="utf-8"))
 
 
@@ -195,7 +196,7 @@ def parse_tool_velocity(data: object) -> float:
     over for safety-relevant geometry.
     """
     try:
-        value = float(data)
+        value = float(data)  # type: ignore[arg-type]
     except (TypeError, ValueError) as exc:
         raise ConfigError("toolVelocityMps must be numeric") from exc
     if not math.isfinite(value):
