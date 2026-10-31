@@ -32,7 +32,9 @@ def zone_obstacles(zone: Zone, cell_m: float = DEFAULT_CELL_M) -> list[dict]:
     """The spheres that together cover the volume of one zone, as ``{"center": {...}, "radius": r}`` objects."""
     if isinstance(cell_m, bool) or not isinstance(cell_m, (int, float)) or not math.isfinite(cell_m) or cell_m <= 0:
         raise ValueError(f"cell_m must be a finite number above zero, got {cell_m!r}")
-    lo, hi = zone.volume.min_corner, zone.volume.max_corner
+    # a shape that is not a box is covered through the axis-aligned box that contains it: larger, never smaller
+    box = zone.volume.bounding_box()
+    lo, hi = box.min_corner, box.max_corner
     xs, ys, zs = _axis_cells(lo.x, hi.x, cell_m), _axis_cells(lo.y, hi.y, cell_m), _axis_cells(lo.z, hi.z, cell_m)
     if len(xs) * len(ys) * len(zs) > MAX_OBSTACLES:
         raise ValueError(f"zone '{zone.zone_id}' would need more than {MAX_OBSTACLES} spheres at cell {cell_m} m: use a larger cell")

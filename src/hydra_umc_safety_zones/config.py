@@ -19,6 +19,14 @@ from typing import Any
 from hydra_umc_safety_zones.breach import DetectedObject
 from hydra_umc_safety_zones.calibration import parse_calibration
 from hydra_umc_safety_zones.geometry import AABB, Point3D
+from hydra_umc_safety_zones.shapes import (
+    OBB,
+    Capsule,
+    Cylinder,
+    GeometrySettings,
+    Volume,
+    parse_geometry_settings,
+)
 from hydra_umc_safety_zones.observation import ObservationStatus, parse_observation_status
 from hydra_umc_safety_zones.zones import SeparationModel, Zone, ZoneLevel, ZoneSet, parse_separation_model
 
@@ -69,6 +77,67 @@ def _point(data: object) -> Point3D:
     return Point3D(x=values["x"], y=values["y"], z=values["z"])
 
 
+_SHAPE_FIELDS: dict[str, set[str]] = {
+    "obb": {"center", "half_extents", "rotation_deg"},
+    "cylinder": {"base_center", "radius", "height"},
+    "capsule": {"start", "end", "radius"},
+}
+
+
+def _number(data: object, what: str, *, required: bool = True, default: float = 0.0) -> float:
+    if data is None and not required:
+        return default
+    if isinstance(data, bool) or not isinstance(data, (int, float)):
+        raise ConfigError(f"{what} must be a number, got {data!r}")
+    if not math.isfinite(data):
+        raise ConfigError(f"{what} must be finite")
+    return float(data)
+
+
+def _triple(data: object, keys: tuple[str, str, str], what: str, *, required: bool = True) -> tuple[float, float, float]:
+    """An object with exactly the given keys (or, when not required, a subset: the missing ones are 0)."""
+    if not isinstance(data, dict):
+        raise ConfigError(f"{what} must be an object with {', '.join(keys)}")
+    extra = sorted(set(data) - set(keys))
+    if extra:
+        raise ConfigError(f"{what} has unknown field(s): {extra}")
+    values = []
+    for key in keys:
+        values.append(_number(data.get(key), f"{what}.{key}", required=required, default=0.0))
+    return values[0], values[1], values[2]
+
+
+def _shape_volume(shape: str, entry: dict, zone_id: str, geometry: GeometrySettings) -> Volume:
+    """The volume of a zone that is not an axis-aligned box. Only reachable when the zones file switched the shapes on."""
+    allowed = _SHAPE_FIELDS[shape] | {"id", "level", "shape"}
+    extra = sorted(set(entry) - allowed)
+    if extra:
+        raise ConfigError(f"zone {zone_id!r}: a {shape} zone has unknown field(s): {extra}")
+    missing = sorted(key for key in _SHAPE_FIELDS[shape] - ({"rotation_deg"} if shape == "obb" else set()) if key not in entry)
+    if missing:
+        raise ConfigError(f"zone {zone_id!r}: a {shape} zone is missing field(s): {missing}")
+    try:
+        volume: Volume
+        if shape == "obb":
+            half = _triple(entry["half_extents"], ("x", "y", "z"), f"zone {zone_id!r} half_extents")
+            rotation = _triple(entry.get("rotation_deg", {}), ("roll", "pitch", "yaw"), f"zone {zone_id!r} rotation_deg", required=False)
+            volume = OBB(_point(entry["center"]), half, rotation)
+        elif shape == "cylinder":
+            volume = Cylinder(
+                _point(entry["base_center"]),
+                _number(entry["radius"], f"zone {zone_id!r} radius"),
+                _number(entry["height"], f"zone {zone_id!r} height"),
+            )
+        else:
+            volume = Capsule(_point(entry["start"]), _point(entry["end"]), _number(entry["radius"], f"zone {zone_id!r} radius"))
+    except ValueError as exc:
+        if isinstance(exc, ConfigError):
+            raise
+        raise ConfigError(f"zone {zone_id!r}: {exc}") from exc
+    # In the conservative mode every shape is replaced by the axis-aligned box that contains it.
+    return volume.bounding_box() if geometry.mode == "bounding" else volume
+
+
 def parse_zones(raw: dict) -> tuple[Zone, ...]:
     """Parses already-loaded JSON shaped like:
     ``{"zones": [{"id": "...", "level": "warning"|"danger",
@@ -87,6 +156,10 @@ def parse_zones(raw: dict) -> tuple[Zone, ...]:
     # not been written yet, not a safe cell.
     if not entries:
         raise ConfigError("zones must not be empty: a cell with no zones is not a safe cell")
+    try:
+        geometry = parse_geometry_settings(raw.get("geometry"))
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
     zones = []
     seen: set[str] = set()
     for entry in entries:
@@ -102,10 +175,20 @@ def parse_zones(raw: dict) -> tuple[Zone, ...]:
             raise ConfigError(
                 f"zone {zone_id!r}: level must be one of {[lv.value for lv in ZoneLevel]} (lower case), got {entry.get('level')!r}"
             ) from exc
-        try:
-            volume = AABB(_point(entry["min"]), _point(entry["max"]))
-        except KeyError as exc:
-            raise ConfigError(f"zone {zone_id!r} is missing {exc}") from exc
+        shape = entry.get("shape", "box")
+        volume: Volume
+        if shape == "box":
+            try:
+                volume = AABB(_point(entry["min"]), _point(entry["max"]))
+            except KeyError as exc:
+                raise ConfigError(f"zone {zone_id!r} is missing {exc}") from exc
+        elif shape in _SHAPE_FIELDS and geometry.shapes:
+            volume = _shape_volume(shape, entry, zone_id, geometry)
+        elif shape in _SHAPE_FIELDS:
+            # The shapes are off unless the file switches them on: a shape that would be read as something else is a refused file, never a smaller zone.
+            raise ConfigError(f"zone {zone_id!r}: shape {shape!r} needs \"geometry\": {{\"shapes\": true}} in the zones file")
+        else:
+            raise ConfigError(f"zone {zone_id!r}: shape must be one of ['box', 'obb', 'cylinder', 'capsule'], got {shape!r}")
         zones.append(Zone(zone_id=zone_id, level=level, volume=volume))
     return tuple(zones)
 

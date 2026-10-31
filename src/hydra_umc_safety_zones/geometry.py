@@ -85,6 +85,10 @@ class AABB:
             raise ValueError(f"radius must be a finite, non-negative number, got {radius!r}")
         return self.distance_to(center) <= radius
 
+    def bounding_box(self) -> "AABB":
+        """The smallest axis-aligned box that contains this volume: itself. Shapes that are not boxes (see shapes.py) answer the same question."""
+        return self
+
     def expanded(self, margin: float) -> "AABB":
         """A new box grown outward by `margin` meters on every axis, same
         center as this one. `margin` must be >= 0 - this can only ever grow

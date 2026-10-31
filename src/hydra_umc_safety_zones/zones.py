@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from hydra_umc_safety_zones.calibration import ZoneCalibration
-from hydra_umc_safety_zones.geometry import AABB
+from hydra_umc_safety_zones.shapes import Volume
 
 
 class ZoneLevel(str, Enum):
@@ -29,7 +29,7 @@ class Zone:
 
     zone_id: str
     level: ZoneLevel
-    volume: AABB
+    volume: Volume
 
 
 @dataclass(frozen=True)
