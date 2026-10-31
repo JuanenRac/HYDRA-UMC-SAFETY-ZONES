@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.1.8] - The robot body as capsules placed by forward kinematics and a body-from-fk command
+
 - **Robot body as capsules (optional):** a zones file that declares `"geometry": {"robot_body": true}` (or an object with `enabled`, `required`, `resolution_m`, `margin_m`, `max_segments`, `max_pieces_per_segment`) lets `POST /check` take a `robotBody` (and `check --body FILE`): the two ends of each segment of the robot, as forward kinematics placed them, with a radius that the installation declares for each (there is no default), optionally with the frame that maps the poses to the frame of the zones. The service builds the capsules, compares them with the zones with the same velocity and separation margins as a detected object, and reports a segment in a breach as `robot:<id>`. It always over-estimates: each segment is cut into spheres that contain it, and the harness with a fixed seed checks that a zone around any point of the capsule is always a breach. Off by default: a request that carries a body is then refused with `400` and `INHIBITED` (CLI: exit 3), never ignored; a malformed body refuses the whole request; `required` makes a request without a body `INHIBITED`. Requests without a body, and every verdict before, are unchanged (pinned by new characterization tests).
 - **`body-from-fk` command:** turns the JSON of `hydra-umc-physics-replica fk --json` and a file that names the segments and declares their radii into the robot body; it reads two files and runs nothing. See `docs/ROBOT_BODY.md` for the model, the assumptions, the chain with PHYSICS-REPLICA and the limits. Not tried with a real robot and not a certified safety function.
 
