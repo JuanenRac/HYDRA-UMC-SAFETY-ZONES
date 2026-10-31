@@ -10,9 +10,13 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from hydra_umc_safety_zones.calibration import ZoneCalibration
 from hydra_umc_safety_zones.shapes import Volume
+
+if TYPE_CHECKING:
+    from hydra_umc_safety_zones.robot_body import RobotBodySettings
 
 
 class ZoneLevel(str, Enum):
@@ -43,6 +47,8 @@ class ZoneSet:
     calibration: ZoneCalibration | None
     # Optional ISO 13855 / ISO 13857 separation-distance model (see SeparationModel); None keeps only the linear margin below.
     separation: "SeparationModel | None" = None
+    # The switch and tuning of the robot body (robot_body.py); None is the same as off: a request that carries a body is refused.
+    robot_body: "RobotBodySettings | None" = None
 
 
 # First real, bounded implementation of a velocity-proportional safety

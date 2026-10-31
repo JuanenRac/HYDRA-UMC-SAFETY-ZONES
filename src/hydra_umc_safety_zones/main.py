@@ -27,19 +27,20 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from hydra_umc_safety_zones.api import SafetyZonesServer
-from hydra_umc_safety_zones.breach import check_breaches
 from hydra_umc_safety_zones.config import (
     ConfigError,
     load_detections,
     load_observation_status,
     load_zone_set,
+    parse_robot_body,
     parse_tool_velocity,
+    strict_json_loads,
 )
 from hydra_umc_safety_zones.estop import NullEStopRequester, request_estop_for
 from hydra_umc_safety_zones.obstacles import DEFAULT_CELL_M, LEVEL_CHOICES, export_obstacles
-from hydra_umc_safety_zones.safety_state import SafetyState, evaluate_safety
+from hydra_umc_safety_zones.fk_input import FkInputError, body_from_fk
+from hydra_umc_safety_zones.safety_state import SafetyState, collect_breaches, evaluate_safety
 from hydra_umc_safety_zones.stateful import StatefulSettings, parse_stateful_settings
-from hydra_umc_safety_zones.zones import scale_zones_for_velocity
 
 PROJECT_NAME = "HYDRA-UMC-SAFETY-ZONES"
 DIST_NAME = "hydra-umc-safety-zones"
@@ -74,10 +75,15 @@ def _run_check(
     detections_path: str,
     observation_path: str | None,
     tool_velocity_mps: float | None = None,
+    body_path: str | None = None,
 ) -> int:
     try:
         zone_set = load_zone_set(zones_path)
         objects = load_detections(detections_path)
+        # A body file with the feature switched off is refused, never ignored (parse_robot_body raises).
+        robot_body = (
+            parse_robot_body(strict_json_loads(Path(body_path).read_text(encoding="utf-8")), zone_set.robot_body) if body_path else None
+        )
         # real, required-in-spirit observer evidence - see
         # evaluate_safety()'s own fail-safe default (None -> INHIBITED)
         # for why this stays an optional CLI flag rather than a hard
@@ -94,7 +100,7 @@ def _run_check(
     today = datetime.now(timezone.utc).date()
 
     try:
-        evaluation = evaluate_safety(zone_set, objects, today, observation, tool_velocity_mps=tool_velocity_mps)
+        evaluation = evaluate_safety(zone_set, objects, today, observation, tool_velocity_mps=tool_velocity_mps, body=robot_body)
     except Exception as exc:  # noqa: BLE001
         print(f"SAFETY STATE: INHIBITED - the evaluation itself failed: {type(exc).__name__}: {exc}")
         return EXIT_INVALID_INPUT
@@ -109,7 +115,7 @@ def _run_check(
     if evaluation.state is SafetyState.READY:
         return 0
 
-    breaches = check_breaches(scale_zones_for_velocity(zone_set.zones, tool_velocity_mps, zone_set.separation), objects)
+    breaches = collect_breaches(zone_set, objects, tool_velocity_mps, robot_body)
     for b in breaches:
         print(f"BREACH: object '{b.object_id}' inside {b.level.value} zone '{b.zone_id}'")
 
@@ -136,6 +142,24 @@ def _run_obstacles(args: argparse.Namespace) -> int:
     if args.output:
         Path(args.output).write_text(text + "\n", encoding="utf-8")
         print(f"obstacles: {len(exported['obstacles'])} spheres written to {args.output}")
+    else:
+        print(text)
+    return 0
+
+
+def _run_body_from_fk(args: argparse.Namespace) -> int:
+    """Turns the output of 'fk --json' into a robot-body file for 'check --body'. Nothing is run; two files are read."""
+    try:
+        fk = strict_json_loads(Path(args.fk).read_text(encoding="utf-8"))
+        segments = strict_json_loads(Path(args.segments).read_text(encoding="utf-8"))
+        body = body_from_fk(fk, segments)
+    except (FkInputError, OSError, ValueError) as exc:
+        print(f"body-from-fk: could not build the robot body: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return EXIT_INVALID_INPUT
+    text = json.dumps(body, indent=2)
+    if args.output:
+        Path(args.output).write_text(text + "\n", encoding="utf-8")
+        print(f"body-from-fk: {len(body['segments'])} segments written to {args.output}")
     else:
         print(text)
     return 0
@@ -254,6 +278,21 @@ def build_parser() -> argparse.ArgumentParser:
              "a silent READY - see evaluate_safety()'s own fail-safe default.",
     )
 
+    check_parser.add_argument(
+        "--body",
+        required=False,
+        help="Path to a robot-body JSON file (the segments of the robot with their declared radii, in the frame of the zones). "
+             "Refused with INHIBITED unless the zones file switches geometry.robot_body on.",
+    )
+
+    fk_parser = subparsers.add_parser(
+        "body-from-fk",
+        help="Build a robot-body file from the JSON of 'hydra-umc-physics-replica fk --json' and a file that names the segments and declares their radii.",
+    )
+    fk_parser.add_argument("--fk", required=True, help="Path to the JSON that 'fk --json' printed (an array of joint poses).")
+    fk_parser.add_argument("--segments", required=True, help="Path to the segments file: segments between named joint frames, with their radii.")
+    fk_parser.add_argument("--output", default="", help="write the JSON to this file instead of standard output")
+
     obstacles_parser = subparsers.add_parser(
         "obstacles",
         help="Export the zones as sphere obstacles (the scenario format of a path planner) that cover every zone completely.",
@@ -325,9 +364,11 @@ def main(argv: list[str] | None = None) -> int:
             except ConfigError as exc:
                 print(f"SAFETY STATE: INHIBITED - invalid safety configuration: {exc}")
                 return EXIT_INVALID_INPUT
-        return _run_check(args.zones, args.detections, args.observation, velocity)
+        return _run_check(args.zones, args.detections, args.observation, velocity, args.body)
     if args.command == "serve":
         return _run_serve(args)
+    if args.command == "body-from-fk":
+        return _run_body_from_fk(args)
     if args.command == "obstacles":
         return _run_obstacles(args)
 

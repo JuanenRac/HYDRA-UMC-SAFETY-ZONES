@@ -14,12 +14,16 @@ against real fixture JSON files — not written from memory.
 
 ```
 $ hydra-umc-safety-zones -h
-usage: hydra-umc-safety-zones [-h] {check,obstacles,serve} ...
+usage: hydra-umc-safety-zones [-h] {check,body-from-fk,obstacles,serve} ...
 
 positional arguments:
-  {check,obstacles,serve}
+  {check,body-from-fk,obstacles,serve}
     check       Check detected objects against zones and request E-STOP for
                 Danger breaches.
+    body-from-fk
+                Build a robot-body file from the JSON of
+                'hydra-umc-physics-replica fk --json' and a file that names
+                the segments and declares their radii.
     obstacles   Export the zones as sphere obstacles (the scenario format of
                 a path planner) that cover every zone completely.
     serve       Run 'check' as a JSON/HTTP API (POST /check) - the exact
@@ -40,7 +44,7 @@ Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-worki
 
 ## Commands
 
-### `check --zones PATH --detections PATH [--observation PATH]`
+### `check --zones PATH --detections PATH [--observation PATH] [--tool-velocity V] [--body PATH]`
 
 ```
 $ hydra-umc-safety-zones check -h
@@ -229,6 +233,12 @@ twice, and a coordinate that is a boolean or a string.
 `--tool-velocity N` (meters/second, finite and not negative) grows every zone by the same
 velocity-proportional margin the API's `toolVelocityMps` does (`0.15 m` per m/s, capped at `0.5 m`).
 
+`--body PATH` adds the robot itself to the check: the file holds the `robotBody` object (segments with their ends and
+**declared** radii, optional `frame`), turned into capsules and compared with the zones like a detected object, with the
+same margins. It only works when the zones file switches `"geometry": {"robot_body": true}` on; otherwise, or for any
+malformed body, the answer is `SAFETY STATE: INHIBITED` and exit `3`. A segment in a breach is reported as
+`robot:<id>`. See `docs/ROBOT_BODY.md`.
+
 Two clock tolerances keep a healthy cell from being inhibited by rounding: an observation
 timestamped up to 0.25 s ahead of this machine's clock is not "in the future", and a calibration
 dated one day ahead (a local date written east of UTC) is not expired. Anything further ahead is.
@@ -306,6 +316,10 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
   itself when a verdict or the heartbeat expires. Off by default: the two routes then do not exist. The tuning
   values are in the `stateful` object of the zones file. See `docs/STATEFUL.md`.
 
+  `POST /check` also accepts an optional `robotBody` object (see `docs/ROBOT_BODY.md`). It needs `"geometry": {"robot_body": true}`
+  in the zones file; without it, or if the body is malformed, the answer is `400` with `"state": "inhibited"`. With a body the
+  answer adds `"robotBody": {"segments": N}` and the segments appear in `breaches` as `robot:<id>`.
+
   A zones file may also switch on the zone shapes (`"geometry": {"shapes": true}`): `obb`, `cylinder` and
   `capsule` next to the boxes. See `docs/GEOMETRY.md`.
 
@@ -331,6 +345,10 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
   Never asserts an E-STOP — only ever requests one, same
   `NullEStopRequester` as the CLI. An object inside several danger zones produces one request that
   names all of them (`zone_ids`).
+
+### `body-from-fk --fk PATH --segments PATH [--output FILE]`
+
+Builds the robot-body file for `check --body` (or the `robotBody` of `POST /check`) from the JSON that `hydra-umc-physics-replica fk --json` printed and a segments file that names which joint frames each segment joins (`from`, `to`: a joint name, `base` or an explicit point) and declares its `radius` (no default). It reads two files and runs nothing. Anything it cannot resolve (an unknown name, a duplicated joint, a missing or non-positive radius, `NaN`) exits `3`, prints the reason on standard error and writes nothing. See `docs/ROBOT_BODY.md` for the whole chain.
 
 ### `obstacles --zones PATH [--level all|danger|warning] [--cell M] [--tool-velocity V] [--output FILE]`
 

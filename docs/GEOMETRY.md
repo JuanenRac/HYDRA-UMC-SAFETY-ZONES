@@ -91,9 +91,10 @@ box around it. An oriented box therefore exports more than it is.
 
 ## Limits and what this does NOT cover
 
-- It does not know where the robot is. A capsule stands for a link only if
-  whoever writes the file placed it there; nothing follows the forward
-  kinematics of a robot, so a capsule on a moving link is a fixed zone.
+- A zone does not know where the robot is. A capsule zone stands for a link only
+  if whoever writes the file placed it there, so a capsule zone on a moving link
+  is a fixed zone. To follow the robot, send its body with each request instead
+  (`docs/ROBOT_BODY.md`).
 - It does not mask a robot's own body out of the detections (self-occlusion).
 - Overestimation is of the **zone**, not of the **person**: the size of an
   object still comes from its `radiusM` and the detector.

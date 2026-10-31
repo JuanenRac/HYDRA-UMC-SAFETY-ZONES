@@ -111,6 +111,52 @@
           }
         },
         {
+          "name": "robot_body.py",
+          "desc": {
+            "en": "The robot body as capsules, over-estimated",
+            "es": "El cuerpo del robot como cápsulas, sobreestimado",
+            "de": "Der Roboterkörper als Kapseln, überschätzt",
+            "fr": "Le corps du robot en capsules, surestimé",
+            "it": "Il corpo del robot come capsule, sovrastimato",
+            "ja": "ロボット本体をカプセルで表現（過大評価）",
+            "zh": "以胶囊体表示机器人本体（偏保守）",
+            "pt": "O corpo do robô como cápsulas, sobrestimado"
+          },
+          "tree_desc": {
+            "en": "The robot body as capsules, over-estimated",
+            "es": "El cuerpo del robot como cápsulas, sobreestimado",
+            "de": "Der Roboterkörper als Kapseln, überschätzt",
+            "fr": "Le corps du robot en capsules, surestimé",
+            "it": "Il corpo del robot come capsule, sovrastimato",
+            "ja": "ロボット本体をカプセルで表現（過大評価）",
+            "zh": "以胶囊体表示机器人本体（偏保守）",
+            "pt": "O corpo do robô como cápsulas, sobrestimado"
+          }
+        },
+        {
+          "name": "fk_input.py",
+          "desc": {
+            "en": "Robot body from the output of fk --json",
+            "es": "Cuerpo del robot a partir de la salida de fk --json",
+            "de": "Roboterkörper aus der Ausgabe von fk --json",
+            "fr": "Corps du robot à partir de la sortie de fk --json",
+            "it": "Corpo del robot dall'output di fk --json",
+            "ja": "fk --json の出力からロボット本体を生成",
+            "zh": "由 fk --json 的输出生成机器人本体",
+            "pt": "Corpo do robô a partir da saída de fk --json"
+          },
+          "tree_desc": {
+            "en": "Robot body from the output of fk --json",
+            "es": "Cuerpo del robot a partir de la salida de fk --json",
+            "de": "Roboterkörper aus der Ausgabe von fk --json",
+            "fr": "Corps du robot à partir de la sortie de fk --json",
+            "it": "Corpo del robot dall'output di fk --json",
+            "ja": "fk --json の出力からロボット本体を生成",
+            "zh": "由 fk --json 的输出生成机器人本体",
+            "pt": "Corpo do robô a partir da saída de fk --json"
+          }
+        },
+        {
           "name": "breach.py",
           "desc": {
             "en": "Real zone-breach checking",

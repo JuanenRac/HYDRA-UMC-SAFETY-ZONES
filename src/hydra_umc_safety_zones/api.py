@@ -30,13 +30,13 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
-from .breach import check_breaches
-from .config import ConfigError, parse_detections, parse_tool_velocity, parse_zone_set, strict_json_loads
+from .config import ConfigError, parse_detections, parse_robot_body, parse_tool_velocity, parse_zone_set, strict_json_loads
 from .estop import NullEStopRequester, request_estop_for
 from .observation import ObservationError, parse_observation_status
-from .safety_state import SafetyEvaluation, SafetyState, evaluate_safety, to_sdk_safety_state
+from .robot_body import RobotBody, RobotBodyError
+from .safety_state import SafetyEvaluation, SafetyState, collect_breaches, evaluate_safety, to_sdk_safety_state
 from .stateful import StatefulMonitor, StatefulSettings, format_event
-from .zones import ZoneSet, scale_zones_for_velocity
+from .zones import ZoneSet
 
 # Connections served at the same time. A client that opens many connections
 # and sends nothing must not be able to use up the threads and the memory of
@@ -273,6 +273,28 @@ class Handler(BaseHTTPRequestHandler):
             _write_error(self, 400, f"invalid safety configuration: {e}")
             return
 
+        robot_body: RobotBody | None = None
+        body_raw = body.get("robotBody")
+        if body_raw is not None:
+            try:
+                robot_body = parse_robot_body(body_raw, zone_set.robot_body)
+            except RobotBodyError as e:
+                # Never ignored and never read as a smaller body: the request is refused and the answer says the cell is not verified.
+                evaluation = SafetyEvaluation(SafetyState.INHIBITED, f"robot body refused: {e}")
+                _write_json(
+                    self,
+                    400,
+                    {
+                        "error": f"invalid robot body: {e}",
+                        "state": evaluation.state.value,
+                        "reason": evaluation.reason,
+                        "breaches": [],
+                        "estopRequests": [],
+                        "sdkSafetyState": to_sdk_safety_state(evaluation),
+                    },
+                )
+                return
+
         limit_error = self._limit_violation(zone_set, observation)
         if limit_error:
             _write_error(self, 400, limit_error)
@@ -282,7 +304,7 @@ class Handler(BaseHTTPRequestHandler):
         if monitor is not None and observation is None:
             evaluation = monitor.missing_heartbeat_evaluation(self.server.clock())
         else:
-            evaluation = evaluate_safety(zone_set, objects, today, observation, tool_velocity_mps=tool_velocity_mps)
+            evaluation = evaluate_safety(zone_set, objects, today, observation, tool_velocity_mps=tool_velocity_mps, body=robot_body)
 
         response: dict = {
             "state": evaluation.state.value,
@@ -298,6 +320,8 @@ class Handler(BaseHTTPRequestHandler):
             # header comment for why both must keep existing side by side).
             "sdkSafetyState": to_sdk_safety_state(evaluation),
         }
+        if robot_body is not None:
+            response["robotBody"] = {"segments": len(robot_body.segments)}
         if self.server.config_sha256:
             # which configuration this verdict was reached with
             response["configSha256"] = self.server.config_sha256
@@ -311,7 +335,7 @@ class Handler(BaseHTTPRequestHandler):
         # against internally - recomputing here with the unscaled
         # zone_set.zones would report a DANGER/WARNING state alongside a
         # `breaches` list that doesn't actually explain it.
-        breaches = check_breaches(scale_zones_for_velocity(zone_set.zones, tool_velocity_mps, zone_set.separation), objects)
+        breaches = collect_breaches(zone_set, objects, tool_velocity_mps, robot_body)
         response["breaches"] = [asdict(b) for b in breaches]
 
         if evaluation.state is SafetyState.WARNING:

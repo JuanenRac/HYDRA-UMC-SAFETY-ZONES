@@ -21,9 +21,16 @@ from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from enum import Enum
 
-from hydra_umc_safety_zones.breach import DetectedObject, check_breaches, worst_level_per_object
+from hydra_umc_safety_zones.breach import Breach, DetectedObject, check_breaches, worst_level_per_object
 from hydra_umc_safety_zones.calibration import calibration_age_days, is_calibration_expired
 from hydra_umc_safety_zones.observation import ObservationStatus, is_observation_stale, observation_age_seconds
+from hydra_umc_safety_zones.robot_body import (
+    BODY_OBJECT_PREFIX,
+    RobotBody,
+    RobotBodyError,
+    RobotBodySettings,
+    check_body_breaches,
+)
 from hydra_umc_safety_zones.zones import ZoneLevel, ZoneSet, scale_zones_for_velocity
 
 
@@ -53,6 +60,30 @@ class SafetyEvaluation:
     fault: bool = False
 
 
+def collect_breaches(
+    zone_set: ZoneSet,
+    objects: tuple[DetectedObject, ...],
+    tool_velocity_mps: float | None = None,
+    body: RobotBody | None = None,
+) -> tuple[Breach, ...]:
+    """The breaches of the detections and, when there is one, of the robot body, against the zones grown for the velocity and the separation model.
+
+    Without a body this is exactly ``check_breaches`` on the scaled zones. A body is refused (RobotBodyError) when the zones file did not
+    switch the feature on, and a detection whose id starts with ``robot:`` is refused so that no stop request can be attributed to the wrong part.
+    """
+    scaled = scale_zones_for_velocity(zone_set.zones, tool_velocity_mps, zone_set.separation)
+    breaches = check_breaches(scaled, objects)
+    if body is None:
+        return breaches
+    settings = zone_set.robot_body
+    if settings is None or not settings.enabled:
+        raise RobotBodyError("a robot body was given but the zones file does not switch it on (geometry.robot_body)")
+    clash = sorted(o.object_id for o in objects if o.object_id.startswith(BODY_OBJECT_PREFIX))
+    if clash:
+        raise RobotBodyError(f"detection id(s) {clash} start with {BODY_OBJECT_PREFIX!r}, which is reserved for the parts of the robot")
+    return breaches + check_body_breaches(scaled, body, settings)
+
+
 def evaluate_safety(
     zone_set: ZoneSet,
     objects: tuple[DetectedObject, ...],
@@ -60,6 +91,7 @@ def evaluate_safety(
     observation: ObservationStatus | None = None,
     now: datetime | None = None,
     tool_velocity_mps: float | None = None,
+    body: RobotBody | None = None,
 ) -> SafetyEvaluation:
     """The one real entry point that decides READY/WARNING/DANGER/INHIBITED.
 
@@ -129,7 +161,16 @@ def evaluate_safety(
             f"last real observation is {stale_age:.1f}s old, exceeds max_age_seconds={observation.max_age_seconds}",
         )
 
-    breaches = check_breaches(scale_zones_for_velocity(zone_set.zones, tool_velocity_mps, zone_set.separation), objects)
+    settings: RobotBodySettings | None = zone_set.robot_body
+    if body is None and settings is not None and settings.enabled and settings.required:
+        return SafetyEvaluation(
+            SafetyState.INHIBITED,
+            "the zones file requires the robot body (geometry.robot_body.required) and the request carries none",
+        )
+    try:
+        breaches = collect_breaches(zone_set, objects, tool_velocity_mps, body)
+    except RobotBodyError as exc:
+        return SafetyEvaluation(SafetyState.INHIBITED, f"robot body refused: {exc}")
     worst = worst_level_per_object(breaches)
 
     danger_objects = sorted(oid for oid, level in worst.items() if level is ZoneLevel.DANGER)

@@ -28,6 +28,15 @@ from hydra_umc_safety_zones.shapes import (
     parse_geometry_settings,
 )
 from hydra_umc_safety_zones.observation import ObservationStatus, parse_observation_status
+from hydra_umc_safety_zones.robot_body import (
+    BodySegment,
+    RobotBody,
+    RobotBodyDisabled,
+    RobotBodyError,
+    RobotBodySettings,
+    RobotFrame,
+    build_robot_body,
+)
 from hydra_umc_safety_zones.zones import SeparationModel, Zone, ZoneLevel, ZoneSet, parse_separation_model
 
 
@@ -215,7 +224,29 @@ def parse_zone_set(raw: dict) -> ZoneSet:
     calibration = parse_calibration(calibration_data) if calibration_data is not None else None
     separation_data = raw.get("separation")
     separation: SeparationModel | None = parse_separation_model(separation_data) if separation_data is not None else None
-    return ZoneSet(zones=zones, calibration=calibration, separation=separation)
+    return ZoneSet(zones=zones, calibration=calibration, separation=separation, robot_body=parse_body_settings(raw.get("geometry")))
+
+
+_BODY_SETTING_FIELDS = ("enabled", "required", "resolution_m", "margin_m", "max_segments", "max_pieces_per_segment")
+
+
+def parse_body_settings(geometry: object) -> RobotBodySettings:
+    """The ``robot_body`` entry of the ``geometry`` object of a zones file: ``true``/``false`` for the switch alone, or an object
+    with ``enabled`` and the tuning values. Missing means off; anything unknown or malformed makes the whole file invalid."""
+    if not isinstance(geometry, dict) or "robot_body" not in geometry:
+        return RobotBodySettings()
+    raw = geometry["robot_body"]
+    try:
+        if isinstance(raw, bool):
+            return RobotBodySettings(enabled=raw)
+        if not isinstance(raw, dict):
+            raise RobotBodyError(f"geometry.robot_body must be true, false or an object, got {raw!r}")
+        unknown = sorted(set(raw) - set(_BODY_SETTING_FIELDS))
+        if unknown:
+            raise RobotBodyError(f"geometry.robot_body has unknown field(s): {unknown}")
+        return RobotBodySettings(**raw)
+    except RobotBodyError as exc:
+        raise ConfigError(str(exc)) from exc
 
 
 def load_zone_set(path: str | Path) -> ZoneSet:
@@ -297,3 +328,63 @@ def load_observation_status(path: str | Path) -> ObservationStatus:
     if not isinstance(raw, dict):
         raise ConfigError("an observation file must hold a JSON object")
     return parse_observation_status(raw)
+
+
+def parse_robot_body(raw: object, settings: RobotBodySettings | None) -> RobotBody:
+    """Reads the ``robotBody`` object of a request (or the body file of the CLI)::
+
+        {"frame": {"translation": {x, y, z}, "rotation_deg": {roll, pitch, yaw}},     (optional: poses -> frame of the zones)
+         "segments": [{"id": "forearm", "start": {x, y, z}, "end": {x, y, z}, "radius": 0.06}, ...]}
+
+    Every length is in metres and every ``radius`` is the one the installation declares for that segment: there is no default.
+    Raises RobotBodyDisabled when the zones file did not switch the feature on, and RobotBodyError (a ValueError) for anything else.
+    """
+    if settings is None or not settings.enabled:
+        raise RobotBodyDisabled("this request carries a robot body but the zones file does not switch it on (geometry.robot_body)")
+    try:
+        if not isinstance(raw, dict):
+            raise RobotBodyError("robotBody must be a JSON object")
+        unknown = sorted(set(raw) - {"frame", "segments"})
+        if unknown:
+            raise RobotBodyError(f"robotBody has unknown field(s): {unknown}")
+        frame = None
+        if raw.get("frame") is not None:
+            frame_raw = raw["frame"]
+            if not isinstance(frame_raw, dict):
+                raise RobotBodyError("robotBody.frame must be an object")
+            extra = sorted(set(frame_raw) - {"translation", "rotation_deg"})
+            if extra:
+                raise RobotBodyError(f"robotBody.frame has unknown field(s): {extra}")
+            frame = RobotFrame(
+                _triple(frame_raw.get("translation", {}), ("x", "y", "z"), "robotBody.frame.translation", required=False),
+                _triple(frame_raw.get("rotation_deg", {}), ("roll", "pitch", "yaw"), "robotBody.frame.rotation_deg", required=False),
+            )
+        entries = raw.get("segments")
+        if not isinstance(entries, list):
+            raise RobotBodyError("robotBody.segments must be a list")
+        if len(entries) > settings.max_segments:
+            raise RobotBodyError(f"a robot body may have {settings.max_segments} segments at most, got {len(entries)}")
+        segments = []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise RobotBodyError("each segment must be an object")
+            extra = sorted(set(entry) - {"id", "start", "end", "radius"})
+            if extra:
+                raise RobotBodyError(f"segment has unknown field(s): {extra}")
+            missing = sorted(key for key in ("id", "start", "end", "radius") if key not in entry)
+            if missing:
+                raise RobotBodyError(f"segment is missing field(s): {missing} (the radius has no default: declare it)")
+            segment_id = _identifier(entry["id"], "segment id")
+            segments.append(
+                BodySegment(
+                    segment_id,
+                    _point(entry["start"]),
+                    _point(entry["end"]),
+                    _number(entry["radius"], f"segment {segment_id!r} radius"),
+                )
+            )
+        return build_robot_body(tuple(segments), frame, settings)
+    except RobotBodyError:
+        raise
+    except ValueError as exc:  # ConfigError from the helpers above
+        raise RobotBodyError(str(exc)) from exc

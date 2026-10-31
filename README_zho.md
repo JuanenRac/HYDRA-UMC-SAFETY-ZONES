@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-718%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-802%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.7-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | 版本 | `0.1.7` |
 | 成熟度 | 可用 |
-| 测试 | 718 (`python -m pytest -q tests`) |
+| 测试 | 802 (`python -m pytest -q tests`) |
 | 技术栈 | Python / 3D vision / Hailo-8 |
 | 目标 | HYDRA-UMC 工作单元的 Raspberry Pi CM5 |
 | 真实硬件 | 尚未：此版本没有在真实硬件上运行的记录 |
@@ -51,7 +51,7 @@ GPL-3.0-or-later - see LICENSE
 | 领域 | 状态 | 在这里的含义 |
 |---|---|---|
 | 软件 | 🟡 | 主要用途可用；上面的诚实性检查列出了仍然缺少的内容 |
-| 测试 | 🟢 | 718 项自动测试，每次变更都会运行 |
+| 测试 | 🟢 | 802 项自动测试，每次变更都会运行 |
 | 真实硬件 | 🔴 | 尚未：此版本没有在真实硬件上运行的记录 |
 | 文档 | 🟢 | 八种语言的 README，每次变更都会与清单核对 |
 
@@ -195,6 +195,8 @@ Node 系列的其他项目一样——这里不存在 `hardware/`/`firmware/` �
 
 **有状态模式（可选）。** `serve --stateful`（或 `SAFETY_ZONES_STATEFUL=1`，或区域文件中的 `"stateful": {"enabled": true}`）增加 `POST /heartbeat`，由观察端证明自己还活着：每次心跳按服务自己的时钟有效几秒，无论观察端写了什么时间，请求也不能再自带观察数据。`GET /events` 在状态变化时以 Server-Sent Events 推送状态，并在裁决或心跳过期时由服务自己发布 INHIBITED；使用方必须把沉默视为不安全。它只存在于内存中，不向 MQTT 发布任何内容，也没有在真实的观察端上试过。默认关闭，这两个路由并不存在。参见 `docs/STATEFUL.md`。
 
+**机器人本体（可选）。** 在区域文件中写入 `"geometry": {"robot_body": true}` 后，`POST /check`（以及 `check --body 文件`）接受 `robotBody`：由正运动学确定的机器人每个线段的两个端点，以及安装方为每个线段声明的半径（没有默认值）。服务在区域的坐标系中构建胶囊体，并以与检测物体相同的速度裕量和分离裕量与区域比较，始终偏保守：每个线段被切分为能包住它的球体，固定种子的测试台会检查胶囊体内任意一点周围的区域都会被判定为越界。默认关闭：此时携带本体的请求会以 `400` 和 INHIBITED 被拒绝（绝不会被忽略），格式错误的本体会使整个请求被拒绝，`required` 会使没有本体的请求变为 INHIBITED。`body-from-fk` 把 `hydra-umc-physics-replica fk --json` 的输出和一个命名线段的文件转换为本体；本服务从不运行该程序。这一切都没有在真实机器人上试过，也不是经认证的安全功能。参见 `docs/ROBOT_BODY.md`。
+
 ## ⚙️ 配置
 
 HTTP 服务通过选项配置；其中两项也可以来自环境变量。
@@ -221,7 +223,7 @@ HTTP 服务通过选项配置；其中两项也可以来自环境变量。
 
 ## 🧪 测试
 
-运行 `python -m pytest -q tests` 会执行 718 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
+运行 `python -m pytest -q tests` 会执行 802 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
 
 CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档、八个 README 和图片。
 
@@ -244,7 +246,7 @@ CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档�
 2. **虚拟环境** —— 若 `.venv/` 不存在则创建；否则复用。
 3. **可编辑安装（含 dev 附加依赖）** —— `pip install -e ".[dev]"`，使 `src/` 下的修改立即生效，安装 `pytest`，并注册 `hydra-umc-safety-zones` 控制台入口点。
 4. **编译检查** —— `python -m compileall -q src` 对 `src/` 下每个文件进行字节码编译，在整个生态系统范围内捕获语法错误。
-5. **真实测试套件** —— `pytest tests/` 运行全部 718 个测试。
+5. **真实测试套件** —— `pytest tests/` 运行全部 802 个测试。
 
 `set -euo pipefail` 会在第一个失败步骤处停止脚本；如果是通过双击而非从已
 打开的终端运行的，窗口会保持打开（`Press Enter to close...`）。
@@ -376,6 +378,8 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── geometry.py               真实的 Point3D/AABB 基础类型
 │   ├── zones.py                  真实的 ZoneLevel/Zone/ZoneSet 定义
 │   ├── shapes.py                 有向盒、圆柱和胶囊体
+│   ├── robot_body.py             以胶囊体表示机器人本体（偏保守）
+│   ├── fk_input.py               由 fk --json 的输出生成机器人本体
 │   ├── breach.py                 真实的区域越界检查
 │   ├── calibration.py            真实的校准新鲜度跟踪
 │   ├── observation.py            真实的观测者健康跟踪 - 镜像 calibration.py
@@ -413,7 +417,7 @@ HYDRA-UMC-SAFETY-ZONES/
 （`geometry.py`/`zones.py`/`breach.py`）、在任何越界逻辑之前就安全故障切换
 到 `INHIBITED` 的真实校准新鲜度强制检查（`calibration.py`/`safety_state.py`）、
 一个在设计上就恪守检测与执行边界的真实 E-STOP*请求*流水线（`estop.py`）、
-一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 718 个通过的
+一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 802 个通过的
 测试——完整的真实构建/运行输出见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 **仍待完成的内容（顺序不分先后，无既定时间表）：**

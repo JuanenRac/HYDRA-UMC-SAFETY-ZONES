@@ -239,7 +239,7 @@ def parse_geometry_settings(data: object) -> GeometrySettings:
         return GeometrySettings()
     if not isinstance(data, dict):
         raise ValueError("geometry must be a JSON object")
-    unknown = sorted(set(data) - {"shapes", "mode"})
+    unknown = sorted(set(data) - {"shapes", "mode", "robot_body"})
     if unknown:
         raise ValueError(f"geometry has unknown field(s): {unknown}")
     shapes = data.get("shapes", False)

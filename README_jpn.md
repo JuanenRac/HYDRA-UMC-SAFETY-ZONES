@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-718%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-802%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.7-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | バージョン | `0.1.7` |
 | 成熟度 | 機能する |
-| テスト | 718 (`python -m pytest -q tests`) |
+| テスト | 802 (`python -m pytest -q tests`) |
 | 技術 | Python / 3D vision / Hailo-8 |
 | 対象 | HYDRA-UMC セルの Raspberry Pi CM5 |
 | 実機での確認 | まだです：このバージョンについて実機での動作記録はありません |
@@ -51,7 +51,7 @@ GPL-3.0-or-later - see LICENSE
 | 領域 | 状態 | ここでの意味 |
 |---|---|---|
 | ソフトウェア | 🟡 | 主な目的では動作します。足りない点は上の正直さの確認に書かれています |
-| テスト | 🟢 | 自動テスト 718 件。変更のたびに実行されます |
+| テスト | 🟢 | 自動テスト 802 件。変更のたびに実行されます |
 | 実機 | 🔴 | まだです：このバージョンについて実機での動作記録はありません |
 | ドキュメント | 🟢 | 8 言語の README。変更のたびにマニフェストと照合されます |
 
@@ -212,6 +212,8 @@ CM5 + Hailo-8 は市販のハードウェアであり、独自に設計する基
 
 **ステートフルモード（任意）。** `serve --stateful`（または `SAFETY_ZONES_STATEFUL=1`、ゾーンファイルの `"stateful": {"enabled": true}`）で `POST /heartbeat` が加わり、観測側が生きていることを示します。各ハートビートは、観測側が書いた時刻に関係なくサービス自身の時計で数秒だけ有効で、リクエストは独自の観測を持ち込めなくなります。`GET /events` は状態が変わるたびに Server-Sent Events で状態をプッシュし、判定またはハートビートが期限切れになるとサービス自身が INHIBITED を発行します。利用側は無音を安全でないものとして扱う必要があります。メモリ上のみで動作し、MQTT には何も発行せず、実際の観測側では試していません。既定ではオフで、この 2 つのルートは存在しません。`docs/STATEFUL.md` を参照してください。
 
+**ロボット本体（任意）。** ゾーンファイルに `"geometry": {"robot_body": true}` を書くと、`POST /check`（および `check --body FILE`）は `robotBody` を受け付けます。これは順運動学が置いたロボットの各セグメントの両端と、設置側が各セグメントに宣言する半径（既定値はありません）です。サービスはゾーンの座標系でカプセルを作り、検出物体と同じ速度マージンと分離マージンでゾーンと比較し、常に過大評価します。各セグメントはそれを包む球に分割され、固定シードのハーネスが、カプセル内の任意の点の周りのゾーンが必ず侵入として検出されることを確認します。既定では無効で、その場合は本体を含むリクエストは `400` と INHIBITED で拒否され（無視されることはありません）、不正な本体はリクエスト全体を拒否し、`required` を指定すると本体のないリクエストは INHIBITED になります。`body-from-fk` は `hydra-umc-physics-replica fk --json` の出力とセグメント名を指定したファイルから本体を作ります。このサービスがそのプログラムを実行することはありません。実機のロボットでは試しておらず、認証済みの安全機能ではありません。`docs/ROBOT_BODY.md` を参照してください。
+
 ## ⚙️ 設定
 
 HTTP サービスはオプションで設定します。うち 2 つは環境変数からも指定できます。
@@ -238,7 +240,7 @@ Python 3.10 以上が必要です。
 
 ## 🧪 テスト
 
-`python -m pytest -q tests` で自動テスト 718 件を実行します。 ハードウェアも、このマシンの外にあるものも必要ありません。
+`python -m pytest -q tests` で自動テスト 802 件を実行します。 ハードウェアも、このマシンの外にあるものも必要ありません。
 
 CI は `HYDRA_UMC_CI=1 python tools/ci_validate.py` を実行し、マニフェスト、文書、8 つの README、図を検査します。
 
@@ -261,7 +263,7 @@ CI は `HYDRA_UMC_CI=1 python tools/ci_validate.py` を実行し、マニフェ�
 2. **仮想環境** — `.venv/` が存在しない場合は作成し、存在する場合は再利用します。
 3. **Editable インストール（dev エクストラ付き）** — `pip install -e ".[dev]"` により `src/` 下の変更が即座に反映され、`pytest` がインストールされ、`hydra-umc-safety-zones` コンソールエントリポイントが登録されます。
 4. **コンパイルチェック** — `python -m compileall -q src` が `src/` 下の各ファイルをバイトコンパイルし、エコシステム全体にわたる構文エラーを検出します。
-5. **実際のテストスイート** — `pytest tests/` が全 718 件のテストを実行します。
+5. **実際のテストスイート** — `pytest tests/` が全 802 件のテストを実行します。
 
 `set -euo pipefail` は最初に失敗したステップでスクリプトを停止させます。
 ダブルクリックで起動された場合（既に開いているターミナルからではなく）は、
@@ -402,6 +404,8 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── geometry.py               実際の Point3D/AABB プリミティブ
 │   ├── zones.py                  実際の ZoneLevel/Zone/ZoneSet 定義
 │   ├── shapes.py                 有向ボックス・円柱・カプセル
+│   ├── robot_body.py             ロボット本体をカプセルで表現（過大評価）
+│   ├── fk_input.py               fk --json の出力からロボット本体を生成
 │   ├── breach.py                 実際のゾーン越境チェック
 │   ├── calibration.py            実際のキャリブレーション鮮度追跡
 │   ├── observation.py            実際の観測者健全性追跡 —— calibration.py を反映
@@ -440,7 +444,7 @@ HYDRA-UMC-SAFETY-ZONES/
 `INHIBITED` にフェイルする実際のキャリブレーション鮮度強制
 （`calibration.py`/`safety_state.py`）、構造上検知と執行の境界を守る
 実際の E-STOP *リクエスト*パイプライン（`estop.py`）、ゾーン/検知 JSON
-ファイルに対する実際の CLI サブコマンド `check`、そして通過した 718 件の
+ファイルに対する実際の CLI サブコマンド `check`、そして通過した 802 件の
 テスト——完全な実際のビルド/実行出力は
 [`CHANGELOG.md`](CHANGELOG.md) を参照してください。
 

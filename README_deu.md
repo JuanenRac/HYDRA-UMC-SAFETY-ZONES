@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-718%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-802%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.7-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | Version | `0.1.7` |
 | Reifegrad | Funktionsfähig |
-| Tests | 718 (`python -m pytest -q tests`) |
+| Tests | 802 (`python -m pytest -q tests`) |
 | Technik | Python / 3D vision / Hailo-8 |
 | Ziel | Der Raspberry Pi CM5 einer HYDRA-UMC-Zelle |
 | Auf echter Hardware | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |
@@ -51,7 +51,7 @@ Jede Zeile ist ein Teil dieses Repositorys, und die Ampel sagt, wie weit er heut
 | Bereich | Stand | Was das hier bedeutet |
 |---|---|---|
 | Software | 🟡 | Funktioniert für seinen Hauptzweck; die Ehrlichkeitsprüfung oben nennt, was noch fehlt |
-| Tests | 🟢 | 718 automatische Tests, bei jeder Änderung ausgeführt |
+| Tests | 🟢 | 802 automatische Tests, bei jeder Änderung ausgeführt |
 | Echte Hardware | 🔴 | Noch nicht: für diese Version ist kein Lauf auf echter Hardware vermerkt |
 | Dokumentation | 🟢 | README in acht Sprachen, bei jeder Änderung gegen das Manifest geprüft |
 
@@ -160,6 +160,8 @@ CM5 + Hailo-8 ist handelsübliche Hardware ohne eigenes zu entwerfendes Board, d
 
 **Zustandsbehafteter Modus (optional).** `serve --stateful` (oder `SAFETY_ZONES_STATEFUL=1`, oder `"stateful": {"enabled": true}` in der Zonendatei) fügt `POST /heartbeat` hinzu, womit der Beobachter beweist, dass er lebt: Jeder Heartbeat zählt einige Sekunden nach der Uhr des Dienstes, gleich welche Zeit der Beobachter schreibt, und eine Anfrage darf keine eigene Beobachtung mehr mitbringen. `GET /events` überträgt den Zustand als Server-Sent Events bei jeder Änderung und veröffentlicht von selbst INHIBITED, wenn ein Urteil oder der Heartbeat abläuft; ein Verbraucher muss Stille als nicht sicher werten. Es lebt nur im Speicher, veröffentlicht nichts über MQTT und wurde mit keinem echten Beobachter erprobt. Standardmäßig aus, die beiden Routen existieren dann nicht. Siehe `docs/STATEFUL.md`.
 
+**Roboterkörper (optional).** Mit `"geometry": {"robot_body": true}` in der Zonendatei akzeptiert `POST /check` (und `check --body DATEI`) einen `robotBody`: die beiden Enden jedes Roboter-Segments, so wie die Vorwärtskinematik sie gesetzt hat, und einen Radius, den die Anlage für jedes Segment festlegt (es gibt keinen Standardwert). Der Dienst baut die Kapseln im Bezugssystem der Zonen und vergleicht sie mit den Zonen, mit denselben Geschwindigkeits- und Trennabstandsmargen wie ein erkanntes Objekt und immer überschätzend: Jedes Segment wird in Kugeln zerlegt, die es enthalten, und ein Prüfstand mit festem Startwert stellt sicher, dass eine Zone um einen beliebigen Punkt der Kapsel eine Verletzung ist. Standardmäßig ist die Funktion aus: Eine Anfrage mit Körper wird dann mit `400` und INHIBITED abgelehnt (nie ignoriert), ein fehlerhafter Körper lehnt die ganze Anfrage ab, und `required` macht eine Anfrage ohne Körper zu INHIBITED. `body-from-fk` macht aus der Ausgabe von `hydra-umc-physics-replica fk --json` und einer Datei, die die Segmente benennt, den Körper; dieser Dienst führt jenes Programm nie aus. Nichts davon wurde mit einem echten Roboter erprobt, und es ist keine zertifizierte Sicherheitsfunktion. Siehe `docs/ROBOT_BODY.md`.
+
 ## ⚙️ Konfiguration
 
 Der HTTP-Dienst wird mit Optionen konfiguriert; zwei davon können auch aus der Umgebung kommen.
@@ -186,7 +188,7 @@ Benötigt Python 3.10 oder neuer.
 
 ## 🧪 Tests
 
-718 automatische Tests laufen mit `python -m pytest -q tests`. Sie brauchen weder Hardware noch etwas außerhalb dieses Rechners.
+802 automatische Tests laufen mit `python -m pytest -q tests`. Sie brauchen weder Hardware noch etwas außerhalb dieses Rechners.
 
 Die CI führt `HYDRA_UMC_CI=1 python tools/ci_validate.py` aus; das prüft das Manifest, die Dokumente, die acht READMEs und die Bilder.
 
@@ -209,7 +211,7 @@ Die CI führt `HYDRA_UMC_CI=1 python tools/ci_validate.py` aus; das prüft das M
 2. **Virtuelle Umgebung** - erstellt `.venv/`, falls nicht vorhanden; verwendet es sonst weiter.
 3. **Editierbare Installation (mit Dev-Extras)** - `pip install -e ".[dev]"`, sodass Änderungen unter `src/` sofort wirken, installiert `pytest` und registriert den Konsolen-Einstiegspunkt `hydra-umc-safety-zones`.
 4. **Compile-Check** - `python -m compileall -q src` kompiliert jede Datei unter `src/` zu Bytecode.
-5. **Echte Testsuite** - `pytest tests/` führt alle 718 Tests aus.
+5. **Echte Testsuite** - `pytest tests/` führt alle 802 Tests aus.
 
 `set -euo pipefail` stoppt das Skript beim ersten fehlschlagenden Schritt; das Fenster bleibt geöffnet (`Press Enter to close...`), wenn es per Doppelklick statt aus einem bereits geöffneten Terminal gestartet wurde.
 
@@ -331,6 +333,8 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── geometry.py               Echte Point3D/AABB-Primitive
 │   ├── zones.py                  Echte ZoneLevel/Zone/ZoneSet-Definitionen
 │   ├── shapes.py                 Orientierte Quader, Zylinder und Kapseln
+│   ├── robot_body.py             Der Roboterkörper als Kapseln, überschätzt
+│   ├── fk_input.py               Roboterkörper aus der Ausgabe von fk --json
 │   ├── breach.py                 Echte Zonenverletzungsprüfung
 │   ├── calibration.py            Echte Verfolgung der Kalibrierungsfrische
 │   ├── observation.py            Echte Beobachter-Gesundheitsverfolgung - spiegelt calibration.py
@@ -364,7 +368,7 @@ HYDRA-UMC-SAFETY-ZONES/
 
 **Bekannte Grenzen heute**
 
-**Was heute funktioniert:** echte Warning-/Danger-Zonendefinitionen und echte Verletzungsprüfung (`geometry.py`/`zones.py`/`breach.py`), echte Durchsetzung der Kalibrierungsfrische, die vor jeglicher Verletzungslogik sicher zu `INHIBITED` fehlschlägt (`calibration.py`/`safety_state.py`), eine echte E-STOP-*Anforderungs*-Pipeline, die die Erkennen-vs-Durchsetzen-Grenze konstruktionsbedingt respektiert (`estop.py`), ein echter CLI-Subbefehl `check` über JSON-Zonen-/Erkennungsdateien und 718 bestandene Tests - siehe [`CHANGELOG.md`](CHANGELOG.md) für die vollständige echte Build-/Run-Ausgabe.
+**Was heute funktioniert:** echte Warning-/Danger-Zonendefinitionen und echte Verletzungsprüfung (`geometry.py`/`zones.py`/`breach.py`), echte Durchsetzung der Kalibrierungsfrische, die vor jeglicher Verletzungslogik sicher zu `INHIBITED` fehlschlägt (`calibration.py`/`safety_state.py`), eine echte E-STOP-*Anforderungs*-Pipeline, die die Erkennen-vs-Durchsetzen-Grenze konstruktionsbedingt respektiert (`estop.py`), ein echter CLI-Subbefehl `check` über JSON-Zonen-/Erkennungsdateien und 802 bestandene Tests - siehe [`CHANGELOG.md`](CHANGELOG.md) für die vollständige echte Build-/Run-Ausgabe.
 
 **Was noch offen ist, ohne bestimmte Reihenfolge und ohne verbindlichen Zeitplan:**
 
