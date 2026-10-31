@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-263%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-718%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.6-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | 版本 | `0.1.6` |
 | 成熟度 | 可用 |
-| 测试 | 263 (`python -m pytest -q tests`) |
+| 测试 | 718 (`python -m pytest -q tests`) |
 | 技术栈 | Python / 3D vision / Hailo-8 |
 | 目标 | HYDRA-UMC 工作单元的 Raspberry Pi CM5 |
 | 真实硬件 | 尚未：此版本没有在真实硬件上运行的记录 |
@@ -51,7 +51,7 @@ GPL-3.0-or-later - see LICENSE
 | 领域 | 状态 | 在这里的含义 |
 |---|---|---|
 | 软件 | 🟡 | 主要用途可用；上面的诚实性检查列出了仍然缺少的内容 |
-| 测试 | 🟢 | 263 项自动测试，每次变更都会运行 |
+| 测试 | 🟢 | 718 项自动测试，每次变更都会运行 |
 | 真实硬件 | 🔴 | 尚未：此版本没有在真实硬件上运行的记录 |
 | 文档 | 🟢 | 八种语言的 README，每次变更都会与清单核对 |
 
@@ -191,6 +191,10 @@ Node 系列的其他项目一样——这里不存在 `hardware/`/`firmware/` �
 
 `GET /state`（与 `POST /check` 相同的令牌）以带有判定时间的 SDK SafetyState 形式返回最新判定，首次判定之前返回 `404`；视觉伺服等使用方读取它，而不是相信调用方的说法。它只保存在内存中。
 
+**区域形状（可选）。** 区域文件中写入 `"geometry": {"shapes": true}` 后，除盒子外还可以使用 `obb`（有向盒）、`cylinder`（垂直圆柱）和 `capsule`（胶囊体）形状的区域。它们默认关闭：未打开开关就使用这些形状的文件会被拒绝，只含盒子的文件与以前完全一样。每种形状都会高估区域而绝不低估，`"mode": "bounding"` 会把每个形状换成包住它的盒子。这些都没有在真实机器人上试过，并且它不知道机器人在哪里，所以机械臂连杆上的胶囊体只是一个固定区域。参见 `docs/GEOMETRY.md`。
+
+**有状态模式（可选）。** `serve --stateful`（或 `SAFETY_ZONES_STATEFUL=1`，或区域文件中的 `"stateful": {"enabled": true}`）增加 `POST /heartbeat`，由观察端证明自己还活着：每次心跳按服务自己的时钟有效几秒，无论观察端写了什么时间，请求也不能再自带观察数据。`GET /events` 在状态变化时以 Server-Sent Events 推送状态，并在裁决或心跳过期时由服务自己发布 INHIBITED；使用方必须把沉默视为不安全。它只存在于内存中，不向 MQTT 发布任何内容，也没有在真实的观察端上试过。默认关闭，这两个路由并不存在。参见 `docs/STATEFUL.md`。
+
 ## ⚙️ 配置
 
 HTTP 服务通过选项配置；其中两项也可以来自环境变量。
@@ -217,7 +221,7 @@ HTTP 服务通过选项配置；其中两项也可以来自环境变量。
 
 ## 🧪 测试
 
-运行 `python -m pytest -q tests` 会执行 263 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
+运行 `python -m pytest -q tests` 会执行 718 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
 
 CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档、八个 README 和图片。
 
@@ -240,7 +244,7 @@ CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档�
 2. **虚拟环境** —— 若 `.venv/` 不存在则创建；否则复用。
 3. **可编辑安装（含 dev 附加依赖）** —— `pip install -e ".[dev]"`，使 `src/` 下的修改立即生效，安装 `pytest`，并注册 `hydra-umc-safety-zones` 控制台入口点。
 4. **编译检查** —— `python -m compileall -q src` 对 `src/` 下每个文件进行字节码编译，在整个生态系统范围内捕获语法错误。
-5. **真实测试套件** —— `pytest tests/` 运行全部 263 个测试。
+5. **真实测试套件** —— `pytest tests/` 运行全部 718 个测试。
 
 `set -euo pipefail` 会在第一个失败步骤处停止脚本；如果是通过双击而非从已
 打开的终端运行的，窗口会保持打开（`Press Enter to close...`）。
@@ -371,6 +375,7 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── __init__.py               包说明与版本
 │   ├── geometry.py               真实的 Point3D/AABB 基础类型
 │   ├── zones.py                  真实的 ZoneLevel/Zone/ZoneSet 定义
+│   ├── shapes.py                 有向盒、圆柱和胶囊体
 │   ├── breach.py                 真实的区域越界检查
 │   ├── calibration.py            真实的校准新鲜度跟踪
 │   ├── observation.py            真实的观测者健康跟踪 - 镜像 calibration.py
@@ -378,6 +383,7 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── estop.py                  真实的 E-STOP 请求（从不执行）
 │   ├── config.py                 真实的区域/检测/观测 JSON 加载
 │   ├── api.py                    简洁的 JSON/HTTP 接口(基于 stdlib http.server),桥接真实的 `check` 逻辑
+│   ├── stateful.py               心跳与推送状态（可选）
 │   └── main.py                   入口点 + 真实的 `check` 子命令
 ├── tests/                        真实测试：几何、越界、校准、观测、safety_state、estop、配置、api、CLI
 ├── docs/                         文档与安全标准
@@ -407,7 +413,7 @@ HYDRA-UMC-SAFETY-ZONES/
 （`geometry.py`/`zones.py`/`breach.py`）、在任何越界逻辑之前就安全故障切换
 到 `INHIBITED` 的真实校准新鲜度强制检查（`calibration.py`/`safety_state.py`）、
 一个在设计上就恪守检测与执行边界的真实 E-STOP*请求*流水线（`estop.py`）、
-一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 263 个通过的
+一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 718 个通过的
 测试——完整的真实构建/运行输出见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 **仍待完成的内容（顺序不分先后，无既定时间表）：**

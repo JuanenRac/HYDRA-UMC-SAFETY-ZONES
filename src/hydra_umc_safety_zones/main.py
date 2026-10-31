@@ -38,6 +38,7 @@ from hydra_umc_safety_zones.config import (
 from hydra_umc_safety_zones.estop import NullEStopRequester, request_estop_for
 from hydra_umc_safety_zones.obstacles import DEFAULT_CELL_M, LEVEL_CHOICES, export_obstacles
 from hydra_umc_safety_zones.safety_state import SafetyState, evaluate_safety
+from hydra_umc_safety_zones.stateful import StatefulSettings, parse_stateful_settings
 from hydra_umc_safety_zones.zones import scale_zones_for_velocity
 
 PROJECT_NAME = "HYDRA-UMC-SAFETY-ZONES"
@@ -140,6 +141,31 @@ def _run_obstacles(args: argparse.Namespace) -> int:
     return 0
 
 
+def _stateful_enabled_in(zones_file: str) -> bool:
+    """True when the zones file switches the stateful mode on; a file that cannot be read says nothing here (loading it fails on its own)."""
+    try:
+        data = json.loads(Path(zones_file).read_text(encoding="utf-8"))
+        return isinstance(data, dict) and isinstance(data.get("stateful"), dict) and data["stateful"].get("enabled") is True
+    except (OSError, ValueError):
+        return False
+
+
+def _stateful_settings(zones_file: str) -> StatefulSettings:
+    """The tunable values of the stateful mode: from the ``stateful`` object of the zones file, with the mode switched on."""
+    data = None
+    if zones_file:
+        raw = json.loads(Path(zones_file).read_text(encoding="utf-8"))
+        data = raw.get("stateful") if isinstance(raw, dict) else None
+    settings = parse_stateful_settings(data)
+    return StatefulSettings(
+        enabled=True,
+        heartbeat_ttl_s=settings.heartbeat_ttl_s,
+        state_ttl_s=settings.state_ttl_s,
+        max_subscribers=settings.max_subscribers,
+        keepalive_s=settings.keepalive_s,
+    )
+
+
 def _run_serve(args: argparse.Namespace) -> int:
     addr, port = args.addr, args.port
     zone_set = None
@@ -154,6 +180,13 @@ def _run_serve(args: argparse.Namespace) -> int:
         except Exception as exc:  # noqa: BLE001
             print(f"[safety-zones] fatal: could not load --zones-file {args.zones_file}: {type(exc).__name__}: {exc}", file=sys.stderr)
             return 2
+    stateful: StatefulSettings | None = None
+    if args.stateful or (args.zones_file and _stateful_enabled_in(args.zones_file)):
+        try:
+            stateful = _stateful_settings(args.zones_file)
+        except Exception as exc:  # noqa: BLE001
+            print(f"[safety-zones] fatal: invalid stateful settings: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 2
     try:
         server = SafetyZonesServer(
             (addr, port),
@@ -164,12 +197,18 @@ def _run_serve(args: argparse.Namespace) -> int:
             max_observation_age_seconds=args.max_observation_age_seconds,
             max_calibration_age_days=args.max_calibration_age_days,
             decision_log=args.decision_log or None,
+            stateful=stateful,
         )
     except OSError as exc:
         print(f"[safety-zones] fatal: could not start the HTTP API on {addr}:{port}: {exc}", file=sys.stderr)
         return 2
     print(f"[safety-zones] HTTP API listening on {addr}:{port}")
-    print("[safety-zones] POST /check, GET /stats")
+    print("[safety-zones] POST /check, GET /stats" + (", POST /heartbeat, GET /events" if stateful is not None else ""))
+    if stateful is not None:
+        print(
+            f"[safety-zones] STATEFUL: the observer proves it is alive with POST /heartbeat (valid {stateful.heartbeat_ttl_s}s); "
+            f"a verdict is valid {stateful.state_ttl_s}s and is pushed on GET /events"
+        )
     if zone_set is not None:
         print(f"[safety-zones] zones and calibration fixed by {args.zones_file} (sha256 {config_sha256})")
     else:
@@ -178,6 +217,7 @@ def _run_serve(args: argparse.Namespace) -> int:
         print("[safety-zones] POST /check requires a bearer token")
     if args.decision_log:
         print(f"[safety-zones] every verdict is logged as a JSON line to {'standard error' if args.decision_log == '-' else args.decision_log}")
+    server.start_watcher()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -260,6 +300,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--decision-log",
         default=os.environ.get("SAFETY_ZONES_DECISION_LOG", ""),
         help="log every verdict of POST /check as one JSON line to this file, or to standard error with '-' (default: off)",
+    )
+
+    serve_parser.add_argument(
+        "--stateful",
+        action="store_true",
+        default=os.environ.get("SAFETY_ZONES_STATEFUL", "") in ("1", "true", "yes"),
+        help="stateful mode: the observer sends POST /heartbeat, POST /check takes its observation from it and GET /events pushes the state "
+             "(the tuning values are in the 'stateful' object of the zones file; off by default)",
     )
 
     return parser

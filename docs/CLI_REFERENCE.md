@@ -233,7 +233,7 @@ Two clock tolerances keep a healthy cell from being inhibited by rounding: an ob
 timestamped up to 0.25 s ahead of this machine's clock is not "in the future", and a calibration
 dated one day ahead (a local date written east of UTC) is not expired. Anything further ahead is.
 
-### `serve [--addr ADDR] [--port PORT] [--zones-file PATH] [--token T] [--max-observation-age-seconds S] [--max-calibration-age-days D] [--decision-log FILE]`
+### `serve [--addr ADDR] [--port PORT] [--zones-file PATH] [--token T] [--max-observation-age-seconds S] [--max-calibration-age-days D] [--decision-log FILE] [--stateful]`
 
 ```
 $ hydra-umc-safety-zones serve -h
@@ -298,6 +298,16 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
   `--decision-log FILE` (or `SAFETY_ZONES_DECISION_LOG`; `-` is standard error) appends one JSON line per
   verdict: `at`, `state`, `sdkSafetyState`, `reason`, `configSha256`, `breaches`, `estopRequests`. It is off
   unless given, and a log that cannot be written never changes the verdict.
+
+  `--stateful` (or `SAFETY_ZONES_STATEFUL=1`, or `"stateful": {"enabled": true}` in the zones file) turns on the
+  stateful mode: `POST /heartbeat` (the observer proves it is alive, stamped by the service's own clock),
+  `POST /check` reading its observation from the last heartbeat (a request that sends `observation` is refused
+  with `400`) and `GET /events` pushing the state as Server-Sent Events, with INHIBITED published by the service
+  itself when a verdict or the heartbeat expires. Off by default: the two routes then do not exist. The tuning
+  values are in the `stateful` object of the zones file. See `docs/STATEFUL.md`.
+
+  A zones file may also switch on the zone shapes (`"geometry": {"shapes": true}`): `obb`, `cylinder` and
+  `capsule` next to the boxes. See `docs/GEOMETRY.md`.
 
   Requests are limited: a body over 1 MiB is refused, a client silent for 10 s is dropped, and at most
   32 connections are served at once (`503` beyond). Responds `200` with `{"state", "reason", "breaches", "estopRequests",

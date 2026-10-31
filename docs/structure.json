@@ -88,6 +88,29 @@
           }
         },
         {
+          "name": "shapes.py",
+          "desc": {
+            "en": "Oriented boxes, cylinders and capsules",
+            "es": "Cajas orientadas, cilindros y cápsulas",
+            "de": "Orientierte Quader, Zylinder und Kapseln",
+            "fr": "Boîtes orientées, cylindres et capsules",
+            "it": "Scatole orientate, cilindri e capsule",
+            "ja": "有向ボックス・円柱・カプセル",
+            "zh": "有向盒、圆柱和胶囊体",
+            "pt": "Caixas orientadas, cilindros e cápsulas"
+          },
+          "tree_desc": {
+            "en": "Oriented boxes, cylinders and capsules",
+            "es": "Cajas orientadas, cilindros y cápsulas",
+            "de": "Orientierte Quader, Zylinder und Kapseln",
+            "fr": "Boîtes orientées, cylindres et capsules",
+            "it": "Scatole orientate, cilindri e capsule",
+            "ja": "有向ボックス・円柱・カプセル",
+            "zh": "有向盒、圆柱和胶囊体",
+            "pt": "Caixas orientadas, cilindros e cápsulas"
+          }
+        },
+        {
           "name": "breach.py",
           "desc": {
             "en": "Real zone-breach checking",
@@ -246,6 +269,29 @@
             "ja": "シンプルなJSON/HTTPサーフェス(stdlibのhttp.server)。実際の`check`ロジックを橋渡し",
             "zh": "简洁的 JSON/HTTP 接口(基于 stdlib http.server),桥接真实的 `check` 逻辑",
             "pt": "Superfície JSON/HTTP simples (stdlib http.server) sobre a lógica real de `check`"
+          }
+        },
+        {
+          "name": "stateful.py",
+          "desc": {
+            "en": "Heartbeats and pushed state (optional)",
+            "es": "Latidos y estado enviado (opcional)",
+            "de": "Heartbeats und gepushter Zustand (optional)",
+            "fr": "Battements et état poussé (optionnel)",
+            "it": "Heartbeat e stato inviato (opzionale)",
+            "ja": "ハートビートと状態のプッシュ（任意）",
+            "zh": "心跳与推送状态（可选）",
+            "pt": "Batimentos e estado enviado (opcional)"
+          },
+          "tree_desc": {
+            "en": "Heartbeats and pushed state (optional)",
+            "es": "Latidos y estado enviado (opcional)",
+            "de": "Heartbeats und gepushter Zustand (optional)",
+            "fr": "Battements et état poussé (optionnel)",
+            "it": "Heartbeat e stato inviato (opzionale)",
+            "ja": "ハートビートと状態のプッシュ（任意）",
+            "zh": "心跳与推送状态（可选）",
+            "pt": "Batimentos e estado enviado (opcional)"
           }
         },
         {

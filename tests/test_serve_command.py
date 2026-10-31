@@ -119,3 +119,75 @@ def test_serve_with_a_zones_file_holds_the_zones_tags_the_hash_and_needs_the_tok
             process.wait()
         process.stdout.close()
         process.stderr.close()
+
+
+def _start(tmp_path, extra_args: list[str], zones_payload: dict | None = None) -> tuple[subprocess.Popen, int]:
+    zones = _zones_file(tmp_path)
+    if zones_payload is not None:
+        merged = json.loads(zones.read_text(encoding="utf-8"))
+        merged.update(zones_payload)
+        zones.write_text(json.dumps(merged), encoding="utf-8")
+    port = _free_port()
+    environment = dict(os.environ, PYTHONPATH=SRC + os.pathsep + os.environ.get("PYTHONPATH", ""), PYTHONUNBUFFERED="1")
+    process = subprocess.Popen(
+        [sys.executable, "-m", "hydra_umc_safety_zones.main", "serve", "--port", str(port), "--zones-file", str(zones), *extra_args],
+        env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+    )
+    for _ in range(100):
+        try:
+            if _call(f"http://127.0.0.1:{port}/stats")[0] == 200:
+                return process, port
+        except OSError:
+            time.sleep(0.1)
+    process.kill()
+    raise AssertionError("the server did not come up")
+
+
+def _stop(process: subprocess.Popen) -> None:
+    process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+    if process.stdout:
+        process.stdout.close()
+    if process.stderr:
+        process.stderr.close()
+
+
+def test_serve_stateful_flag_turns_the_heartbeat_route_on_and_the_default_leaves_it_off(tmp_path) -> None:
+    now = datetime.now(timezone.utc).isoformat()
+    beat = {"active": True, "observedAt": now, "maxAgeSeconds": 60, "error": None}
+    process, port = _start(tmp_path, [])
+    try:
+        assert _call(f"http://127.0.0.1:{port}/heartbeat", beat)[0] == 404
+    finally:
+        _stop(process)
+    process, port = _start(tmp_path, ["--stateful"])
+    try:
+        base = f"http://127.0.0.1:{port}"
+        assert _call(f"{base}/check", {"detections": {"objects": []}})[1]["state"] == "inhibited"
+        assert _call(f"{base}/heartbeat", beat)[0] == 200
+        assert _call(f"{base}/check", {"detections": {"objects": []}})[1]["state"] == "ready"
+    finally:
+        _stop(process)
+
+
+def test_serve_stateful_can_be_switched_on_and_tuned_in_the_zones_file(tmp_path) -> None:
+    beat = {"active": True, "observedAt": datetime.now(timezone.utc).isoformat(), "maxAgeSeconds": 60, "error": None}
+    process, port = _start(tmp_path, [], {"stateful": {"enabled": True, "heartbeat_ttl_s": 0.5}})
+    try:
+        base = f"http://127.0.0.1:{port}"
+        assert _call(f"{base}/heartbeat", beat) == (200, {"accepted": True, "validForSeconds": 0.5})
+    finally:
+        _stop(process)
+
+
+def test_serve_refuses_to_start_on_invalid_stateful_settings(tmp_path, capsys) -> None:
+    zones = _zones_file(tmp_path)
+    data = json.loads(zones.read_text(encoding="utf-8"))
+    data["stateful"] = {"enabled": True, "heartbeat_ttl_s": -1}
+    zones.write_text(json.dumps(data), encoding="utf-8")
+    assert main(["serve", "--port", str(_free_port()), "--zones-file", str(zones)]) == 2
+    assert "invalid stateful settings" in capsys.readouterr().err

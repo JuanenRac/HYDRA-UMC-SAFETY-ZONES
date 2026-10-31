@@ -20,8 +20,11 @@ from __future__ import annotations
 
 import hmac
 import json
+import queue
 import sys
 import threading
+import time
+from collections.abc import Callable
 from dataclasses import asdict
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -32,6 +35,7 @@ from .config import ConfigError, parse_detections, parse_tool_velocity, parse_zo
 from .estop import NullEStopRequester, request_estop_for
 from .observation import ObservationError, parse_observation_status
 from .safety_state import SafetyEvaluation, SafetyState, evaluate_safety, to_sdk_safety_state
+from .stateful import StatefulMonitor, StatefulSettings, format_event
 from .zones import ZoneSet, scale_zones_for_velocity
 
 # Connections served at the same time. A client that opens many connections
@@ -123,8 +127,42 @@ class Handler(BaseHTTPRequestHandler):
                 _write_json(self, 404, {"error": "no safety verdict has been reached yet"})
             else:
                 _write_json(self, 200, verdict)
+        elif path == "/events" and self.server.monitor is not None:
+            if not self._authorized():
+                self._write_unauthorized()
+                return
+            self._stream_events()
         else:
             _write_error(self, 404, "not found")
+
+    def _stream_events(self) -> None:
+        """Server-Sent Events: the held state first, then every change and every expiry; a comment line when nothing happens."""
+        monitor = self.server.monitor
+        assert monitor is not None
+        subscriber = monitor.subscribe()
+        if subscriber is None:
+            _write_error(self, 503, "too many open streams")
+            return
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.close_connection = True
+            self.wfile.write(format_event(monitor.current_event(self.server.clock())))
+            self.wfile.flush()
+            while not self.server.stopping.is_set():
+                try:
+                    payload = subscriber.events.get(timeout=monitor.settings.keepalive_s)
+                    self.wfile.write(format_event(payload))
+                except queue.Empty:
+                    self.wfile.write(b": keepalive\n\n")
+                self.wfile.flush()
+        except OSError:
+            pass  # the consumer went away
+        finally:
+            monitor.unsubscribe(subscriber)
 
     def _authorized(self) -> bool:
         token = self.server.token
@@ -146,13 +184,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
-        if path == "/check" and not self._authorized():
+        if (path == "/check" or (path == "/heartbeat" and self.server.monitor is not None)) and not self._authorized():
             self._write_unauthorized()
             return
         try:
             body = _read_json_body(self)
         except (json.JSONDecodeError, ValueError) as e:
             _write_error(self, 400, f"malformed JSON body: {e}")
+            return
+        if path == "/heartbeat" and self.server.monitor is not None:
+            self._handle_heartbeat(body)
             return
         if path != "/check":
             _write_error(self, 404, "not found")
@@ -179,7 +220,20 @@ class Handler(BaseHTTPRequestHandler):
             except OSError:
                 pass
 
+    def _handle_heartbeat(self, body: dict) -> None:
+        """The observer's proof of life. An invalid one renews nothing: the previous heartbeat just keeps ageing."""
+        monitor = self.server.monitor
+        assert monitor is not None
+        try:
+            observation = parse_observation_status(body)
+        except (ObservationError, TypeError, ValueError) as e:
+            _write_error(self, 400, f"invalid heartbeat: {e}")
+            return
+        monitor.record_heartbeat(observation, self.server.clock())
+        _write_json(self, 200, {"accepted": True, "validForSeconds": monitor.settings.heartbeat_ttl_s})
+
     def _handle_check(self, body: dict) -> None:
+        monitor = self.server.monitor
         try:
             if self.server.zone_set is not None:
                 # Authoritative mode: the zones and calibration are the
@@ -198,7 +252,13 @@ class Handler(BaseHTTPRequestHandler):
             # but omitting it always resolves to INHIBITED, never a
             # silent READY, via evaluate_safety()'s own fail-safe default.
             observation_raw = body.get("observation")
+            if monitor is not None and observation_raw is not None:
+                # The observer must not vouch for its own freshness: in the stateful mode the evidence is its heartbeats.
+                _write_error(self, 400, "this server is stateful: the observation comes from POST /heartbeat, a request must not send one")
+                return
             observation = parse_observation_status(observation_raw) if observation_raw is not None else None
+            if monitor is not None:
+                observation = monitor.current_observation(self.server.clock())
             # Optional real head/tool velocity (meters/second) - an
             # additional, opt-in envelope-scaling input alongside
             # `observation` above, with the exact same fail-safe shape: a
@@ -219,7 +279,10 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         today = datetime.now(timezone.utc).date()
-        evaluation = evaluate_safety(zone_set, objects, today, observation, tool_velocity_mps=tool_velocity_mps)
+        if monitor is not None and observation is None:
+            evaluation = monitor.missing_heartbeat_evaluation(self.server.clock())
+        else:
+            evaluation = evaluate_safety(zone_set, objects, today, observation, tool_velocity_mps=tool_velocity_mps)
 
         response: dict = {
             "state": evaluation.state.value,
@@ -291,8 +354,18 @@ class SafetyZonesServer(ThreadingHTTPServer):
         max_observation_age_seconds: float | None = None,
         max_calibration_age_days: int | None = None,
         decision_log: str | None = None,
+        stateful: StatefulSettings | None = None,
+        clock: Callable[[], float] | None = None,
     ) -> None:
+        # Set before the socket is bound: a failed bind calls server_close().
+        self.stopping = threading.Event()
         super().__init__(address, Handler)
+        # Seconds on a clock that only moves forward; a test hands in a simulated one.
+        self.clock: Callable[[], float] = clock or time.monotonic
+        self.monitor: StatefulMonitor | None = (
+            StatefulMonitor(stateful, config_sha256) if stateful is not None and stateful.enabled else None
+        )
+        self._watcher: threading.Thread | None = None
         self.role = role
         self.token = token or None
         self.zone_set = zone_set
@@ -305,6 +378,23 @@ class SafetyZonesServer(ThreadingHTTPServer):
         self._decision_lock = threading.Lock()
         self._last_verdict: dict | None = None
         self._verdict_lock = threading.Lock()
+
+    def start_watcher(self, interval_s: float = 0.25) -> None:
+        """Starts the thread that publishes INHIBITED when a verdict or the heartbeat expires (stateful mode only)."""
+        monitor = self.monitor
+        if monitor is None or self._watcher is not None:
+            return
+
+        def run() -> None:
+            while not self.stopping.wait(interval_s):
+                monitor.tick(self.clock())
+
+        self._watcher = threading.Thread(target=run, name="safety-zones-expiry", daemon=True)
+        self._watcher.start()
+
+    def server_close(self) -> None:
+        self.stopping.set()
+        super().server_close()
 
     def last_verdict(self) -> dict | None:
         """The most recent verdict of /check as the SDK SafetyState with the time it was reached, or None before the first one."""
@@ -324,6 +414,8 @@ class SafetyZonesServer(ThreadingHTTPServer):
     def log_decision(self, response: dict) -> None:
         """Remember the verdict for GET /state and, when a destination is set, append one JSON line (state, reason, configuration hash, counts); never raises."""
         self._remember_verdict(response)
+        if self.monitor is not None:
+            self.monitor.record_verdict(response, self.clock())
         if self._decision_log is None:
             return
         line = json.dumps(

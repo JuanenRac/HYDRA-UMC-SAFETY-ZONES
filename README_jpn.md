@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-263%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-718%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.1.6-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | バージョン | `0.1.6` |
 | 成熟度 | 機能する |
-| テスト | 263 (`python -m pytest -q tests`) |
+| テスト | 718 (`python -m pytest -q tests`) |
 | 技術 | Python / 3D vision / Hailo-8 |
 | 対象 | HYDRA-UMC セルの Raspberry Pi CM5 |
 | 実機での確認 | まだです：このバージョンについて実機での動作記録はありません |
@@ -51,7 +51,7 @@ GPL-3.0-or-later - see LICENSE
 | 領域 | 状態 | ここでの意味 |
 |---|---|---|
 | ソフトウェア | 🟡 | 主な目的では動作します。足りない点は上の正直さの確認に書かれています |
-| テスト | 🟢 | 自動テスト 263 件。変更のたびに実行されます |
+| テスト | 🟢 | 自動テスト 718 件。変更のたびに実行されます |
 | 実機 | 🔴 | まだです：このバージョンについて実機での動作記録はありません |
 | ドキュメント | 🟢 | 8 言語の README。変更のたびにマニフェストと照合されます |
 
@@ -208,6 +208,10 @@ CM5 + Hailo-8 は市販のハードウェアであり、独自に設計する基
 
 `GET /state`（`POST /check` と同じトークン）は、最新の判定を、それが出された時刻付きの SDK SafetyState として返します。最初の判定の前は `404` です。ビジュアルサーボのような利用側は、呼び出し側の申告を信じる代わりにこれを読みます。メモリ上にのみ保持されます。
 
+**ゾーンの形状（任意）。** ゾーンファイルに `"geometry": {"shapes": true}` を書くと、ボックスに加えて `obb`（有向ボックス）、`cylinder`（垂直）、`capsule` の形のゾーンを使えます。既定ではオフで、スイッチ無しでこれらを指定したファイルは拒否され、ボックスだけのファイルは従来とまったく同じに動作します。どの形状もゾーンを過大に見積もり、過小にはしません。`"mode": "bounding"` は各形状をそれを含むボックスに置き換えます。いずれも実機のロボットでは試しておらず、ロボットの位置も知らないため、アームのリンク上のカプセルは固定ゾーンです。`docs/GEOMETRY.md` を参照してください。
+
+**ステートフルモード（任意）。** `serve --stateful`（または `SAFETY_ZONES_STATEFUL=1`、ゾーンファイルの `"stateful": {"enabled": true}`）で `POST /heartbeat` が加わり、観測側が生きていることを示します。各ハートビートは、観測側が書いた時刻に関係なくサービス自身の時計で数秒だけ有効で、リクエストは独自の観測を持ち込めなくなります。`GET /events` は状態が変わるたびに Server-Sent Events で状態をプッシュし、判定またはハートビートが期限切れになるとサービス自身が INHIBITED を発行します。利用側は無音を安全でないものとして扱う必要があります。メモリ上のみで動作し、MQTT には何も発行せず、実際の観測側では試していません。既定ではオフで、この 2 つのルートは存在しません。`docs/STATEFUL.md` を参照してください。
+
 ## ⚙️ 設定
 
 HTTP サービスはオプションで設定します。うち 2 つは環境変数からも指定できます。
@@ -234,7 +238,7 @@ Python 3.10 以上が必要です。
 
 ## 🧪 テスト
 
-`python -m pytest -q tests` で自動テスト 263 件を実行します。 ハードウェアも、このマシンの外にあるものも必要ありません。
+`python -m pytest -q tests` で自動テスト 718 件を実行します。 ハードウェアも、このマシンの外にあるものも必要ありません。
 
 CI は `HYDRA_UMC_CI=1 python tools/ci_validate.py` を実行し、マニフェスト、文書、8 つの README、図を検査します。
 
@@ -257,7 +261,7 @@ CI は `HYDRA_UMC_CI=1 python tools/ci_validate.py` を実行し、マニフェ�
 2. **仮想環境** — `.venv/` が存在しない場合は作成し、存在する場合は再利用します。
 3. **Editable インストール（dev エクストラ付き）** — `pip install -e ".[dev]"` により `src/` 下の変更が即座に反映され、`pytest` がインストールされ、`hydra-umc-safety-zones` コンソールエントリポイントが登録されます。
 4. **コンパイルチェック** — `python -m compileall -q src` が `src/` 下の各ファイルをバイトコンパイルし、エコシステム全体にわたる構文エラーを検出します。
-5. **実際のテストスイート** — `pytest tests/` が全 263 件のテストを実行します。
+5. **実際のテストスイート** — `pytest tests/` が全 718 件のテストを実行します。
 
 `set -euo pipefail` は最初に失敗したステップでスクリプトを停止させます。
 ダブルクリックで起動された場合（既に開いているターミナルからではなく）は、
@@ -397,6 +401,7 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── __init__.py               パッケージの説明とバージョン
 │   ├── geometry.py               実際の Point3D/AABB プリミティブ
 │   ├── zones.py                  実際の ZoneLevel/Zone/ZoneSet 定義
+│   ├── shapes.py                 有向ボックス・円柱・カプセル
 │   ├── breach.py                 実際のゾーン越境チェック
 │   ├── calibration.py            実際のキャリブレーション鮮度追跡
 │   ├── observation.py            実際の観測者健全性追跡 —— calibration.py を反映
@@ -404,6 +409,7 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── estop.py                  実際の E-STOP リクエスト（実行は決してしない）
 │   ├── config.py                 ゾーン/検知/観測データの実際の JSON 読み込み
 │   ├── api.py                    シンプルなJSON/HTTPサーフェス(stdlibのhttp.server)。実際の`check`ロジックを橋渡し
+│   ├── stateful.py               ハートビートと状態のプッシュ（任意）
 │   └── main.py                   エントリポイント + 実際の `check` サブコマンド
 ├── tests/                        実際のテスト：幾何、越境、キャリブレーション、観測、safety_state、estop、設定、api、CLI
 ├── docs/                         ドキュメントと安全基準
@@ -434,7 +440,7 @@ HYDRA-UMC-SAFETY-ZONES/
 `INHIBITED` にフェイルする実際のキャリブレーション鮮度強制
 （`calibration.py`/`safety_state.py`）、構造上検知と執行の境界を守る
 実際の E-STOP *リクエスト*パイプライン（`estop.py`）、ゾーン/検知 JSON
-ファイルに対する実際の CLI サブコマンド `check`、そして通過した 263 件の
+ファイルに対する実際の CLI サブコマンド `check`、そして通過した 718 件の
 テスト——完全な実際のビルド/実行出力は
 [`CHANGELOG.md`](CHANGELOG.md) を参照してください。
 
