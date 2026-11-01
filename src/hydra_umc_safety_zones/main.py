@@ -46,7 +46,15 @@ from hydra_umc_safety_zones.can_estop import (
     open_bus,
     state_is_safe,
 )
-from hydra_umc_safety_zones.signing import SigningError, StateSigner, load_key_file
+from hydra_umc_safety_zones.signing import (
+    Ed25519StateSigner,
+    Signer,
+    SigningError,
+    StateSigner,
+    generate_keypair,
+    load_key_file,
+    load_private_key_file,
+)
 from hydra_umc_safety_zones.obstacles import DEFAULT_CELL_M, LEVEL_CHOICES, export_obstacles
 from hydra_umc_safety_zones.fk_input import FkInputError, body_from_fk
 from hydra_umc_safety_zones.safety_state import SafetyState, collect_breaches, evaluate_safety
@@ -232,10 +240,13 @@ def _run_serve(args: argparse.Namespace) -> int:
         except Exception as exc:  # noqa: BLE001
             print(f"[safety-zones] fatal: invalid stateful settings: {type(exc).__name__}: {exc}", file=sys.stderr)
             return 2
-    signer = None
+    signer: Signer | None = None
     if args.state_key_file:
         try:
-            signer = StateSigner(load_key_file(args.state_key_file), args.state_key_id)
+            if args.state_signing_alg == "ed25519":
+                signer = Ed25519StateSigner(load_private_key_file(args.state_key_file), args.state_key_id)
+            else:
+                signer = StateSigner(load_key_file(args.state_key_file), args.state_key_id)
         except SigningError as exc:
             print(f"[safety-zones] fatal: --state-key-file: {exc}", file=sys.stderr)
             return 2
@@ -272,7 +283,7 @@ def _run_serve(args: argparse.Namespace) -> int:
             f"{can_config.heartbeat_period_ms} ms only while the last verdict is READY (not tried on a real bus)"
         )
     if signer is not None:
-        print(f"[safety-zones] every verdict is signed (HMAC-SHA256, key id {signer.key_id})")
+        print(f"[safety-zones] every verdict is signed ({signer.alg}, key id {signer.key_id})")
     print(f"[safety-zones] HTTP API listening on {addr}:{port}")
     print("[safety-zones] POST /check, GET /stats" + (", POST /heartbeat, GET /events" if stateful is not None else ""))
     if stateful is not None:
@@ -395,6 +406,13 @@ def build_parser() -> argparse.ArgumentParser:
              "because a consumer must verify before the service starts signing",
     )
     serve_parser.add_argument(
+        "--state-signing-alg",
+        choices=("hmac", "ed25519"),
+        default=os.environ.get("SAFETY_ZONES_STATE_SIGNING_ALG", "hmac"),
+        help="how verdicts are signed when --state-key-file is given: hmac (a shared key, the default) or ed25519 (--state-key-file is then a PEM private key "
+             "kept outside the repository, and a consumer needs only the public key; needs the cryptography package)",
+    )
+    serve_parser.add_argument(
         "--state-key-id",
         default=os.environ.get("SAFETY_ZONES_STATE_KEY_ID", "default"),
         help="the id of the signing key, carried in the signature (default: default)",
@@ -412,6 +430,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="stateful mode: the observer sends POST /heartbeat, POST /check takes its observation from it and GET /events pushes the state "
              "(the tuning values are in the 'stateful' object of the zones file; off by default)",
     )
+
+    keygen_parser = subparsers.add_parser(
+        "state-keygen",
+        help="Create an Ed25519 key pair for signing verdicts: the private key (owner-only, never printed) and the public key to give to the consumers. Never overwrites a file.",
+    )
+    keygen_parser.add_argument("--private-out", required=True, help="where the private key (PEM) is written; keep it outside every repository")
+    keygen_parser.add_argument("--public-out", required=True, help="where the public key (PEM) is written")
 
     return parser
 
@@ -431,6 +456,14 @@ def main(argv: list[str] | None = None) -> int:
         return _run_check(args.zones, args.detections, args.observation, velocity, args.body)
     if args.command == "serve":
         return _run_serve(args)
+    if args.command == "state-keygen":
+        try:
+            generate_keypair(args.private_out, args.public_out)
+        except SigningError as exc:
+            print(f"[safety-zones] fatal: {exc}", file=sys.stderr)
+            return 2
+        print(f"[safety-zones] Ed25519 key pair written: private key {args.private_out} (owner only), public key {args.public_out}")
+        return 0
     if args.command == "body-from-fk":
         return _run_body_from_fk(args)
     if args.command == "obstacles":

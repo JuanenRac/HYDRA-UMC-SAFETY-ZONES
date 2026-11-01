@@ -15,7 +15,9 @@ dependencies = []
 [project.optional-dependencies]
 # can: the E-STOP request and the safe heartbeat over a CAN bus (--can-estop-config)
 can = ["python-can>=4.0"]
-dev = ["pytest>=8.0"]
+# ed25519: signing the verdicts with an asymmetric key (--state-signing-alg ed25519)
+ed25519 = ["cryptography>=42"]
+dev = ["pytest>=8.0", "cryptography>=42"]
 
 [project.scripts]
 hydra-umc-safety-zones = "hydra_umc_safety_zones.main:main"

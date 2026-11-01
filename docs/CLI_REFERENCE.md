@@ -243,7 +243,7 @@ Two clock tolerances keep a healthy cell from being inhibited by rounding: an ob
 timestamped up to 0.25 s ahead of this machine's clock is not "in the future", and a calibration
 dated one day ahead (a local date written east of UTC) is not expired. Anything further ahead is.
 
-### `serve [--addr ADDR] [--port PORT] [--zones-file PATH] [--token T] [--max-observation-age-seconds S] [--max-calibration-age-days D] [--decision-log FILE] [--stateful] [--state-key-file FILE] [--state-key-id ID] [--can-estop-config FILE]`
+### `serve [--addr ADDR] [--port PORT] [--zones-file PATH] [--token T] [--max-observation-age-seconds S] [--max-calibration-age-days D] [--decision-log FILE] [--stateful] [--state-key-file FILE] [--state-signing-alg hmac|ed25519] [--state-key-id ID] [--can-estop-config FILE]`
 
 ```
 $ hydra-umc-safety-zones serve -h
@@ -313,6 +313,9 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
   verdict: the answer of `POST /check` and `GET /state` carry `sdkSafetyStateSignature` (`alg`, `key_id`, `counter`, `sig`). The key is at least 32 characters
   in a file and is never printed. A consumer verifies with `hydra_umc_safety_zones.signing.verify` / `effective_state`, which read anything unsigned, forged, old or
   replayed as `INHIBITED`. Off by default.
+  `--state-signing-alg ed25519` (or `SAFETY_ZONES_STATE_SIGNING_ALG`; `hmac` is the default) signs with an Ed25519 private key instead: `--state-key-file` is then a PEM
+  private key kept outside every repository and never printed, and the consumers hold only the public key. `hydra-umc-safety-zones state-keygen --private-out FILE --public-out FILE`
+  creates the pair (it never overwrites a file; the private key is created readable by its owner only). Ed25519 needs `pip install cryptography`.
   `--can-estop-config FILE` (or `SAFETY_ZONES_CAN_ESTOP_CONFIG`) turns on the stop request and the safe heartbeat over CAN; see `docs/CAN_ESTOP.md`. Off by default.
   `--stateful` (or `SAFETY_ZONES_STATEFUL=1`, or `"stateful": {"enabled": true}` in the zones file) turns on the
   stateful mode: `POST /heartbeat` (the observer proves it is alive, stamped by the service's own clock),

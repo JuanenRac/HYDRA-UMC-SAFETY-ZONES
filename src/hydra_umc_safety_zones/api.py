@@ -32,7 +32,7 @@ from urllib.parse import urlparse
 
 from .config import ConfigError, parse_detections, parse_robot_body, parse_tool_velocity, parse_zone_set, strict_json_loads
 from .estop import EStopRequester, NullEStopRequester, request_estop_for
-from .signing import StateSigner
+from .signing import Signer
 from .observation import ObservationError, parse_observation_status
 from .robot_body import RobotBody, RobotBodyError
 from .safety_state import SafetyEvaluation, SafetyState, collect_breaches, evaluate_safety, to_sdk_safety_state
@@ -386,7 +386,7 @@ class SafetyZonesServer(ThreadingHTTPServer):
         decision_log: str | None = None,
         stateful: StatefulSettings | None = None,
         clock: Callable[[], float] | None = None,
-        signer: StateSigner | None = None,
+        signer: Signer | None = None,
         estop_requester: EStopRequester | None = None,
     ) -> None:
         # Set before the socket is bound: a failed bind calls server_close().
