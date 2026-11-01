@@ -37,6 +37,16 @@ from hydra_umc_safety_zones.config import (
     strict_json_loads,
 )
 from hydra_umc_safety_zones.estop import NullEStopRequester, request_estop_for
+from hydra_umc_safety_zones.can_estop import (
+    CanConfigError,
+    CanEStopError,
+    CanEStopRequester,
+    HeartbeatSender,
+    load_config as load_can_config,
+    open_bus,
+    state_is_safe,
+)
+from hydra_umc_safety_zones.signing import SigningError, StateSigner, load_key_file
 from hydra_umc_safety_zones.obstacles import DEFAULT_CELL_M, LEVEL_CHOICES, export_obstacles
 from hydra_umc_safety_zones.fk_input import FkInputError, body_from_fk
 from hydra_umc_safety_zones.safety_state import SafetyState, collect_breaches, evaluate_safety
@@ -190,6 +200,17 @@ def _stateful_settings(zones_file: str) -> StatefulSettings:
     )
 
 
+def _start_can(path: str):
+    """Reads the CAN configuration and opens the bus: the requester, the heartbeat sender (not started) and the configuration. None-like when it is not enabled is an error: a file given is a file meant."""
+    config = load_can_config(path)
+    if not config.enabled:
+        raise CanConfigError('the file says "enabled": false')
+    bus = open_bus(config)
+    requester = CanEStopRequester(bus, config)
+    heartbeat = HeartbeatSender(bus, config, lambda: False)
+    return requester, heartbeat, config
+
+
 def _run_serve(args: argparse.Namespace) -> int:
     addr, port = args.addr, args.port
     zone_set = None
@@ -211,6 +232,20 @@ def _run_serve(args: argparse.Namespace) -> int:
         except Exception as exc:  # noqa: BLE001
             print(f"[safety-zones] fatal: invalid stateful settings: {type(exc).__name__}: {exc}", file=sys.stderr)
             return 2
+    signer = None
+    if args.state_key_file:
+        try:
+            signer = StateSigner(load_key_file(args.state_key_file), args.state_key_id)
+        except SigningError as exc:
+            print(f"[safety-zones] fatal: --state-key-file: {exc}", file=sys.stderr)
+            return 2
+    can_runtime = None
+    if args.can_estop_config:
+        try:
+            can_runtime = _start_can(args.can_estop_config)
+        except (CanConfigError, CanEStopError) as exc:
+            print(f"[safety-zones] fatal: --can-estop-config: {exc}", file=sys.stderr)
+            return 2
     try:
         server = SafetyZonesServer(
             (addr, port),
@@ -222,10 +257,22 @@ def _run_serve(args: argparse.Namespace) -> int:
             max_calibration_age_days=args.max_calibration_age_days,
             decision_log=args.decision_log or None,
             stateful=stateful,
+            signer=signer,
+            estop_requester=can_runtime[0] if can_runtime else None,
         )
     except OSError as exc:
         print(f"[safety-zones] fatal: could not start the HTTP API on {addr}:{port}: {exc}", file=sys.stderr)
         return 2
+    if can_runtime is not None:
+        _, heartbeat, can_config = can_runtime
+        heartbeat.is_safe = lambda: state_is_safe(server.last_verdict(), can_config.state_max_age_ms)
+        heartbeat.start()
+        print(
+            f"[safety-zones] CAN: stop requests on id {can_config.estop_id:#x}, safe heartbeat on id {can_config.heartbeat_id:#x} every "
+            f"{can_config.heartbeat_period_ms} ms only while the last verdict is READY (not tried on a real bus)"
+        )
+    if signer is not None:
+        print(f"[safety-zones] every verdict is signed (HMAC-SHA256, key id {signer.key_id})")
     print(f"[safety-zones] HTTP API listening on {addr}:{port}")
     print("[safety-zones] POST /check, GET /stats" + (", POST /heartbeat, GET /events" if stateful is not None else ""))
     if stateful is not None:
@@ -341,6 +388,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="log every verdict of POST /check as one JSON line to this file, or to standard error with '-' (default: off)",
     )
 
+    serve_parser.add_argument(
+        "--state-key-file",
+        default=os.environ.get("SAFETY_ZONES_STATE_KEY_FILE", ""),
+        help="a file with the shared key (at least 32 characters) that signs every verdict (sdkSafetyStateSignature); off by default, "
+             "because a consumer must verify before the service starts signing",
+    )
+    serve_parser.add_argument(
+        "--state-key-id",
+        default=os.environ.get("SAFETY_ZONES_STATE_KEY_ID", "default"),
+        help="the id of the signing key, carried in the signature (default: default)",
+    )
+    serve_parser.add_argument(
+        "--can-estop-config",
+        default=os.environ.get("SAFETY_ZONES_CAN_ESTOP_CONFIG", ""),
+        help="a JSON file (identifiers, channel, heartbeat period) that turns on the E-STOP request and the safe heartbeat over CAN with python-can; "
+             "off by default, a stop is then only recorded",
+    )
     serve_parser.add_argument(
         "--stateful",
         action="store_true",

@@ -31,7 +31,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 from .config import ConfigError, parse_detections, parse_robot_body, parse_tool_velocity, parse_zone_set, strict_json_loads
-from .estop import NullEStopRequester, request_estop_for
+from .estop import EStopRequester, NullEStopRequester, request_estop_for
+from .signing import StateSigner
 from .observation import ObservationError, parse_observation_status
 from .robot_body import RobotBody, RobotBodyError
 from .safety_state import SafetyEvaluation, SafetyState, collect_breaches, evaluate_safety, to_sdk_safety_state
@@ -343,8 +344,13 @@ class Handler(BaseHTTPRequestHandler):
             _write_json(self, 200, response)
             return
 
-        requester = NullEStopRequester()
-        requests = request_estop_for(breaches, requester)
+        # the requester is the CAN one when the service was started with a CAN configuration, and the recording one otherwise
+        requester = self.server.estop_requester or NullEStopRequester()
+        try:
+            requests = request_estop_for(breaches, requester)
+        except Exception as exc:  # noqa: BLE001 - a transport that fails must not hide the verdict: the state stays a stop
+            requests = ()
+            response["estopTransportError"] = f"{type(exc).__name__}: {exc}"
         response["estopRequests"] = [asdict(r) for r in requests]
         self.server.log_decision(response)
         _write_json(self, 200, response)
@@ -380,6 +386,8 @@ class SafetyZonesServer(ThreadingHTTPServer):
         decision_log: str | None = None,
         stateful: StatefulSettings | None = None,
         clock: Callable[[], float] | None = None,
+        signer: StateSigner | None = None,
+        estop_requester: EStopRequester | None = None,
     ) -> None:
         # Set before the socket is bound: a failed bind calls server_close().
         self.stopping = threading.Event()
@@ -402,6 +410,9 @@ class SafetyZonesServer(ThreadingHTTPServer):
         self._decision_lock = threading.Lock()
         self._last_verdict: dict | None = None
         self._verdict_lock = threading.Lock()
+        # Off unless a key was given: then every verdict carries a signature (see signing.py).
+        self.signer = signer
+        self.estop_requester = estop_requester
 
     def start_watcher(self, interval_s: float = 0.25) -> None:
         """Starts the thread that publishes INHIBITED when a verdict or the heartbeat expires (stateful mode only)."""
@@ -425,11 +436,23 @@ class SafetyZonesServer(ThreadingHTTPServer):
         with self._verdict_lock:
             return None if self._last_verdict is None else dict(self._last_verdict)
 
+    def _sign(self, response: dict) -> None:
+        """Adds `sdkSafetyStateSignature` to a verdict when the service signs; a signing that fails leaves the verdict unsigned, which a consumer reads as INHIBITED."""
+        sdk = response.get("sdkSafetyState")
+        if self.signer is None or not isinstance(sdk, dict):
+            return
+        try:
+            response["sdkSafetyStateSignature"] = self.signer.sign(sdk)
+        except Exception:  # noqa: BLE001
+            response.pop("sdkSafetyStateSignature", None)
+
     def _remember_verdict(self, response: dict) -> None:
         sdk = response.get("sdkSafetyState")
         if not isinstance(sdk, dict):
             return
         record = {"sdkSafetyState": dict(sdk), "reason": response.get("reason")}
+        if isinstance(response.get("sdkSafetyStateSignature"), dict):
+            record["sdkSafetyStateSignature"] = dict(response["sdkSafetyStateSignature"])
         if response.get("configSha256"):
             record["configSha256"] = response["configSha256"]
         with self._verdict_lock:
@@ -437,6 +460,7 @@ class SafetyZonesServer(ThreadingHTTPServer):
 
     def log_decision(self, response: dict) -> None:
         """Remember the verdict for GET /state and, when a destination is set, append one JSON line (state, reason, configuration hash, counts); never raises."""
+        self._sign(response)
         self._remember_verdict(response)
         if self.monitor is not None:
             self.monitor.record_verdict(response, self.clock())

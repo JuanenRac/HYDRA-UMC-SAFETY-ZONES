@@ -243,7 +243,7 @@ Two clock tolerances keep a healthy cell from being inhibited by rounding: an ob
 timestamped up to 0.25 s ahead of this machine's clock is not "in the future", and a calibration
 dated one day ahead (a local date written east of UTC) is not expired. Anything further ahead is.
 
-### `serve [--addr ADDR] [--port PORT] [--zones-file PATH] [--token T] [--max-observation-age-seconds S] [--max-calibration-age-days D] [--decision-log FILE] [--stateful]`
+### `serve [--addr ADDR] [--port PORT] [--zones-file PATH] [--token T] [--max-observation-age-seconds S] [--max-calibration-age-days D] [--decision-log FILE] [--stateful] [--state-key-file FILE] [--state-key-id ID] [--can-estop-config FILE]`
 
 ```
 $ hydra-umc-safety-zones serve -h
@@ -309,6 +309,11 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
   verdict: `at`, `state`, `sdkSafetyState`, `reason`, `configSha256`, `breaches`, `estopRequests`. It is off
   unless given, and a log that cannot be written never changes the verdict.
 
+  `--state-key-file FILE` (or `SAFETY_ZONES_STATE_KEY_FILE`; `--state-key-id` / `SAFETY_ZONES_STATE_KEY_ID`, default `default`) signs every
+  verdict: the answer of `POST /check` and `GET /state` carry `sdkSafetyStateSignature` (`alg`, `key_id`, `counter`, `sig`). The key is at least 32 characters
+  in a file and is never printed. A consumer verifies with `hydra_umc_safety_zones.signing.verify` / `effective_state`, which read anything unsigned, forged, old or
+  replayed as `INHIBITED`. Off by default.
+  `--can-estop-config FILE` (or `SAFETY_ZONES_CAN_ESTOP_CONFIG`) turns on the stop request and the safe heartbeat over CAN; see `docs/CAN_ESTOP.md`. Off by default.
   `--stateful` (or `SAFETY_ZONES_STATEFUL=1`, or `"stateful": {"enabled": true}` in the zones file) turns on the
   stateful mode: `POST /heartbeat` (the observer proves it is alive, stamped by the service's own clock),
   `POST /check` reading its observation from the last heartbeat (a request that sends `observation` is refused

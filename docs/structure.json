@@ -341,6 +341,52 @@
           }
         },
         {
+          "name": "signing.py",
+          "desc": {
+            "en": "HMAC signature of the safety state (optional)",
+            "es": "Firma HMAC del estado de seguridad (opcional)",
+            "de": "HMAC-Signatur des Sicherheitszustands (optional)",
+            "fr": "Signature HMAC de l'état de sécurité (optionnel)",
+            "it": "Firma HMAC dello stato di sicurezza (opzionale)",
+            "ja": "安全状態の HMAC 署名（任意）",
+            "zh": "安全状态的 HMAC 签名（可选）",
+            "pt": "Assinatura HMAC do estado de segurança (opcional)"
+          },
+          "tree_desc": {
+            "en": "HMAC signature of the safety state (optional)",
+            "es": "Firma HMAC del estado de seguridad (opcional)",
+            "de": "HMAC-Signatur des Sicherheitszustands (optional)",
+            "fr": "Signature HMAC de l'état de sécurité (optionnel)",
+            "it": "Firma HMAC dello stato di sicurezza (opzionale)",
+            "ja": "安全状態の HMAC 署名（任意）",
+            "zh": "安全状态的 HMAC 签名（可选）",
+            "pt": "Assinatura HMAC do estado de segurança (opcional)"
+          }
+        },
+        {
+          "name": "can_estop.py",
+          "desc": {
+            "en": "E-STOP request and safe heartbeat over CAN (optional)",
+            "es": "Petición de paro y latido seguro por CAN (opcional)",
+            "de": "Not-Halt-Anforderung und sicherer Heartbeat über CAN (optional)",
+            "fr": "Demande d'arrêt et battement sûr par CAN (optionnel)",
+            "it": "Richiesta di arresto e heartbeat sicuro via CAN (opzionale)",
+            "ja": "CAN による非常停止要求とセーフハートビート（任意）",
+            "zh": "通过 CAN 的急停请求与安全心跳（可选）",
+            "pt": "Pedido de paragem e batimento seguro por CAN (opcional)"
+          },
+          "tree_desc": {
+            "en": "E-STOP request and safe heartbeat over CAN (optional)",
+            "es": "Petición de paro y latido seguro por CAN (opcional)",
+            "de": "Not-Halt-Anforderung und sicherer Heartbeat über CAN (optional)",
+            "fr": "Demande d'arrêt et battement sûr par CAN (optionnel)",
+            "it": "Richiesta di arresto e heartbeat sicuro via CAN (opzionale)",
+            "ja": "CAN による非常停止要求とセーフハートビート（任意）",
+            "zh": "通过 CAN 的急停请求与安全心跳（可选）",
+            "pt": "Pedido de paragem e batimento seguro por CAN (opcional)"
+          }
+        },
+        {
           "name": "main.py",
           "desc": {
             "en": "Entry point + real `check` subcommand",

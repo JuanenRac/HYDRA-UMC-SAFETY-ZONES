@@ -13,6 +13,8 @@ authors = [{ name = "JuanenRac", email = "electrohobby3d@gmail.com" }]
 dependencies = []
 
 [project.optional-dependencies]
+# can: the E-STOP request and the safe heartbeat over a CAN bus (--can-estop-config)
+can = ["python-can>=4.0"]
 dev = ["pytest>=8.0"]
 
 [project.scripts]
