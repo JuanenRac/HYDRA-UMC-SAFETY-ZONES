@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
+from .service_metrics import MetricsHandlerMixin
 from .config import ConfigError, parse_detections, parse_robot_body, parse_tool_velocity, parse_zone_set, strict_json_loads
 from .estop import EStopRequester, NullEStopRequester, request_estop_for
 from .signing import Signer
@@ -103,8 +104,9 @@ def _read_json_body(handler: BaseHTTPRequestHandler) -> dict:
     return body
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
     server: "SafetyZonesServer"
+    metrics_service = "hydra-umc-safety-zones"
 
     # Seconds a client may stay silent on its connection before the server
     # drops it: without it a client that announces a body and sends nothing
@@ -115,6 +117,8 @@ class Handler(BaseHTTPRequestHandler):
         pass  # quiet by default, same reasoning as this family's other api.py files
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.serve_metrics(authorized=self._authorized()):
+            return
         path = urlparse(self.path).path
         if path == "/stats":
             _write_json(self, 200, {"role": self.server.role})

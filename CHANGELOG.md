@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **`GET /metrics` in the text format of Prometheus:** the version, the uptime, the responses by class of status (2xx to 5xx) and the health, the aggregate of the checks of the service; only numbers about the service, never a path, an address, a token or a body. Behind the bearer token when the service has one. The code is the canonical `service_metrics.py` of HYDRA-UMC-SDK, copied byte for byte. 4 tests against a real server.
+
 ## [0.1.9] - Signed verdicts with HMAC or Ed25519 as options and the E-STOP request with a safe heartbeat over CAN, both off by default
 
 - **Ed25519 as an option for the signed verdicts (HMAC stays the default):** `serve --state-signing-alg ed25519 --state-key-file KEY.pem` signs with an Ed25519 private key that is kept outside the repository and never printed; the signature is `{"alg": "Ed25519", "key_id", "counter", "sig"}` over the same message. `state-keygen --private-out FILE --public-out FILE` creates the pair (it never overwrites a file; the private key is owner-only). A consumer holds only the public key; `signing.verify` and `effective_state` take `expected_alg`, `public_key` and `allow_repeat` (a consumer that polls the last verdict reads the same one again, and only an older counter is a replay), so a verdict signed with the other algorithm, with none, altered, old or replayed is `INHIBITED`. Needs the `cryptography` package (`pip install cryptography`).
