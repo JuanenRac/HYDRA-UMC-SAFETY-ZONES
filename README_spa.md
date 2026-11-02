@@ -171,6 +171,8 @@ CM5 + Hailo-8 es hardware ya existente sin placa propia que diseñar, así que -
 
 **Cuerpo del robot (opcional).** Con `"geometry": {"robot_body": true}` en el fichero de zonas, `POST /check` (y `check --body FICHERO`) acepta un `robotBody`: los dos extremos de cada segmento del robot, tal como los colocó la cinemática directa, y un radio que la instalación declara para cada segmento (no hay valor por defecto). El servicio construye las cápsulas en el sistema de referencia de las zonas y las compara con las zonas, con los mismos márgenes de velocidad y de separación que un objeto detectado, sobreestimando siempre: cada segmento se trocea en esferas que lo contienen y un arnés con semilla fija comprueba que una zona alrededor de cualquier punto de la cápsula es una invasión. Está apagado por defecto: entonces una petición que trae un cuerpo se rechaza con `400` e INHIBITED (nunca se ignora), un cuerpo mal formado rechaza toda la petición y `required` hace que una petición sin cuerpo sea INHIBITED. `body-from-fk` convierte la salida de `hydra-umc-physics-replica fk --json` y un fichero que nombra los segmentos en el cuerpo; este servicio nunca ejecuta ese programa. Nada de esto se ha probado con un robot real y no es una función de seguridad certificada. Véase `docs/ROBOT_BODY.md`.
 
+**Alarma de A.R.M.O.R. (opcional).** `"armorAlarm": {"enabled": true}` en el fichero de zonas hace que el servicio lea `armor/alarm/<node_id>/state` de un broker MQTT (`pip install "hydra-umc-safety-zones[mqtt]"`) y convierta cada mensaje en un SafetyState del SDK con una tabla que fijas tú. Una alarma sonando, un panel que ha dejado de hablar y un mensaje corrupto **inhiben los arranques nuevos** (el veredicto es INHIBITED, se muestra en `armorAlarm` y en `GET /armor-alarm`) y nunca paran una máquina en marcha, ni siquiera el latido seguro; la inhibición solo se levanta cuando el panel dice que no hay alarma y pasa un tiempo configurable. SAFE_STOP solo es posible con `safeStop` activado, y viene apagado. Los mensajes del panel no van firmados, así que el broker debe ser el interno. Apagado por defecto; no se ha probado con una alarma real. Véase `docs/ARMOR_ALARM.md`.
+
 ## ⚙️ Configuración
 
 El servicio HTTP se configura con opciones; dos de ellas pueden venir también del entorno.
@@ -352,6 +354,8 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── config.py                 Carga real de JSON para zonas/detecciones/observación
 │   ├── api.py                    Superficie JSON/HTTP plana (http.server de stdlib) sobre la lógica real de `check`
 │   ├── stateful.py               Latidos y estado enviado (opcional)
+│   ├── armor_alarm.py            La alarma de A.R.M.O.R. inhibe arranques (opcional)
+│   ├── armor_alarm_mqtt.py       Enlace MQTT que alimenta la lectura de la alarma (opcional)
 │   ├── signing.py                Firma HMAC del estado de seguridad (opcional)
 │   ├── can_estop.py              Petición de paro y latido seguro por CAN (opcional)
 │   └── main.py                   Entry point + subcomando real `check`

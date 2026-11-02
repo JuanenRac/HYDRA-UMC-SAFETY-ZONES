@@ -59,6 +59,8 @@ from hydra_umc_safety_zones.obstacles import DEFAULT_CELL_M, LEVEL_CHOICES, expo
 from hydra_umc_safety_zones.fk_input import FkInputError, body_from_fk
 from hydra_umc_safety_zones.safety_state import SafetyState, collect_breaches, evaluate_safety
 from hydra_umc_safety_zones.stateful import StatefulSettings, parse_stateful_settings
+from hydra_umc_safety_zones.armor_alarm import ArmorAlarmConfigError, ArmorAlarmGate, parse_settings as parse_armor_alarm_settings
+from hydra_umc_safety_zones.armor_alarm_mqtt import ArmorAlarmSubscriber
 
 PROJECT_NAME = "HYDRA-UMC-SAFETY-ZONES"
 DIST_NAME = "hydra-umc-safety-zones"
@@ -208,6 +210,34 @@ def _stateful_settings(zones_file: str) -> StatefulSettings:
     )
 
 
+def _armor_audit_writer(destination: str):
+    """The audit sink of the reading of the ARMOR alarm: one JSON line per record to a file, or to standard error with '-'; None keeps them in memory only."""
+    if not destination:
+        return None
+
+    def write(record: dict) -> None:
+        line = json.dumps(record, sort_keys=True)
+        if destination == "-":
+            print(line, file=sys.stderr, flush=True)
+        else:
+            with open(destination, "a", encoding="utf-8") as handle:
+                handle.write(line + "\n")
+
+    return write
+
+
+def _start_armor_alarm(zones_file: str) -> tuple[ArmorAlarmGate, ArmorAlarmSubscriber] | None:
+    """The gate and the (not yet started) subscriber when the zones file switches ``armorAlarm.enabled`` on; None when it is off or absent."""
+    if not zones_file:
+        return None
+    raw = json.loads(Path(zones_file).read_text(encoding="utf-8"))
+    settings = parse_armor_alarm_settings(raw.get("armorAlarm") if isinstance(raw, dict) else None)
+    if not settings.enabled:
+        return None
+    gate = ArmorAlarmGate(settings, _armor_audit_writer(settings.audit_log))
+    return gate, ArmorAlarmSubscriber(gate)
+
+
 def _start_can(path: str):
     """Reads the CAN configuration and opens the bus: the requester, the heartbeat sender (not started) and the configuration. None-like when it is not enabled is an error: a file given is a file meant."""
     config = load_can_config(path)
@@ -250,6 +280,12 @@ def _run_serve(args: argparse.Namespace) -> int:
         except SigningError as exc:
             print(f"[safety-zones] fatal: --state-key-file: {exc}", file=sys.stderr)
             return 2
+    armor_runtime = None
+    try:
+        armor_runtime = _start_armor_alarm(args.zones_file)
+    except (ArmorAlarmConfigError, OSError, ValueError) as exc:
+        print(f"[safety-zones] fatal: invalid armorAlarm settings: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
     can_runtime = None
     if args.can_estop_config:
         try:
@@ -270,6 +306,7 @@ def _run_serve(args: argparse.Namespace) -> int:
             stateful=stateful,
             signer=signer,
             estop_requester=can_runtime[0] if can_runtime else None,
+            armor_gate=armor_runtime[0] if armor_runtime else None,
         )
     except OSError as exc:
         print(f"[safety-zones] fatal: could not start the HTTP API on {addr}:{port}: {exc}", file=sys.stderr)
@@ -281,6 +318,20 @@ def _run_serve(args: argparse.Namespace) -> int:
         print(
             f"[safety-zones] CAN: stop requests on id {can_config.estop_id:#x}, safe heartbeat on id {can_config.heartbeat_id:#x} every "
             f"{can_config.heartbeat_period_ms} ms only while the last verdict is READY (not tried on a real bus)"
+        )
+    if armor_runtime is not None:
+        gate, subscriber = armor_runtime
+        try:
+            subscriber.start()
+        except (ArmorAlarmConfigError, OSError) as exc:
+            print(f"[safety-zones] fatal: the reading of the ARMOR alarm could not start: {exc}", file=sys.stderr)
+            server.server_close()
+            return 2
+        broker = gate.settings.broker
+        print(
+            f"[safety-zones] ARMOR alarm: reading {gate.settings.topic} from {broker.host}:{broker.port}; a sounding alarm INHIBITS new starts and never stops a machine"
+            + (" except by the safe stop that the installation switched on" if gate.settings.safe_stop else "")
+            + " (not tried with a real alarm)"
         )
     if signer is not None:
         print(f"[safety-zones] every verdict is signed ({signer.alg}, key id {signer.key_id})")
@@ -305,6 +356,8 @@ def _run_serve(args: argparse.Namespace) -> int:
     except KeyboardInterrupt:
         pass
     finally:
+        if armor_runtime is not None:
+            armor_runtime[1].stop()
         server.server_close()
         print("[safety-zones] shutting down")
     return 0

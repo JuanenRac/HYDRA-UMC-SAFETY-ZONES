@@ -17,6 +17,8 @@ dependencies = []
 can = ["python-can>=4.0"]
 # ed25519: signing the verdicts with an asymmetric key (--state-signing-alg ed25519)
 ed25519 = ["cryptography>=42"]
+# mqtt: the reading of the alarm of A.R.M.O.R. (armorAlarm.enabled in the zones file)
+mqtt = ["paho-mqtt>=2.0"]
 dev = ["pytest>=8.0", "cryptography>=42"]
 
 [project.scripts]

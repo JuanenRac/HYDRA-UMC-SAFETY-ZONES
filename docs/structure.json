@@ -341,6 +341,52 @@
           }
         },
         {
+          "name": "armor_alarm.py",
+          "desc": {
+            "en": "House alarm of A.R.M.O.R. inhibits starts (optional)",
+            "es": "La alarma de A.R.M.O.R. inhibe arranques (opcional)",
+            "de": "Alarm von A.R.M.O.R. sperrt Starts (optional)",
+            "fr": "L'alarme d'A.R.M.O.R. inhibe les démarrages (optionnel)",
+            "it": "L'allarme di A.R.M.O.R. inibisce gli avvii (opzionale)",
+            "ja": "A.R.M.O.R.の警報で開始を禁止（任意）",
+            "zh": "A.R.M.O.R.警报禁止启动（可选）",
+            "pt": "O alarme do A.R.M.O.R. inibe os arranques (opcional)"
+          },
+          "tree_desc": {
+            "en": "House alarm of A.R.M.O.R. inhibits starts (optional)",
+            "es": "La alarma de A.R.M.O.R. inhibe arranques (opcional)",
+            "de": "Alarm von A.R.M.O.R. sperrt Starts (optional)",
+            "fr": "L'alarme d'A.R.M.O.R. inhibe les démarrages (optionnel)",
+            "it": "L'allarme di A.R.M.O.R. inibisce gli avvii (opzionale)",
+            "ja": "A.R.M.O.R.の警報で開始を禁止（任意）",
+            "zh": "A.R.M.O.R.警报禁止启动（可选）",
+            "pt": "O alarme do A.R.M.O.R. inibe os arranques (opcional)"
+          }
+        },
+        {
+          "name": "armor_alarm_mqtt.py",
+          "desc": {
+            "en": "MQTT link that feeds the alarm reading (optional)",
+            "es": "Enlace MQTT que alimenta la lectura de la alarma (opcional)",
+            "de": "MQTT-Anbindung für das Lesen des Alarms (optional)",
+            "fr": "Liaison MQTT qui alimente la lecture de l'alarme (optionnel)",
+            "it": "Collegamento MQTT che alimenta la lettura dell'allarme (opzionale)",
+            "ja": "警報の読み取りに使うMQTT接続（任意）",
+            "zh": "为警报读取提供数据的MQTT链路（可选）",
+            "pt": "Ligação MQTT que alimenta a leitura do alarme (opcional)"
+          },
+          "tree_desc": {
+            "en": "MQTT link that feeds the alarm reading (optional)",
+            "es": "Enlace MQTT que alimenta la lectura de la alarma (opcional)",
+            "de": "MQTT-Anbindung für das Lesen des Alarms (optional)",
+            "fr": "Liaison MQTT qui alimente la lecture de l'alarme (optionnel)",
+            "it": "Collegamento MQTT che alimenta la lettura dell'allarme (opzionale)",
+            "ja": "警報の読み取りに使うMQTT接続（任意）",
+            "zh": "为警报读取提供数据的MQTT链路（可选）",
+            "pt": "Ligação MQTT que alimenta a leitura do alarme (opcional)"
+          }
+        },
+        {
           "name": "signing.py",
           "desc": {
             "en": "HMAC signature of the safety state (optional)",

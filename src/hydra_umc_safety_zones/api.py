@@ -32,6 +32,7 @@ from urllib.parse import urlparse
 
 from .service_metrics import MetricsHandlerMixin
 from .config import ConfigError, parse_detections, parse_robot_body, parse_tool_velocity, parse_zone_set, strict_json_loads
+from .armor_alarm import ArmorAlarmGate, combine
 from .estop import EStopRequester, NullEStopRequester, request_estop_for
 from .signing import Signer
 from .observation import ObservationError, parse_observation_status
@@ -132,6 +133,14 @@ class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
                 _write_json(self, 404, {"error": "no safety verdict has been reached yet"})
             else:
                 _write_json(self, 200, verdict)
+        elif path == "/armor-alarm" and self.server.armor_gate is not None:
+            if not self._authorized():
+                self._write_unauthorized()
+                return
+            gate = self.server.armor_gate
+            payload = gate.status(self.server.clock()).as_dict()
+            payload["audit"] = list(gate.audit_records[-50:])
+            _write_json(self, 200, payload)
         elif path == "/events" and self.server.monitor is not None:
             if not self._authorized():
                 self._write_unauthorized()
@@ -311,6 +320,22 @@ class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
         else:
             evaluation = evaluate_safety(zone_set, objects, today, observation, tool_velocity_mps=tool_velocity_mps, body=robot_body)
 
+        # The alarm of A.R.M.O.R. (off unless armorAlarm.enabled): a sounding alarm, a silent panel or a corrupt message INHIBITS a verdict that would be READY;
+        # it never turns a running machine off, except when the installation switched the safe stop on.
+        armor = None
+        armor_only = False
+        armor_stop = False
+        if self.server.armor_gate is not None:
+            armor = self.server.armor_gate.status(self.server.clock())
+            before = evaluation.state
+            new_state, new_reason = combine(before.value, evaluation.reason, armor)
+            if new_state != before.value:
+                evaluation = SafetyEvaluation(SafetyState(new_state), new_reason, evaluation.fault)
+                armor_only = before is SafetyState.READY and evaluation.state is SafetyState.INHIBITED
+                armor_stop = evaluation.state is SafetyState.DANGER and before is not SafetyState.DANGER
+            elif armor.inhibits and before is SafetyState.WARNING:
+                evaluation = SafetyEvaluation(before, f"{evaluation.reason}; {armor.reason}", evaluation.fault)
+
         response: dict = {
             "state": evaluation.state.value,
             "reason": evaluation.reason,
@@ -325,13 +350,17 @@ class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
             # header comment for why both must keep existing side by side).
             "sdkSafetyState": to_sdk_safety_state(evaluation),
         }
+        if armor is not None:
+            response["armorAlarm"] = armor.as_dict()
+            if armor_only:
+                response["armorInhibitOnly"] = True
         if robot_body is not None:
             response["robotBody"] = {"segments": len(robot_body.segments)}
         if self.server.config_sha256:
             # which configuration this verdict was reached with
             response["configSha256"] = self.server.config_sha256
 
-        if evaluation.state in (SafetyState.INHIBITED, SafetyState.READY):
+        if armor_stop or evaluation.state in (SafetyState.INHIBITED, SafetyState.READY):
             self.server.log_decision(response)
             _write_json(self, 200, response)
             return
@@ -392,6 +421,7 @@ class SafetyZonesServer(ThreadingHTTPServer):
         clock: Callable[[], float] | None = None,
         signer: Signer | None = None,
         estop_requester: EStopRequester | None = None,
+        armor_gate: ArmorAlarmGate | None = None,
     ) -> None:
         # Set before the socket is bound: a failed bind calls server_close().
         self.stopping = threading.Event()
@@ -417,6 +447,8 @@ class SafetyZonesServer(ThreadingHTTPServer):
         # Off unless a key was given: then every verdict carries a signature (see signing.py).
         self.signer = signer
         self.estop_requester = estop_requester
+        # Off unless the zones file switches armorAlarm.enabled on (see armor_alarm.py).
+        self.armor_gate = armor_gate
 
     def start_watcher(self, interval_s: float = 0.25) -> None:
         """Starts the thread that publishes INHIBITED when a verdict or the heartbeat expires (stateful mode only)."""
@@ -457,6 +489,9 @@ class SafetyZonesServer(ThreadingHTTPServer):
         record = {"sdkSafetyState": dict(sdk), "reason": response.get("reason")}
         if isinstance(response.get("sdkSafetyStateSignature"), dict):
             record["sdkSafetyStateSignature"] = dict(response["sdkSafetyStateSignature"])
+        if response.get("armorInhibitOnly") is True:
+            # the only cause of the INHIBITED is the house alarm: it must not silence the safe heartbeat of a machine that is running
+            record["armorInhibitOnly"] = True
         if response.get("configSha256"):
             record["configSha256"] = response["configSha256"]
         with self._verdict_lock:

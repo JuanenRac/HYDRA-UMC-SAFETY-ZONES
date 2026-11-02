@@ -171,6 +171,8 @@ CM5 + Hailo-8 is off-the-shelf hardware with no board of its own to design, so -
 
 **Robot body (optional).** With `"geometry": {"robot_body": true}` in the zones file, `POST /check` (and `check --body FILE`) accepts a `robotBody`: the two ends of each segment of the robot, as forward kinematics placed them, and a radius that the installation declares for each segment (there is no default). The service builds the capsules in the frame of the zones and compares them with the zones, with the same velocity and separation margins as a detected object, always over-estimating: each segment is cut into spheres that contain it, and a harness with a fixed seed checks that a zone around any point of the capsule is a breach. It is off by default: a request that carries a body is then refused with `400` and INHIBITED (never ignored), a malformed body refuses the whole request, and `required` makes a request without a body INHIBITED. `body-from-fk` turns the output of `hydra-umc-physics-replica fk --json` plus a file that names the segments into the body; this service never runs that program. Nothing here has been tried with a real robot and it is not a certified safety function. See `docs/ROBOT_BODY.md`.
 
+**Alarm of A.R.M.O.R. (optional).** `"armorAlarm": {"enabled": true}` in the zones file makes the service read `armor/alarm/<node_id>/state` from an MQTT broker (`pip install "hydra-umc-safety-zones[mqtt]"`) and turn each message into an SDK SafetyState with a table you set. A sounding alarm, a panel that has gone silent and a corrupt message **inhibit new starts** (the verdict is INHIBITED, shown in `armorAlarm` and on `GET /armor-alarm`) and never stop a machine that is running, not even the safe heartbeat; the inhibition is lifted only when the panel says there is no alarm and a configurable time goes by. SAFE_STOP is possible only with `safeStop` switched on, and it is off by default. The messages of the panel are not signed, so the broker must be the internal one. Off by default; not tried with a real alarm. See `docs/ARMOR_ALARM.md`.
+
 ## ⚙️ Configuration
 
 The HTTP service is configured with flags; two of them can also come from the environment.
@@ -354,6 +356,8 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── config.py                 Real JSON loading for zones/detections/observation
 │   ├── api.py                    Plain JSON/HTTP surface (stdlib http.server) over the real `check` logic
 │   ├── stateful.py               Heartbeats and pushed state (optional)
+│   ├── armor_alarm.py            House alarm of A.R.M.O.R. inhibits starts (optional)
+│   ├── armor_alarm_mqtt.py       MQTT link that feeds the alarm reading (optional)
 │   ├── signing.py                HMAC signature of the safety state (optional)
 │   ├── can_estop.py              E-STOP request and safe heartbeat over CAN (optional)
 │   └── main.py                   Entry point + real `check` subcommand

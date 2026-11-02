@@ -171,6 +171,8 @@ CM5 + Hailo-8 ist handelsübliche Hardware ohne eigenes zu entwerfendes Board, d
 
 **Roboterkörper (optional).** Mit `"geometry": {"robot_body": true}` in der Zonendatei akzeptiert `POST /check` (und `check --body DATEI`) einen `robotBody`: die beiden Enden jedes Roboter-Segments, so wie die Vorwärtskinematik sie gesetzt hat, und einen Radius, den die Anlage für jedes Segment festlegt (es gibt keinen Standardwert). Der Dienst baut die Kapseln im Bezugssystem der Zonen und vergleicht sie mit den Zonen, mit denselben Geschwindigkeits- und Trennabstandsmargen wie ein erkanntes Objekt und immer überschätzend: Jedes Segment wird in Kugeln zerlegt, die es enthalten, und ein Prüfstand mit festem Startwert stellt sicher, dass eine Zone um einen beliebigen Punkt der Kapsel eine Verletzung ist. Standardmäßig ist die Funktion aus: Eine Anfrage mit Körper wird dann mit `400` und INHIBITED abgelehnt (nie ignoriert), ein fehlerhafter Körper lehnt die ganze Anfrage ab, und `required` macht eine Anfrage ohne Körper zu INHIBITED. `body-from-fk` macht aus der Ausgabe von `hydra-umc-physics-replica fk --json` und einer Datei, die die Segmente benennt, den Körper; dieser Dienst führt jenes Programm nie aus. Nichts davon wurde mit einem echten Roboter erprobt, und es ist keine zertifizierte Sicherheitsfunktion. Siehe `docs/ROBOT_BODY.md`.
 
+**Alarm von A.R.M.O.R. (optional).** `"armorAlarm": {"enabled": true}` in der Zonendatei lässt den Dienst `armor/alarm/<node_id>/state` von einem MQTT-Broker lesen (`pip install "hydra-umc-safety-zones[mqtt]"`) und jede Nachricht mit einer frei einstellbaren Tabelle in einen SDK-SafetyState umwandeln. Ein ertönender Alarm, eine verstummte Zentrale und eine beschädigte Nachricht **sperren neue Starts** (das Urteil ist INHIBITED, sichtbar in `armorAlarm` und auf `GET /armor-alarm`) und halten nie eine laufende Maschine an, auch nicht den sicheren Heartbeat; die Sperre wird erst aufgehoben, wenn die Zentrale „kein Alarm“ meldet und eine einstellbare Zeit vergeht. SAFE_STOP ist nur mit eingeschaltetem `safeStop` möglich und standardmäßig aus. Die Nachrichten der Zentrale sind nicht signiert, daher muss der Broker der interne sein. Standardmäßig aus; mit keinem echten Alarm erprobt. Siehe `docs/ARMOR_ALARM.md`.
+
 ## ⚙️ Konfiguration
 
 Der HTTP-Dienst wird mit Optionen konfiguriert; zwei davon können auch aus der Umgebung kommen.
@@ -352,6 +354,8 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── config.py                 Echtes JSON-Laden für Zonen/Erkennungen/Beobachtung
 │   ├── api.py                    Einfache JSON/HTTP-Oberfläche (stdlib http.server) über die echte `check`-Logik
 │   ├── stateful.py               Heartbeats und gepushter Zustand (optional)
+│   ├── armor_alarm.py            Alarm von A.R.M.O.R. sperrt Starts (optional)
+│   ├── armor_alarm_mqtt.py       MQTT-Anbindung für das Lesen des Alarms (optional)
 │   ├── signing.py                HMAC-Signatur des Sicherheitszustands (optional)
 │   ├── can_estop.py              Not-Halt-Anforderung und sicherer Heartbeat über CAN (optional)
 │   └── main.py                   Einstiegspunkt + echter `check`-Subbefehl

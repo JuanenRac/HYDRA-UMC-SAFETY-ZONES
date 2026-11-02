@@ -206,6 +206,8 @@ Node 系列的其他项目一样——这里不存在 `hardware/`/`firmware/` �
 
 **机器人本体（可选）。** 在区域文件中写入 `"geometry": {"robot_body": true}` 后，`POST /check`（以及 `check --body 文件`）接受 `robotBody`：由正运动学确定的机器人每个线段的两个端点，以及安装方为每个线段声明的半径（没有默认值）。服务在区域的坐标系中构建胶囊体，并以与检测物体相同的速度裕量和分离裕量与区域比较，始终偏保守：每个线段被切分为能包住它的球体，固定种子的测试台会检查胶囊体内任意一点周围的区域都会被判定为越界。默认关闭：此时携带本体的请求会以 `400` 和 INHIBITED 被拒绝（绝不会被忽略），格式错误的本体会使整个请求被拒绝，`required` 会使没有本体的请求变为 INHIBITED。`body-from-fk` 把 `hydra-umc-physics-replica fk --json` 的输出和一个命名线段的文件转换为本体；本服务从不运行该程序。这一切都没有在真实机器人上试过，也不是经认证的安全功能。参见 `docs/ROBOT_BODY.md`。
 
+**A.R.M.O.R. 警报（可选）。** 在区域文件中写入 `"armorAlarm": {"enabled": true}`，服务会从 MQTT 代理读取 `armor/alarm/<node_id>/state`（`pip install "hydra-umc-safety-zones[mqtt]"`），并按你设定的表把每条消息转换为 SDK 的 SafetyState。警报鸣响、面板沉默和损坏的消息会**禁止新的启动**（判定为 INHIBITED，显示在 `armorAlarm` 和 `GET /armor-alarm` 中），但绝不会停止正在运行的机器，安全心跳也不受影响；只有面板报告无警报并且经过可配置的时间后，禁止才会解除。只有开启 `safeStop` 才可能出现 SAFE_STOP，默认关闭。面板的消息没有签名，因此代理必须是内部代理。默认关闭；未用真实警报试过。参见 `docs/ARMOR_ALARM.md`。
+
 ## ⚙️ 配置
 
 HTTP 服务通过选项配置；其中两项也可以来自环境变量。
@@ -397,6 +399,8 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── config.py                 真实的区域/检测/观测 JSON 加载
 │   ├── api.py                    简洁的 JSON/HTTP 接口(基于 stdlib http.server),桥接真实的 `check` 逻辑
 │   ├── stateful.py               心跳与推送状态（可选）
+│   ├── armor_alarm.py            A.R.M.O.R.警报禁止启动（可选）
+│   ├── armor_alarm_mqtt.py       为警报读取提供数据的MQTT链路（可选）
 │   ├── signing.py                安全状态的 HMAC 签名（可选）
 │   ├── can_estop.py              通过 CAN 的急停请求与安全心跳（可选）
 │   └── main.py                   入口点 + 真实的 `check` 子命令

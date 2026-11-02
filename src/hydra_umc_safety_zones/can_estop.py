@@ -277,13 +277,16 @@ class HeartbeatSender:
 
 
 def state_is_safe(last_verdict: dict | None, max_age_ms: int, now_s: Callable[[], float] = time.time) -> bool:
-    """True when the last verdict is READY and its timestamp is not older than `max_age_ms` (no verdict yet means not safe)."""
+    """True when the last verdict is READY (or INHIBITED only by the house alarm) and its timestamp is not older than `max_age_ms` (no verdict yet means not safe)."""
     from datetime import datetime, timezone
 
     if not last_verdict:
         return False
     sdk = last_verdict.get("sdkSafetyState")
-    if not isinstance(sdk, dict) or sdk.get("state") != "READY":
+    if not isinstance(sdk, dict):
+        return False
+    # A verdict that is INHIBITED only because the house alarm (A.R.M.O.R.) sounds keeps the heartbeat: it stops new starts, never a running machine.
+    if sdk.get("state") != "READY" and not (sdk.get("state") == "INHIBITED" and last_verdict.get("armorInhibitOnly") is True):
         return False
     stamp = sdk.get("timestamp_utc")
     if not isinstance(stamp, str):
