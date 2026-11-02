@@ -1,0 +1,321 @@
+{
+ "description": "Signed alarm states (docs/CONTRACTS.md, the signed state of an alarm): the key, the bytes that are signed (canonical, UTF-8), and the HMAC-SHA256 in hex of them. 'tampered' messages carry the sig of the first case and must not verify. Written by tools/make_conformance.py.",
+ "key": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+ "cases": [
+  {
+   "name": "an armed panel",
+   "node_id": "alarm-1",
+   "message": {
+    "kind": "alarm",
+    "node_id": "alarm-1",
+    "timestamp_ms": 1000,
+    "phase": "armed",
+    "mode": "away",
+    "siren": false,
+    "locked_out": false,
+    "commands_enabled": true,
+    "zones": [
+     {
+      "id": "front-door",
+      "name": "Front door",
+      "kind": "entry",
+      "state": "normal",
+      "bypassed": false
+     },
+     {
+      "id": "window",
+      "kind": "instant",
+      "state": "normal",
+      "bypassed": false
+     }
+    ],
+    "open_zones": [],
+    "events": [
+     {
+      "ago_s": 12,
+      "kind": "armed"
+     }
+    ],
+    "seq": 1790000000000
+   },
+   "canonical": "armor-alarm-state|alarm-1|1000|armed|away|0|0|1||front-door:normal:0,window:normal:0|1790000000000",
+   "sig": "ffded9139b498ef3f6177ed46c2d800e427a3402cdf166004d25347889a1e4d6"
+  },
+  {
+   "name": "a disarmed panel with no zones",
+   "node_id": "alarm-1",
+   "message": {
+    "kind": "alarm",
+    "node_id": "alarm-1",
+    "timestamp_ms": 1000,
+    "phase": "disarmed",
+    "mode": "disarmed",
+    "siren": false,
+    "locked_out": false,
+    "commands_enabled": true,
+    "zones": [],
+    "open_zones": [],
+    "events": [],
+    "seq": 1790000000001
+   },
+   "canonical": "armor-alarm-state|alarm-1|1000|disarmed|disarmed|0|0|1|||1790000000001",
+   "sig": "1995702b4a692474ba676e27187b43f1e6a04295a753ec4f78d7a79ada94ea02"
+  },
+  {
+   "name": "a sounding alarm with an open zone",
+   "node_id": "alarm-1",
+   "message": {
+    "kind": "alarm",
+    "node_id": "alarm-1",
+    "timestamp_ms": 1000,
+    "phase": "alarm",
+    "mode": "away",
+    "siren": true,
+    "locked_out": false,
+    "commands_enabled": true,
+    "zones": [
+     {
+      "id": "window",
+      "kind": "instant",
+      "state": "triggered",
+      "bypassed": false
+     }
+    ],
+    "open_zones": [
+     "window"
+    ],
+    "events": [
+     {
+      "ago_s": 3,
+      "kind": "alarm",
+      "zone": "window"
+     }
+    ],
+    "seq": 1790000000002
+   },
+   "canonical": "armor-alarm-state|alarm-1|1000|alarm|away|1|0|1|window|window:triggered:0|1790000000002",
+   "sig": "2d2e06218bf082be117ac1d85cfdaa14533d28b30ed64ee740e5ad77605a17c6"
+  },
+  {
+   "name": "a zone that is left out",
+   "node_id": "alarm-1",
+   "message": {
+    "kind": "alarm",
+    "node_id": "alarm-1",
+    "timestamp_ms": 1000,
+    "phase": "armed",
+    "mode": "away",
+    "siren": false,
+    "locked_out": false,
+    "commands_enabled": true,
+    "zones": [
+     {
+      "id": "front-door",
+      "kind": "entry",
+      "state": "tamper",
+      "bypassed": true
+     }
+    ],
+    "open_zones": [],
+    "events": [
+     {
+      "ago_s": 12,
+      "kind": "armed"
+     }
+    ],
+    "seq": 1790000000003
+   },
+   "canonical": "armor-alarm-state|alarm-1|1000|armed|away|0|0|1||front-door:tamper:1|1790000000003",
+   "sig": "6a4e5a247a6f272c1ef41d8eafb2b2fc24ff39f30353391108f90ff63401aee5"
+  },
+  {
+   "name": "a locked-out panel that takes no commands",
+   "node_id": "alarm-1",
+   "message": {
+    "kind": "alarm",
+    "node_id": "alarm-1",
+    "timestamp_ms": 1000,
+    "phase": "armed",
+    "mode": "away",
+    "siren": false,
+    "locked_out": true,
+    "commands_enabled": false,
+    "zones": [
+     {
+      "id": "front-door",
+      "name": "Front door",
+      "kind": "entry",
+      "state": "normal",
+      "bypassed": false
+     },
+     {
+      "id": "window",
+      "kind": "instant",
+      "state": "normal",
+      "bypassed": false
+     }
+    ],
+    "open_zones": [],
+    "events": [
+     {
+      "ago_s": 12,
+      "kind": "armed"
+     }
+    ],
+    "seq": 0
+   },
+   "canonical": "armor-alarm-state|alarm-1|1000|armed|away|0|1|0||front-door:normal:0,window:normal:0|0",
+   "sig": "846ffbaa2fc493918629125b5a96fb85e2eab3cf5a83502f5b5447d82d1f066c"
+  }
+ ],
+ "tampered": [
+  {
+   "name": "the phase changed after signing",
+   "message": {
+    "kind": "alarm",
+    "node_id": "alarm-1",
+    "timestamp_ms": 1000,
+    "phase": "disarmed",
+    "mode": "disarmed",
+    "siren": false,
+    "locked_out": false,
+    "commands_enabled": true,
+    "zones": [
+     {
+      "id": "front-door",
+      "name": "Front door",
+      "kind": "entry",
+      "state": "normal",
+      "bypassed": false
+     },
+     {
+      "id": "window",
+      "kind": "instant",
+      "state": "normal",
+      "bypassed": false
+     }
+    ],
+    "open_zones": [],
+    "events": [
+     {
+      "ago_s": 12,
+      "kind": "armed"
+     }
+    ],
+    "seq": 1790000000000
+   },
+   "sig": "ffded9139b498ef3f6177ed46c2d800e427a3402cdf166004d25347889a1e4d6"
+  },
+  {
+   "name": "the siren flag changed after signing",
+   "message": {
+    "kind": "alarm",
+    "node_id": "alarm-1",
+    "timestamp_ms": 1000,
+    "phase": "alarm",
+    "mode": "away",
+    "siren": true,
+    "locked_out": false,
+    "commands_enabled": true,
+    "zones": [
+     {
+      "id": "front-door",
+      "name": "Front door",
+      "kind": "entry",
+      "state": "normal",
+      "bypassed": false
+     },
+     {
+      "id": "window",
+      "kind": "instant",
+      "state": "normal",
+      "bypassed": false
+     }
+    ],
+    "open_zones": [],
+    "events": [
+     {
+      "ago_s": 12,
+      "kind": "armed"
+     }
+    ],
+    "seq": 1790000000000
+   },
+   "sig": "ffded9139b498ef3f6177ed46c2d800e427a3402cdf166004d25347889a1e4d6"
+  },
+  {
+   "name": "a zone state changed after signing",
+   "message": {
+    "kind": "alarm",
+    "node_id": "alarm-1",
+    "timestamp_ms": 1000,
+    "phase": "armed",
+    "mode": "away",
+    "siren": false,
+    "locked_out": false,
+    "commands_enabled": true,
+    "zones": [
+     {
+      "id": "front-door",
+      "name": "Front door",
+      "kind": "entry",
+      "state": "triggered",
+      "bypassed": false
+     },
+     {
+      "id": "window",
+      "kind": "instant",
+      "state": "normal",
+      "bypassed": false
+     }
+    ],
+    "open_zones": [],
+    "events": [
+     {
+      "ago_s": 12,
+      "kind": "armed"
+     }
+    ],
+    "seq": 1790000000000
+   },
+   "sig": "ffded9139b498ef3f6177ed46c2d800e427a3402cdf166004d25347889a1e4d6"
+  },
+  {
+   "name": "the sequence changed after signing",
+   "message": {
+    "kind": "alarm",
+    "node_id": "alarm-1",
+    "timestamp_ms": 1000,
+    "phase": "armed",
+    "mode": "away",
+    "siren": false,
+    "locked_out": false,
+    "commands_enabled": true,
+    "zones": [
+     {
+      "id": "front-door",
+      "name": "Front door",
+      "kind": "entry",
+      "state": "normal",
+      "bypassed": false
+     },
+     {
+      "id": "window",
+      "kind": "instant",
+      "state": "normal",
+      "bypassed": false
+     }
+    ],
+    "open_zones": [],
+    "events": [
+     {
+      "ago_s": 12,
+      "kind": "armed"
+     }
+    ],
+    "seq": 1790000000001
+   },
+   "sig": "ffded9139b498ef3f6177ed46c2d800e427a3402cdf166004d25347889a1e4d6"
+  }
+ ]
+}

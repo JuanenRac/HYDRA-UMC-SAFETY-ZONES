@@ -42,7 +42,7 @@ def msg(phase: str = "armed", ts: int = 1000, node: str = "alarm-1", **extra: ob
 
 
 def gate(**kw: object) -> ArmorAlarmGate:
-    return ArmorAlarmGate(ArmorAlarmSettings(enabled=True, **kw))  # type: ignore[arg-type]
+    return ArmorAlarmGate(ArmorAlarmSettings(enabled=True, **{"require_signature": False, **kw}))  # type: ignore[arg-type]
 
 
 # -- off by default ----------------------------------------------------------------------------------------------------------------
@@ -287,7 +287,7 @@ def test_combine_never_lowers_a_verdict() -> None:
 
 def test_audit_records_the_changes() -> None:
     lines: list[dict] = []
-    g = ArmorAlarmGate(ArmorAlarmSettings(enabled=True, hysteresis_s=0.0), lines.append)
+    g = ArmorAlarmGate(ArmorAlarmSettings(enabled=True, require_signature=False, hysteresis_s=0.0), lines.append)
     g.ingest(TOPIC, msg("armed", 1000), 0.0)
     g.status(0.0)
     g.ingest(TOPIC, msg("alarm", 2000), 1.0)
@@ -303,7 +303,7 @@ def test_a_failing_audit_sink_changes_nothing() -> None:
     def boom(_: dict) -> None:
         raise OSError("disk full")
 
-    g = ArmorAlarmGate(ArmorAlarmSettings(enabled=True), boom)
+    g = ArmorAlarmGate(ArmorAlarmSettings(enabled=True, require_signature=False), boom)
     g.ingest(TOPIC, msg("alarm"), 0.0)
     assert g.status(0.0).inhibits
 
@@ -326,7 +326,11 @@ def test_a_failing_audit_sink_changes_nothing() -> None:
         {"maxAgeS": float("nan")},
         {"hysteresisS": -1},
         {"hysteresisS": True},
-        {"broker": {"host": "10.0.0.5"}},  # not on this machine and not declared internal
+        {"requireSignature": False, "broker": {"host": "10.0.0.5"}},  # unsigned, not on this machine and not declared internal
+        {"enabled": True},  # the signature is required and no key file is named
+        {"signatureKeyFile": 5},
+        {"requireSignature": "yes"},
+        {"signatureMaxSkewS": -1},
         {"broker": {"port": 0}},
         {"broker": {"hostt": "x"}},
     ],
@@ -339,7 +343,7 @@ def test_bad_settings_are_refused(raw: object) -> None:
 def test_good_settings() -> None:
     s = parse_settings(
         {
-            "enabled": True, "nodes": ["alarm-1"], "maxAgeS": 20, "hysteresisS": 30, "unknownInhibits": False, "safeStop": True,
+            "enabled": True, "requireSignature": False, "nodes": ["alarm-1"], "maxAgeS": 20, "hysteresisS": 30, "unknownInhibits": False, "safeStop": True,
             "phaseTable": {"alarm": "SAFE_STOP", "armed": "READY"},
             "broker": {"host": "10.0.0.5", "internal": True, "port": 8883, "tls": True},
         }
@@ -383,7 +387,7 @@ def test_subscriber_subscribes_and_feeds_the_gate(tmp_path: Path) -> None:
     user, password = tmp_path / "u", tmp_path / "p"
     user.write_text("safety\n", encoding="utf-8")
     password.write_text("hunter2\n", encoding="utf-8")
-    settings = parse_settings({"enabled": True, "hysteresisS": 0, "broker": {"usernameFile": str(user), "passwordFile": str(password)}})
+    settings = parse_settings({"enabled": True, "requireSignature": False, "hysteresisS": 0, "broker": {"usernameFile": str(user), "passwordFile": str(password)}})
     g = ArmorAlarmGate(settings)
     now = [0.0]
     fake = FakeClient()
@@ -403,7 +407,7 @@ def test_subscriber_subscribes_and_feeds_the_gate(tmp_path: Path) -> None:
 
 
 def test_a_missing_secret_file_stops_the_start(tmp_path: Path) -> None:
-    settings = parse_settings({"enabled": True, "broker": {"usernameFile": str(tmp_path / "none")}})
+    settings = parse_settings({"enabled": True, "requireSignature": False, "broker": {"usernameFile": str(tmp_path / "none")}})
     with pytest.raises(ArmorAlarmConfigError):
         ArmorAlarmSubscriber(ArmorAlarmGate(settings), client=FakeClient()).start()
 
@@ -471,7 +475,7 @@ def test_service_without_the_gate_is_unchanged() -> None:
 
 def test_service_alarm_inhibits_then_lifts_with_the_hysteresis() -> None:
     clock = FakeClock()
-    g = ArmorAlarmGate(ArmorAlarmSettings(enabled=True, hysteresis_s=10.0))
+    g = ArmorAlarmGate(ArmorAlarmSettings(enabled=True, require_signature=False, hysteresis_s=10.0))
     with _server(g, clock) as (base, server):
         g.ingest(TOPIC, msg("armed", 1000), clock())
         clock.now += 10
@@ -491,7 +495,7 @@ def test_service_alarm_inhibits_then_lifts_with_the_hysteresis() -> None:
 
 def test_service_silent_broker_is_unknown_and_shown() -> None:
     clock = FakeClock()
-    g = ArmorAlarmGate(ArmorAlarmSettings(enabled=True, hysteresis_s=0.0, max_age_s=30.0))
+    g = ArmorAlarmGate(ArmorAlarmSettings(enabled=True, require_signature=False, hysteresis_s=0.0, max_age_s=30.0))
     with _server(g, clock) as (base, _):
         g.ingest(TOPIC, msg("armed"), clock())
         assert _call(base, "POST", "/check", _check_body())[1]["state"] == "ready"
@@ -502,7 +506,7 @@ def test_service_silent_broker_is_unknown_and_shown() -> None:
 
 def test_service_a_danger_breach_stays_a_danger_under_an_alarm() -> None:
     clock = FakeClock()
-    g = ArmorAlarmGate(ArmorAlarmSettings(enabled=True))
+    g = ArmorAlarmGate(ArmorAlarmSettings(enabled=True, require_signature=False))
     with _server(g, clock) as (base, _):
         g.ingest(TOPIC, msg("alarm"), clock())
         answer = _call(base, "POST", "/check", _check_body(x=1.0))[1]
@@ -512,11 +516,11 @@ def test_service_a_danger_breach_stays_a_danger_under_an_alarm() -> None:
 def test_service_safe_stop_only_when_switched_on() -> None:
     clock = FakeClock()
     table = dict(DEFAULT_PHASE_TABLE, alarm="SAFE_STOP")
-    off = ArmorAlarmGate(ArmorAlarmSettings(enabled=True, phase_table=table))
+    off = ArmorAlarmGate(ArmorAlarmSettings(enabled=True, require_signature=False, phase_table=table))
     with _server(off, clock) as (base, _):
         off.ingest(TOPIC, msg("alarm"), clock())
         assert _call(base, "POST", "/check", _check_body())[1]["sdkSafetyState"]["state"] == "INHIBITED"
-    on = ArmorAlarmGate(ArmorAlarmSettings(enabled=True, phase_table=table, safe_stop=True))
+    on = ArmorAlarmGate(ArmorAlarmSettings(enabled=True, require_signature=False, phase_table=table, safe_stop=True))
     with _server(on, clock) as (base, _):
         on.ingest(TOPIC, msg("alarm"), clock())
         answer = _call(base, "POST", "/check", _check_body())[1]
@@ -525,7 +529,7 @@ def test_service_safe_stop_only_when_switched_on() -> None:
 
 def test_the_house_alarm_does_not_silence_the_safe_heartbeat_but_other_inhibitions_do() -> None:
     clock = FakeClock()
-    g = ArmorAlarmGate(ArmorAlarmSettings(enabled=True))
+    g = ArmorAlarmGate(ArmorAlarmSettings(enabled=True, require_signature=False))
     with _server(g, clock) as (base, server):
         g.ingest(TOPIC, msg("alarm"), clock())
         _call(base, "POST", "/check", _check_body())
