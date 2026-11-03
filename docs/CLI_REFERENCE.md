@@ -384,3 +384,10 @@ reporting (populating `--observation`/`"observation"` from an actual
 tracking process's own liveness, rather than a hand-authored JSON file)
 is likewise out of scope for this repo — this repo defines and enforces the
 contract, not the producer.
+
+
+## `GET /health` (off by default)
+
+A uniform health route, the same in every service of the family. It is closed unless the operator opens it with `serve --health-open` or `HYDRA_UMC_SAFETY_ZONES_HEALTH_OPEN=1`: closed, it answers `404 {"error": "not found"}` like any route that does not exist.
+
+Open, it answers `200` with `{"status": "ok", "service": "hydra-umc-safety-zones", "version": "<version>"}` to a caller on loopback. A caller that is not on loopback must present the bearer token of the service (a service started without a token never answers one). The body never carries a path, a setting or a secret. The health path of the project manifest (`health_path`) is unchanged.

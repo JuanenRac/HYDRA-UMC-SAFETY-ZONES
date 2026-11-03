@@ -30,6 +30,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
+from .health_route import HealthRouteMixin
 from .service_metrics import MetricsHandlerMixin
 from .config import ConfigError, parse_detections, parse_robot_body, parse_tool_velocity, parse_zone_set, strict_json_loads
 from .armor_alarm import ArmorAlarmGate, combine
@@ -105,7 +106,7 @@ def _read_json_body(handler: BaseHTTPRequestHandler) -> dict:
     return body
 
 
-class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
+class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
     server: "SafetyZonesServer"
     metrics_service = "hydra-umc-safety-zones"
 
@@ -118,6 +119,8 @@ class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
         pass  # quiet by default, same reasoning as this family's other api.py files
 
     def do_GET(self) -> None:  # noqa: N802
+        if self.serve_health(self.server.token):
+            return
         if self.serve_metrics(authorized=self._authorized()):
             return
         path = urlparse(self.path).path
