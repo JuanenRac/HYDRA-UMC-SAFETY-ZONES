@@ -9,12 +9,11 @@ from datetime import datetime, timezone
 import pytest
 
 from hydra_umc_safety_zones.breach import DetectedObject
-from hydra_umc_safety_zones.calibration import ZoneCalibration
 from hydra_umc_safety_zones.config import ConfigError, parse_zone_set
 from hydra_umc_safety_zones.geometry import Point3D
 from hydra_umc_safety_zones.observation import ObservationStatus
 from hydra_umc_safety_zones.safety_state import SafetyState, evaluate_safety
-from hydra_umc_safety_zones.separation_eval import SeparationVerdict, separation_report
+from hydra_umc_safety_zones.separation_eval import separation_report
 from hydra_umc_safety_zones.zones import parse_separation_params, scale_zones_for_velocity
 
 NOW = datetime.now(timezone.utc)
