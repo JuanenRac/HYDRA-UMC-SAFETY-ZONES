@@ -410,6 +410,8 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
 
 
 class SafetyZonesServer(ThreadingHTTPServer):
+
+    health_open: bool = False  # GET /health answers only when the operator opens it (health_route.py)
     daemon_threads = True
 
     def __init__(
