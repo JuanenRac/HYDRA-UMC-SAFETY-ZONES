@@ -31,6 +31,7 @@ from hydra_umc_safety_zones.robot_body import (
     RobotBodySettings,
     check_body_breaches,
 )
+from hydra_umc_safety_zones.separation_eval import separation_report
 from hydra_umc_safety_zones.zones import ZoneLevel, ZoneSet, scale_zones_for_velocity
 
 
@@ -58,6 +59,9 @@ class SafetyEvaluation:
     # state is then FAULT (an avería), not INHIBITED (not verified), so a
     # consumer can tell a broken detector from an unconfirmed one.
     fault: bool = False
+    # The separation distance zone by zone (separation_eval.separation_report), or None when the verdict was reached before it could be
+    # computed (calibration, observer). Optional and additive: the signed SDK state does not carry it.
+    separation: dict | None = None
 
 
 def collect_breaches(
@@ -172,20 +176,30 @@ def evaluate_safety(
     except RobotBodyError as exc:
         return SafetyEvaluation(SafetyState.INHIBITED, f"robot body refused: {exc}")
     worst = worst_level_per_object(breaches)
+    separation = separation_report(zone_set, breaches)
 
     danger_objects = sorted(oid for oid, level in worst.items() if level is ZoneLevel.DANGER)
     if danger_objects:
         return SafetyEvaluation(
-            SafetyState.DANGER, f"object(s) {danger_objects} breached a danger zone"
+            SafetyState.DANGER, f"object(s) {danger_objects} breached a danger zone", separation=separation
         )
 
     warning_objects = sorted(oid for oid, level in worst.items() if level is ZoneLevel.WARNING)
     if warning_objects:
         return SafetyEvaluation(
-            SafetyState.WARNING, f"object(s) {warning_objects} breached a warning zone"
+            SafetyState.WARNING, f"object(s) {warning_objects} breached a warning zone", separation=separation
         )
 
-    return SafetyEvaluation(SafetyState.READY, "no breach, calibration valid")
+    if zone_set.separation_required and separation["status"] == "not_evaluated":
+        # fail closed: a separation distance that was not evaluated releases nothing
+        empty = [z["zone"] for z in separation["zones"] if z["verdict"] == "not_evaluated"]
+        return SafetyEvaluation(
+            SafetyState.INHIBITED,
+            f"separation distance not evaluated for zone(s) {empty}: K, T and C are not configured (the zones file requires them)",
+            separation=separation,
+        )
+
+    return SafetyEvaluation(SafetyState.READY, "no breach, calibration valid", separation=separation)
 
 
 # HYDRA-UMC-SDK's own formal contract (contracts/json-schema/v1/

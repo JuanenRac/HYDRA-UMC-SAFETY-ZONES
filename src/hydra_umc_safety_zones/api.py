@@ -330,11 +330,11 @@ class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
             before = evaluation.state
             new_state, new_reason = combine(before.value, evaluation.reason, armor)
             if new_state != before.value:
-                evaluation = SafetyEvaluation(SafetyState(new_state), new_reason, evaluation.fault)
+                evaluation = SafetyEvaluation(SafetyState(new_state), new_reason, evaluation.fault, evaluation.separation)
                 armor_only = before is SafetyState.READY and evaluation.state is SafetyState.INHIBITED
                 armor_stop = evaluation.state is SafetyState.DANGER and before is not SafetyState.DANGER
             elif armor.inhibits and before is SafetyState.WARNING:
-                evaluation = SafetyEvaluation(before, f"{evaluation.reason}; {armor.reason}", evaluation.fault)
+                evaluation = SafetyEvaluation(before, f"{evaluation.reason}; {armor.reason}", evaluation.fault, evaluation.separation)
 
         response: dict = {
             "state": evaluation.state.value,
@@ -350,6 +350,9 @@ class Handler(MetricsHandlerMixin, BaseHTTPRequestHandler):
             # header comment for why both must keep existing side by side).
             "sdkSafetyState": to_sdk_safety_state(evaluation),
         }
+        if evaluation.separation is not None:
+            # optional and additive: evaluated_safe / evaluated_unsafe / not_evaluated, with the zones and the reason of each
+            response["separation"] = evaluation.separation
         if armor is not None:
             response["armorAlarm"] = armor.as_dict()
             if armor_only:
@@ -494,6 +497,8 @@ class SafetyZonesServer(ThreadingHTTPServer):
             record["armorInhibitOnly"] = True
         if response.get("configSha256"):
             record["configSha256"] = response["configSha256"]
+        if isinstance(response.get("separation"), dict):
+            record["separation"] = response["separation"]
         with self._verdict_lock:
             self._last_verdict = record
 

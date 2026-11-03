@@ -8,7 +8,7 @@ model described in the README (slowdown vs stop)."""
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import TYPE_CHECKING
 
@@ -34,6 +34,10 @@ class Zone:
     zone_id: str
     level: ZoneLevel
     volume: Volume
+    # Optional K, T and C of this zone alone (the "separation" object of the zone in the zones file). None means the zone declares none
+    # of them (or not all: `separation_missing` names what is empty); then the machine-wide figures of the ZoneSet apply, if any.
+    separation: "SeparationModel | None" = None
+    separation_missing: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -49,6 +53,11 @@ class ZoneSet:
     separation: "SeparationModel | None" = None
     # The switch and tuning of the robot body (robot_body.py); None is the same as off: a request that carries a body is refused.
     robot_body: "RobotBodySettings | None" = None
+    # Which of K, T and C the machine-wide "separation" object leaves empty (all three when the file has none); there is no default value.
+    separation_missing: tuple[str, ...] = ("approach_speed_mps", "total_stop_time_s", "intrusion_distance_m")
+    # When true (zones file key "separation_required"), a zone whose separation distance is not evaluated makes a verdict that would be
+    # READY INHIBITED. Off by default so that a zones file written before this existed keeps its verdicts.
+    separation_required: bool = False
 
 
 # First real, bounded implementation of a velocity-proportional safety
@@ -135,6 +144,34 @@ def parse_separation_model(data: object) -> SeparationModel:
     )
 
 
+SEPARATION_REQUIRED_FIGURES = ("approach_speed_mps", "total_stop_time_s", "intrusion_distance_m")
+
+
+def parse_separation_params(data: object) -> "tuple[SeparationModel | None, tuple[str, ...]]":
+    """Reads a ``"separation"`` object whose figures may still be empty: K, T and C are configuration with NO default value.
+
+    Returns ``(model, missing)``. ``model`` is a SeparationModel only when K, T and C are all present; otherwise it is ``None`` and
+    ``missing`` names every figure that is absent or ``null`` (an absent object misses all three). A value that is present but wrong
+    (negative, not finite, not a number, all three zero) is refused with ValueError, never read as empty.
+    """
+    if data is None:
+        return None, SEPARATION_REQUIRED_FIGURES
+    if not isinstance(data, dict):
+        raise ValueError("separation must be a JSON object")
+    allowed = set(SEPARATION_REQUIRED_FIGURES) | {"tool_deceleration_mps2"}
+    unknown = sorted(set(data) - allowed)
+    if unknown:
+        raise ValueError(f"separation has unknown field(s): {unknown}")
+    missing = tuple(name for name in SEPARATION_REQUIRED_FIGURES if data.get(name) is None)
+    if missing:
+        for name in SEPARATION_REQUIRED_FIGURES:
+            value = data.get(name)
+            if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0):
+                raise ValueError(f"separation.{name} must be a finite number that is not negative, got {value!r}")
+        return None, missing
+    return parse_separation_model(data), ()
+
+
 def velocity_margin_m(tool_velocity_mps: float) -> float:
     """The extra margin (in meters) a zone's own static volume grows by for
     a given non-negative tool velocity - linear in speed, capped at
@@ -160,18 +197,22 @@ def scale_zones_for_velocity(
     `zone_id`/`level`, each one's `volume` grown by `velocity_margin_m()`
     via `AABB.expanded()` - which itself refuses to ever shrink a volume.
     """
+    zones = tuple(zones)
     if tool_velocity_mps is None:
-        if separation is None:
+        if separation is None and all(z.separation is None for z in zones):
             return zones
         # the separation distance does not depend on the tool: with a model configured the zones grow even when no velocity is given
         tool_velocity_mps = 0.0
-    margin = velocity_margin_m(tool_velocity_mps)
-    if separation is not None:
-        # the model can only grow the envelope: the linear margin stays as the floor
-        margin = max(margin, separation.margin_m(tool_velocity_mps))
-    if margin <= 0:
-        return zones
-    return tuple(
-        Zone(zone_id=zone.zone_id, level=zone.level, volume=zone.volume.expanded(margin))
-        for zone in zones
-    )
+    linear = velocity_margin_m(tool_velocity_mps)
+    grown = []
+    for zone in zones:
+        model = zone.separation if zone.separation is not None else separation
+        margin = linear
+        if model is not None:
+            # the model can only grow the envelope: the linear margin stays as the floor
+            margin = max(margin, model.margin_m(tool_velocity_mps))
+        if margin <= 0:
+            grown.append(zone)
+        else:
+            grown.append(replace(zone, volume=zone.volume.expanded(margin)))
+    return tuple(grown)

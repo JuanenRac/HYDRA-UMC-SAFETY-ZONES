@@ -37,7 +37,7 @@ from hydra_umc_safety_zones.robot_body import (
     RobotFrame,
     build_robot_body,
 )
-from hydra_umc_safety_zones.zones import SeparationModel, Zone, ZoneLevel, ZoneSet, parse_separation_model
+from hydra_umc_safety_zones.zones import SeparationModel, Zone, ZoneLevel, ZoneSet, parse_separation_params
 
 
 class ConfigError(ValueError):
@@ -198,7 +198,14 @@ def parse_zones(raw: dict) -> tuple[Zone, ...]:
             raise ConfigError(f"zone {zone_id!r}: shape {shape!r} needs \"geometry\": {{\"shapes\": true}} in the zones file")
         else:
             raise ConfigError(f"zone {zone_id!r}: shape must be one of ['box', 'obb', 'cylinder', 'capsule'], got {shape!r}")
-        zones.append(Zone(zone_id=zone_id, level=level, volume=volume))
+        zone_model: SeparationModel | None = None
+        zone_missing: tuple[str, ...] = ()
+        if entry.get("separation") is not None:
+            try:
+                zone_model, zone_missing = parse_separation_params(entry["separation"])
+            except ValueError as exc:
+                raise ConfigError(f"zone {zone_id!r}: {exc}") from exc
+        zones.append(Zone(zone_id=zone_id, level=level, volume=volume, separation=zone_model, separation_missing=zone_missing))
     return tuple(zones)
 
 
@@ -223,8 +230,17 @@ def parse_zone_set(raw: dict) -> ZoneSet:
     calibration_data = raw.get("calibration")
     calibration = parse_calibration(calibration_data) if calibration_data is not None else None
     separation_data = raw.get("separation")
-    separation: SeparationModel | None = parse_separation_model(separation_data) if separation_data is not None else None
-    return ZoneSet(zones=zones, calibration=calibration, separation=separation, robot_body=parse_body_settings(raw.get("geometry")))
+    try:
+        separation, separation_missing = parse_separation_params(separation_data)
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from exc
+    required = raw.get("separation_required", False)
+    if not isinstance(required, bool):
+        raise ConfigError(f"separation_required must be true or false, got {required!r}")
+    return ZoneSet(
+        zones=zones, calibration=calibration, separation=separation, robot_body=parse_body_settings(raw.get("geometry")),
+        separation_missing=separation_missing, separation_required=required,
+    )
 
 
 _BODY_SETTING_FIELDS = ("enabled", "required", "resolution_m", "margin_m", "max_segments", "max_pieces_per_segment")

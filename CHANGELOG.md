@@ -4,6 +4,7 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The separation distance has no default figures and says when it was not evaluated:** the approach speed K, the total stopping time T and the intrusion margin C of `S = K*T + C` (indicative, not a certification) can be given per zone (`separation` in the zone) or for the whole machine, and have no built-in value. A zone without all three is `not_evaluated` with the empty figures named; the answers of `POST /check` and `GET /state` carry an optional `separation` field (`evaluated_safe`, `evaluated_unsafe` or `not_evaluated`, per zone and overall) and the signed state is unchanged. `"separation_required": true` makes a verdict that would be READY INHIBITED while any zone is not evaluated (off by default, so existing zones files keep their verdicts). Each zone grows by its own S. An empty figure in the file is no longer an error, a wrong one is. New `docs/SEPARATION.md` and `docs/zones.separation.example.json` (every figure empty); 18 new tests.
 - **Bench test script:** `docs/BENCH_TESTS.md` lists the checks of the CAN emergency-stop request and the safe heartbeat that need a real bus and firmware, all marked not executed.
 
 ## [0.2.0] - An ARMOR alarm inhibits the starts of a cell, the alarm state must be signed by ARMOR and the safe heartbeat of the CAN bus is not cut by an alarm of the house alone

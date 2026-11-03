@@ -157,7 +157,7 @@ def test_the_keys_of_a_check_answer_are_pinned() -> None:
         objects = {"objects": [{"id": "p", "position": {"x": 1, "y": 1, "z": 1}}]}
         status, body = _post(f"{base}/check", {"zones": zones, "detections": objects, "observation": observation})
         assert status == 200
-        assert sorted(body) == ["breaches", "estopRequests", "reason", "sdkSafetyState", "state"]
+        assert sorted(body) == ["breaches", "estopRequests", "reason", "sdkSafetyState", "separation", "state"]
         assert body["state"] == "danger"
         assert [b["zone_id"] for b in body["breaches"]] == ["box-danger"]
         assert sorted(body["breaches"][0]) == ["level", "object_id", "position", "zone_id"]

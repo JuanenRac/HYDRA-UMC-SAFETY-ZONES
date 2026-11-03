@@ -226,6 +226,29 @@
           }
         },
         {
+          "name": "separation_eval.py",
+          "desc": {
+            "en": "Separation distance per zone",
+            "es": "Distancia de separación por zona",
+            "de": "Sicherheitsabstand je Zone",
+            "fr": "Distance de séparation par zone",
+            "it": "Distanza di separazione per zona",
+            "ja": "ゾーンごとの分離距離",
+            "zh": "按区域的分离距离",
+            "pt": "Distância de separação por zona"
+          },
+          "tree_desc": {
+            "en": "Separation distance per zone: evaluated safe, unsafe or not evaluated",
+            "es": "Distancia de separación por zona: evaluada segura, insegura o no evaluada",
+            "de": "Sicherheitsabstand je Zone: bewertet sicher, unsicher oder nicht bewertet",
+            "fr": "Distance de séparation par zone : évaluée sûre, non sûre ou non évaluée",
+            "it": "Distanza di separazione per zona: valutata sicura, non sicura o non valutata",
+            "ja": "ゾーンごとの分離距離：評価済み安全、評価済み危険、未評価",
+            "zh": "按区域的分离距离：已评估安全、已评估不安全或未评估",
+            "pt": "Distância de separação por zona: avaliada segura, insegura ou não avaliada"
+          }
+        },
+        {
           "name": "safety_state.py",
           "desc": {
             "en": "Real fail-safe decision",

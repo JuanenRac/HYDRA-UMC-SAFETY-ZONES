@@ -1,0 +1,23 @@
+{
+  "_comment": "Example zones file for the separation distance. K, T and C have NO default: while any of them is null the zone is reported as not_evaluated and nothing is computed with an invented value. Fill them in only from your own risk assessment. S = K * T + C is indicative, it is not a certification.",
+  "_comment_separation": "Machine-wide figures, used by every zone that does not declare its own. approach_speed_mps = K (m/s), total_stop_time_s = T (s, detection reaction plus the full stopping time of the machine), intrusion_distance_m = C (m, ISO 13857). tool_deceleration_mps2 is optional.",
+  "_comment_required": "true: a zone that is not evaluated makes a verdict that would be READY INHIBITED. false (default): the verdict is unchanged and the answer only reports the zone as not_evaluated.",
+  "separation_required": false,
+  "separation": {
+    "approach_speed_mps": null,
+    "total_stop_time_s": null,
+    "intrusion_distance_m": null
+  },
+  "calibration": {"version": "cal-1", "source": "manual", "calibrated_at": "2000-01-01", "max_age_days": 30},
+  "zones": [
+    {
+      "id": "warn1", "level": "warning",
+      "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 5, "y": 5, "z": 5}
+    },
+    {
+      "id": "danger1", "level": "danger",
+      "min": {"x": 0, "y": 0, "z": 0}, "max": {"x": 1, "y": 1, "z": 1},
+      "separation": {"approach_speed_mps": null, "total_stop_time_s": null, "intrusion_distance_m": null}
+    }
+  ]
+}
