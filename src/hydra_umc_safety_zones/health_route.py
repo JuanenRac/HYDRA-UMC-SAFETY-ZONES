@@ -1,30 +1,39 @@
 # =============================================================================
-# HYDRA-UMC-SAFETY-ZONES - src/hydra_umc_safety_zones/health_route.py
+# HYDRA-UMC-SDK - tools/canonical/health_route.py
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 # GPL-3.0-or-later - see LICENSE
 # =============================================================================
-"""The uniform `GET /health` of the services of the family, closed unless the operator opens it.
+"""The uniform `GET /health` of the Python services of the family, closed unless the operator opens it, written once.
+
+This file has a single canonical copy (`tools/canonical/health_route.py` of HYDRA-UMC-SDK) that is vendored, byte for byte, into the services that list it in
+`PER_REPOSITORY_FILES` of `tools/sync_repo_tools.py`; the script keeps the copies identical. It needs nothing but the standard library, so a service adopts it
+whether or not it carries `http_common.py`, and nothing in it is specific to a service: the name of the service comes from the package the file sits in.
 
 Every service of the family can answer `GET /health` with the same small body, `{"status": "ok", "service": ..., "version": ...}`, so that a watchdog or the
 service registry can read the health of any of them the same way. It is an opt-in:
 
 * Closed (the default): the route answers `404` like any route that does not exist, and nothing else about the service changes.
-* Open (`--health-open` on the command line or `HYDRA_UMC_SAFETY_ZONES_HEALTH_OPEN=1`): the route answers `200` to a caller on loopback. A caller that
-  is not on loopback must present the bearer token of the service; a service without a token never answers a caller that is not on loopback.
+* Open (`--health-open` on the command line, or `HYDRA_UMC_<SERVICE>_HEALTH_OPEN=1` where `<SERVICE>` is the package name in capitals, for example
+  `HYDRA_UMC_COGNITIVE_NODE_HEALTH_OPEN`): the route answers `200` to a caller on loopback. A caller that is not on loopback must present the bearer token of the
+  service (`401` otherwise); a service without a token never answers a caller that is not on loopback.
 
-The body names the service and its version and nothing else: no path, no configuration, no secret.
+The body names the service and its version and nothing else: no path, no configuration, no secret. The handler may set `metrics_service` and `metrics_version`
+(the same attributes the `/metrics` route reads); without them the service is named after the package and the version is `unknown`.
+
+A service adopts it in three steps: put `HealthRouteMixin` before `BaseHTTPRequestHandler` in the bases of the handler, call `self.serve_health(token)` first in
+`do_GET` (`token` is the bearer token of the service, or `None`), and set `server.health_open = health_open_requested(flag)` where it starts the server.
 """
 from __future__ import annotations
 
+import hmac
 import ipaddress
+import json
 import os
 from http.server import BaseHTTPRequestHandler
 
-import hmac
-import json
-
+_PACKAGE = (__package__ or __name__).split(".", 1)[0]
 HEALTH_PATH = "/health"
-ENV_HEALTH_OPEN = "HYDRA_UMC_SAFETY_ZONES_HEALTH_OPEN"
+ENV_HEALTH_OPEN = f"{_PACKAGE.upper()}_HEALTH_OPEN"
 _TRUE = {"1", "true", "yes", "on"}
 
 
@@ -50,8 +59,8 @@ def _write(handler: BaseHTTPRequestHandler, status: int, payload: object) -> Non
 
 
 def _bearer_ok(handler: BaseHTTPRequestHandler, expected: str) -> bool:
-    header = handler.headers.get("Authorization", "")
-    return header.startswith("Bearer ") and hmac.compare_digest(header[len("Bearer "):].strip().encode("utf-8"), expected.encode("utf-8"))
+    scheme, _, presented = handler.headers.get("Authorization", "").partition(" ")
+    return scheme == "Bearer" and hmac.compare_digest(presented.strip().encode("utf-8"), expected.encode("utf-8"))
 
 
 class HealthRouteMixin(BaseHTTPRequestHandler):
@@ -64,16 +73,15 @@ class HealthRouteMixin(BaseHTTPRequestHandler):
         if not getattr(self.server, "health_open", False):
             _write(self, 404, {"error": "not found"})
             return True
-        if not _is_loopback(self.client_address[0]):
-            if not token or not _bearer_ok(self, token):
-                _write(self, 401, {"error": "a valid bearer token is required"})
-                return True
+        if not _is_loopback(self.client_address[0]) and (not token or not _bearer_ok(self, token)):
+            _write(self, 401, {"error": "a valid bearer token is required"})
+            return True
         _write(
             self,
             200,
             {
                 "status": "ok",
-                "service": getattr(self, "metrics_service", "") or "hydra-umc-safety-zones",
+                "service": getattr(self, "metrics_service", "") or _PACKAGE.replace("_", "-"),
                 "version": getattr(self, "metrics_version", "") or "unknown",
             },
         )
