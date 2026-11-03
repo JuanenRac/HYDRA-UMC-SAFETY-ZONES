@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **Bench test script:** `docs/BENCH_TESTS.md` lists the checks of the CAN emergency-stop request and the safe heartbeat that need a real bus and firmware, all marked not executed.
+
 ## [0.2.0] - An ARMOR alarm inhibits the starts of a cell, the alarm state must be signed by ARMOR and the safe heartbeat of the CAN bus is not cut by an alarm of the house alone
 
 - **The state of the alarm of A.R.M.O.R. has to be signed, and a message that is not never changes the answer:** the new `armorAlarm.requireSignature` (true by default whenever the reading is on) refuses, counts (`unsigned`, `invalid`, `replay`, `skew`, `key`, `malformed`, shown in `armorAlarm.signature`) and audits a state with no signature, a wrong one, a `seq` that does not go up for that panel or one far from this machine's clock (`armorAlarm.signatureMaxSkewS`, 300 s, 0 to not check); it does not refresh the liveness of the panel and it can never lift an inhibition, so a panel heard only through refused messages is `unknown` and inhibits. The key of the installation is read from a file outside the repository (`armorAlarm.signatureKeyFile`, needed while the signature is required) and is never printed or logged; a missing or unusable key refuses everything. A broker that is not on this machine no longer needs `broker.internal` while the signature is required. With `requireSignature` false the old behaviour stays. The canonical bytes and the signatures are checked against the vectors shared with A.R.M.O.R.
