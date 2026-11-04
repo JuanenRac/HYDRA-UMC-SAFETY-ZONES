@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The manifest declares the uniform `GET /health` route:** `service.health_path` is `/health` now. The route stays closed (404) until the service switch opens it, and the health checks of the server and of the family ask `/stats` after a 404 on `/health`.
+
 - **`GET /state` lists the zones that are breached:** next to the verdict it carries `breaches` (at most 20 entries, each with `zone_id`, `level` and `object_id`, no positions), `breachCount` and `estopRequestCount`, so a panel can show which zone an object is in and whether a stop was asked. The signed `sdkSafetyState` is not changed. 1 new test.
 
 ## [0.2.1] - The separation distance of a zone is evaluated from the approach speed, the stopping time and the intrusion margin that the operator sets, a zone without them is reported as not evaluated, and the health route is available behind a switch that is closed by default
