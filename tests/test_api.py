@@ -410,3 +410,19 @@ def test_state_needs_the_token_when_one_is_configured() -> None:
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_state_lists_the_zones_the_objects_are_in_and_how_many_stops_were_asked() -> None:
+    with running_server() as base:
+        _post(f"{base}/check", {"zones": _zones(), "detections": _detections(50, 50, 50), "observation": _observation()})
+        status, body = _get(f"{base}/state")
+        assert status == 200
+        assert body["breaches"] == [] and body["breachCount"] == 0 and body["estopRequestCount"] == 0
+        _post(f"{base}/check", {"zones": _zones(), "detections": _detections(1, 1, 1), "observation": _observation()})
+        status, body = _get(f"{base}/state")
+        assert status == 200
+        assert body["breachCount"] == len(body["breaches"]) >= 1
+        first = body["breaches"][0]
+        assert set(first) == {"zone_id", "level", "object_id"}
+        assert first["level"] in ("warning", "danger")
+        assert "position" not in json.dumps(body["breaches"])

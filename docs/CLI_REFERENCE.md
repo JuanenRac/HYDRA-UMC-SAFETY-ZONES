@@ -263,7 +263,7 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
 `systemd/hydra-umc-safety-zones.service` unit.
 
 * **`GET /stats`** — `{"role": "..."}`, a liveness/identity check.
-* **`GET /state`** — the latest verdict of `POST /check`: `{"sdkSafetyState": {schema_version, state, source, timestamp_utc}, "reason": ..., "configSha256": ...}`, `200`;
+* **`GET /state`** — the latest verdict of `POST /check`: `{"sdkSafetyState": {schema_version, state, source, timestamp_utc}, "reason": ..., "configSha256": ..., "breaches": [{zone_id, level, object_id}], "breachCount": N, "estopRequestCount": N}`, `200` (`breaches` lists at most 20 and has no positions; the signed `sdkSafetyState` is not changed);
   `404` before the first verdict. Needs the bearer token when one is configured. A consumer judges the age of
   `timestamp_utc` itself.
 * **`POST /check`** — body `{"zones": {...}, "detections": {...}, "observation": {...}}`,

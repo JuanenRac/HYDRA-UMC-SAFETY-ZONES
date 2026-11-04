@@ -409,6 +409,10 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
         return None
 
 
+# The most breaches GET /state lists (the count is always given), so the answer stays small when many objects are inside.
+_STATE_BREACHES_MAX = 20
+
+
 class SafetyZonesServer(ThreadingHTTPServer):
 
     health_open: bool = False  # GET /health answers only when the operator opens it (health_route.py)
@@ -504,6 +508,19 @@ class SafetyZonesServer(ThreadingHTTPServer):
             record["configSha256"] = response["configSha256"]
         if isinstance(response.get("separation"), dict):
             record["separation"] = response["separation"]
+        # What the panels show next to the verdict: which zone each object is in, at which level, and whether a stop was asked.
+        # Short and without positions; the signed state above is not touched.
+        breaches = response.get("breaches")
+        if isinstance(breaches, list):
+            record["breaches"] = [
+                {"zone_id": str(b.get("zone_id", "")), "level": str(getattr(b.get("level"), "value", b.get("level", ""))), "object_id": str(b.get("object_id", ""))}
+                for b in breaches[:_STATE_BREACHES_MAX]
+                if isinstance(b, dict)
+            ]
+            record["breachCount"] = len(breaches)
+        estops = response.get("estopRequests")
+        if isinstance(estops, list):
+            record["estopRequestCount"] = len(estops)
         with self._verdict_lock:
             self._last_verdict = record
 
