@@ -25,5 +25,8 @@
     "port": 8108,
     "systemd_unit": "hydra-umc-safety-zones.service",
     "health_path": "/health"
-  }
+  },
+  "depends_on": [
+    "HYDRA-UMC-VISION-NODE"
+  ]
 }
