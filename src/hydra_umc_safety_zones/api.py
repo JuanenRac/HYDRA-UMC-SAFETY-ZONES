@@ -31,6 +31,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
 from .health_route import HealthRouteMixin
+from .server_identity import accepts
 from .service_metrics import MetricsHandlerMixin
 from .config import ConfigError, parse_detections, parse_robot_body, parse_tool_velocity, parse_zone_set, strict_json_loads
 from .armor_alarm import ArmorAlarmGate, combine
@@ -124,6 +125,9 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
         if self.serve_metrics(authorized=self._authorized()):
             return
         path = urlparse(self.path).path
+        if path == "/stats" and self.server.identity_key is not None and not self._authorized():
+            self._write_unauthorized()  # with the identity of the SERVER on, not even the health path is open
+            return
         if path == "/stats":
             _write_json(self, 200, {"role": self.server.role})
         elif path == "/state":
@@ -183,6 +187,8 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
 
     def _authorized(self) -> bool:
         token = self.server.token
+        if self.server.identity_key is not None:
+            return accepts(self, token or "", self.server.identity_key)  # the identity of HYDRA-UMC-SERVER is on: nothing is open
         if not token:
             return True
         header = self.headers.get("Authorization", "")
@@ -201,7 +207,7 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
-        if (path == "/check" or (path == "/heartbeat" and self.server.monitor is not None)) and not self._authorized():
+        if (self.server.identity_key is not None or path == "/check" or (path == "/heartbeat" and self.server.monitor is not None)) and not self._authorized():
             self._write_unauthorized()
             return
         try:
@@ -416,6 +422,7 @@ _STATE_BREACHES_MAX = 20
 class SafetyZonesServer(ThreadingHTTPServer):
 
     health_open: bool = False  # GET /health answers only when the operator opens it (health_route.py)
+    identity_key: bytes | None = None  # the signing key of HYDRA-UMC-SERVER, when the operator turned its identity on (server_identity.py)
     daemon_threads = True
 
     def __init__(

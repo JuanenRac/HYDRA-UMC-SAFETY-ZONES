@@ -24,6 +24,7 @@ import os
 import sys
 
 from .health_route import health_open_requested
+from .server_identity import identity_key_from
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -282,6 +283,11 @@ def _run_serve(args: argparse.Namespace) -> int:
         except SigningError as exc:
             print(f"[safety-zones] fatal: --state-key-file: {exc}", file=sys.stderr)
             return 2
+    try:
+        identity_key = identity_key_from(args.identity_key_file)
+    except ValueError as exc:
+        print(f"[safety-zones] fatal: --identity-key-file: {exc}", file=sys.stderr)
+        return 2
     armor_runtime = None
     try:
         armor_runtime = _start_armor_alarm(args.zones_file)
@@ -352,6 +358,9 @@ def _run_serve(args: argparse.Namespace) -> int:
         print("[safety-zones] POST /check requires a bearer token")
     if args.decision_log:
         print(f"[safety-zones] every verdict is logged as a JSON line to {'standard error' if args.decision_log == '-' else args.decision_log}")
+    server.identity_key = identity_key
+    if identity_key is not None:
+        print("[safety-zones] tokens of HYDRA-UMC-SERVER accepted: every route needs an identity, and a viewer may read but not change")
     server.start_watcher()
     try:
         server.health_open = health_open_requested(args.health_open)
@@ -425,6 +434,7 @@ def build_parser() -> argparse.ArgumentParser:
              "server-side file path.",
     )
     serve_parser.add_argument("--addr", default="127.0.0.1", help="address to bind the HTTP API to")
+    serve_parser.add_argument("--identity-key-file", default=None, help="file with the signing key of HYDRA-UMC-SERVER (its JWT_SECRET): a valid token of the SERVER is then accepted, every route (GET /health and GET /stats too) demands an identity and a viewer may read but not change (off by default; or set HYDRA_UMC_SAFETY_ZONES_IDENTITY_KEY_FILE)")
     serve_parser.add_argument("--health-open", action="store_true", help="answer GET /health (open to loopback, to other callers only with the bearer token); closed by default, or set HYDRA_UMC_SAFETY_ZONES_HEALTH_OPEN=1")
     serve_parser.add_argument("--port", type=int, default=8108, help="port for the HTTP API")
     serve_parser.add_argument(

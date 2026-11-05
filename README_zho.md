@@ -92,6 +92,7 @@ GPL-3.0-or-later - see LICENSE
 * 🔏 **签名判定与 CAN 急停请求（均为可选）：** 使用 `--state-key-file` 时，每个判定都带有 `sdkSafetyStateSignature`（对状态、只增不减的计数器和密钥 ID 做 HMAC-SHA256），`effective_state` 会把未签名、伪造、过期或重放的内容一律视为 `INHIBITED`；使用 `--can-estop-config` 时，危险判定会通过 python-can 在 CAN 总线上发送停止帧，而心跳仅在最近一次判定为 READY 时才发出，因此失声的服务会使机器停下。只在模拟总线上试过；帧格式仍需与固件商定。
 * 🔑 **Ed25519 作为签名判定的可选方案（默认关闭，默认仍为 HMAC）：** `serve --state-signing-alg ed25519 --state-key-file KEY.pem` 使用存放在仓库之外、绝不输出的私钥签名（`state-keygen` 生成密钥对且不会覆盖任何文件），因此使用方只持有公钥，无法签名；`signing.verify` 接受 `expected_alg`，所以用另一种算法签名、未签名、被篡改、过期或重放的判定都是 `INHIBITED`。需要 `cryptography` 包。
 * 🩺 **统一的 `GET /health`，默认关闭：** `serve --health-open`（或 `HYDRA_UMC_SAFETY_ZONES_HEALTH_OPEN=1`）使服务以 `{"status": "ok", "service": ..., "version": ...}` 响应 `GET /health`，家族中每个服务的响应体相同；没有该开关时，该路由像不存在的路由一样返回 `404`。非回环地址的调用方必须出示服务的 bearer 令牌，响应体不含路径、配置或密钥。
+* 🪪 **HYDRA-UMC-SERVER 的身份（默认关闭）：** `serve --identity-key-file 文件`（或 `HYDRA_UMC_SAFETY_ZONES_IDENTITY_KEY_FILE=文件`）会让服务在自己的令牌之外，也接受服务器在登录时签发的已签名令牌：查看者只能读取而不能更改，没有凭据的请求即使在环回地址上也会被拒绝。不开启该开关时一切照旧。
 
 **一项已确定、且现已在代码中落实的关键设计边界：** 本项目**仅负责检测和请求** E-STOP——它自身
 从不发出物理停止信号。`estop.py` 中唯一真实的请求者 `NullEStopRequester`
