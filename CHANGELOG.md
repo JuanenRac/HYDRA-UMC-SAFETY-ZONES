@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **`POST /hold` and `GET /holds` let a service that has the identity of the server hold one robot (off by default):** `--hold` starts the routes (without it they answer `404`), they never answer without a credential, and a hold is only recorded and listed. Only with `--hold-actuate` (which needs the CAN stop requester) does a hold also hand a stop request to the requester. Described in `docs/HOLD.md`. 8 tests.
+
 - **The build test of the repository compiles only on CI or when allowed:** for the stacks that compile (`rust`, `go`, `android`, `flutter`, `firmware-c`), `tools/build_test.py` prints `BUILD_TEST=SKIPPED` with exit status 2 on a plain PC, never a pass; `ALLOW_LOCAL_BUILD=1` allows it and a CI runner always may. The `python` and `node` stacks are not locked.
 
 ## [0.2.2] - The identity of HYDRA-UMC-SERVER, off by default (serve --identity-key-file FILE, or HYDRAUMCSAFETYZONESIDENTITYKEYFILE): the service verifies the signed token (HS256 JWT with exp, username and role) that the server issues at... (and 3 more changes)

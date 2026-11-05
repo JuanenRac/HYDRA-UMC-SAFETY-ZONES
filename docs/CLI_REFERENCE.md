@@ -317,6 +317,7 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
   private key kept outside every repository and never printed, and the consumers hold only the public key. `hydra-umc-safety-zones state-keygen --private-out FILE --public-out FILE`
   creates the pair (it never overwrites a file; the private key is created readable by its owner only). Ed25519 needs `pip install cryptography`.
   `--can-estop-config FILE` (or `SAFETY_ZONES_CAN_ESTOP_CONFIG`) turns on the stop request and the safe heartbeat over CAN; see `docs/CAN_ESTOP.md`. Off by default.
+  `--hold` (or `SAFETY_ZONES_HOLD=1`) starts `POST /hold` and `GET /holds` for a caller with the identity of the server, which only record the hold; `--hold-actuate` also hands a stop request to the CAN requester. Both off by default; see `docs/HOLD.md`.
   `--stateful` (or `SAFETY_ZONES_STATEFUL=1`, or `"stateful": {"enabled": true}` in the zones file) turns on the
   stateful mode: `POST /heartbeat` (the observer proves it is alive, stamped by the service's own clock),
   `POST /check` reading its observation from the last heartbeat (a request that sends `observation` is refused

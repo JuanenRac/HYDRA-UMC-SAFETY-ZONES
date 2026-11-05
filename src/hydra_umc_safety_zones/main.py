@@ -24,6 +24,7 @@ import os
 import sys
 
 from .health_route import health_open_requested
+from .hold import HoldRegistry
 from .server_identity import identity_key_from
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
@@ -319,6 +320,14 @@ def _run_serve(args: argparse.Namespace) -> int:
     except OSError as exc:
         print(f"[safety-zones] fatal: could not start the HTTP API on {addr}:{port}: {exc}", file=sys.stderr)
         return 2
+    if args.hold:
+        if args.hold_actuate and can_runtime is None:
+            print("[safety-zones] fatal: --hold-actuate needs --can-estop-config (a hold is handed to the same requester as a breach)", file=sys.stderr)
+            server.server_close()
+            return 2
+        server.holds = HoldRegistry()
+        server.hold_actuate = bool(args.hold_actuate)
+        print(f"[safety-zones] holds on: POST /hold records a hold{' and requests a stop' if server.hold_actuate else ' (recorded only; --hold-actuate would also request a stop)'}")
     if can_runtime is not None:
         _, heartbeat, can_config = can_runtime
         heartbeat.is_safe = lambda: state_is_safe(server.last_verdict(), can_config.state_max_age_ms)
@@ -489,6 +498,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=os.environ.get("SAFETY_ZONES_CAN_ESTOP_CONFIG", ""),
         help="a JSON file (identifiers, channel, heartbeat period) that turns on the E-STOP request and the safe heartbeat over CAN with python-can; "
              "off by default, a stop is then only recorded",
+    )
+    serve_parser.add_argument(
+        "--hold",
+        action="store_true",
+        default=os.environ.get("SAFETY_ZONES_HOLD", "") in ("1", "true", "yes"),
+        help="POST /hold lets a caller with the identity of the server (or the token) hold one robot and GET /holds lists them; the hold is only recorded "
+             "(off by default, the routes answer 404)",
+    )
+    serve_parser.add_argument(
+        "--hold-actuate",
+        action="store_true",
+        default=os.environ.get("SAFETY_ZONES_HOLD_ACTUATE", "") in ("1", "true", "yes"),
+        help="with --hold, a hold also hands a stop request to the CAN requester (needs --can-estop-config; off by default, a hold is then only recorded)",
     )
     serve_parser.add_argument(
         "--stateful",

@@ -30,7 +30,9 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
 
+from .estop import EStopRequest
 from .health_route import HealthRouteMixin
+from .hold import HoldError, HoldRegistry, parse_hold_request
 from .server_identity import accepts
 from .service_metrics import MetricsHandlerMixin
 from .config import ConfigError, parse_detections, parse_robot_body, parse_tool_velocity, parse_zone_set, strict_json_loads
@@ -148,6 +150,11 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
             payload = gate.status(self.server.clock()).as_dict()
             payload["audit"] = list(gate.audit_records[-50:])
             _write_json(self, 200, payload)
+        elif path == "/holds" and self.server.holds is not None:
+            if not self._authorized():
+                self._write_unauthorized()
+                return
+            _write_json(self, 200, {"holds": self.server.holds.listing(), "actuate": self.server.hold_actuate})
         elif path == "/events" and self.server.monitor is not None:
             if not self._authorized():
                 self._write_unauthorized()
@@ -207,7 +214,7 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
-        if (self.server.identity_key is not None or path == "/check" or (path == "/heartbeat" and self.server.monitor is not None)) and not self._authorized():
+        if (self.server.identity_key is not None or path in ("/check", "/hold") or (path == "/heartbeat" and self.server.monitor is not None)) and not self._authorized():
             self._write_unauthorized()
             return
         try:
@@ -217,6 +224,9 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
             return
         if path == "/heartbeat" and self.server.monitor is not None:
             self._handle_heartbeat(body)
+            return
+        if path == "/hold" and self.server.holds is not None:
+            self._handle_hold(body)
             return
         if path != "/check":
             _write_error(self, 404, "not found")
@@ -242,6 +252,38 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
                 )
             except OSError:
                 pass
+
+    def _handle_hold(self, body: dict) -> None:
+        """Hold (or release) one robot. Never without a credential; a stop request leaves only when the operator turned that on."""
+        if self.server.identity_key is None and not self.server.token:
+            _write_error(self, 403, "a hold needs a credential: start the service with the identity of the server or a token")
+            return
+        try:
+            robot, reason, release = parse_hold_request(body)
+        except HoldError as e:
+            _write_error(self, 400, str(e))
+            return
+        holds = self.server.holds
+        assert holds is not None
+        if release:
+            _write_json(self, 200, {"robot": robot, "held": False, "released": holds.release(robot), "actuated": False})
+            return
+        identity = getattr(self, "identity", None)
+        by = getattr(identity, "username", None) or "token"
+        try:
+            record = holds.hold(robot, reason, str(by)[:64])
+        except HoldError as e:
+            _write_error(self, 429, str(e))
+            return
+        actuated = False
+        requester = self.server.estop_requester
+        if self.server.hold_actuate and requester is not None:
+            try:
+                requester.send(EStopRequest(object_id=robot, zone_id="hold", reason=f"hold: {reason}", zone_ids=("hold",)))
+                actuated = True
+            except Exception:  # noqa: BLE001 - the hold stays recorded; the caller is told the stop was not requested
+                actuated = False
+        _write_json(self, 200, {"robot": robot, "held": True, "seq": record.seq, "actuated": actuated})
 
     def _handle_heartbeat(self, body: dict) -> None:
         """The observer's proof of life. An invalid one renews nothing: the previous heartbeat just keeps ageing."""
@@ -422,6 +464,8 @@ _STATE_BREACHES_MAX = 20
 class SafetyZonesServer(ThreadingHTTPServer):
 
     health_open: bool = False  # GET /health answers only when the operator opens it (health_route.py)
+    holds: HoldRegistry | None = None  # POST /hold and GET /holds exist only when the operator started the service with --hold (hold.py)
+    hold_actuate: bool = False  # a hold also hands a stop request to the requester only with --hold-actuate
     identity_key: bytes | None = None  # the signing key of HYDRA-UMC-SERVER, when the operator turned its identity on (server_identity.py)
     daemon_threads = True
 
