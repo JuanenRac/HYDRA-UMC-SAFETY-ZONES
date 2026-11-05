@@ -37,6 +37,7 @@ import base64
 import binascii
 import hmac
 import json
+import math
 import os
 import time
 from dataclasses import dataclass
@@ -49,6 +50,7 @@ _PACKAGE = (__package__ or __name__).split(".", 1)[0]
 ENV_IDENTITY_KEY_FILE = f"{_PACKAGE.upper()}_IDENTITY_KEY_FILE"
 MIN_KEY_LENGTH = 32
 MAX_TOKEN_CHARS = 4096
+IAT_SKEW_SECONDS = 5  # clock difference tolerated for an `iat` in the future, as the SERVER does
 ROLES = ("admin", "operator", "viewer")
 WRITE_ROLES = frozenset({"admin", "operator"})
 READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
@@ -117,13 +119,16 @@ def verify_token(token: str | None, key: bytes, *, now: float | None = None) -> 
     claims = _json_part(parts[1])
     moment = time.time() if now is None else now
     exp = claims.get("exp")
-    if isinstance(exp, bool) or not isinstance(exp, (int, float)):
+    if isinstance(exp, bool) or not isinstance(exp, (int, float)) or not math.isfinite(exp):  # NaN compares false with everything: it would never expire
         raise IdentityError("the token has no expiry")
     if exp <= moment:
         raise IdentityError("the token has expired")
     nbf = claims.get("nbf")
-    if nbf is not None and (isinstance(nbf, bool) or not isinstance(nbf, (int, float)) or nbf > moment):
+    if nbf is not None and (isinstance(nbf, bool) or not isinstance(nbf, (int, float)) or not math.isfinite(nbf) or nbf > moment):
         raise IdentityError("the token is not valid yet")
+    iat = claims.get("iat")
+    if iat is not None and (isinstance(iat, bool) or not isinstance(iat, (int, float)) or not math.isfinite(iat) or iat > moment + IAT_SKEW_SECONDS):
+        raise IdentityError("the token was issued in the future")
     username, role = claims.get("username"), claims.get("role")
     if not isinstance(username, str) or not username:
         raise IdentityError("the token names no user")
