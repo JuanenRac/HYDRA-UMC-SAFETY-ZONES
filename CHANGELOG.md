@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.2.2] - The identity of HYDRA-UMC-SERVER, off by default (serve --identity-key-file FILE, or HYDRAUMCSAFETYZONESIDENTITYKEYFILE): the service verifies the signed token (HS256 JWT with exp, username and role) that the server issues at... (and 3 more changes)
+
 - **The identity of HYDRA-UMC-SERVER, off by default (`serve --identity-key-file FILE`, or `HYDRA_UMC_SAFETY_ZONES_IDENTITY_KEY_FILE`):** the service verifies the signed token (HS256 JWT with `exp`, `username` and `role`) that the server issues at login and accepts it next to its own token. A viewer may read but not change, and a request with no credential is refused even on loopback, `GET /health` and `GET /stats` included: nothing is open. An address that is not loopback no longer needs a token of the service. The key is the signing key of the server, read from a file that only the group of the service may read, at least 32 characters; without the switch nothing changes. `server_identity.py` is the canonical copy of the SDK, and `python -m hydra_umc_safety_zones.server_identity probe --port PORT` is the probe of a container, which signs a short-lived token of its own with the same key file.
 
 - **`separation_required` stays off by default, with a test:** a zones file that does not set it keeps its verdict (a zone without K, T and C is reported as not evaluated and does not inhibit); `"separation_required": true` is the stricter choice for a cell whose risk assessment gives the figures.
