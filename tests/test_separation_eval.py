@@ -186,3 +186,9 @@ def test_the_example_file_parses_and_leaves_every_zone_not_evaluated():
     assert zone_set.separation is None and zone_set.separation_required is False
     assert {z.zone_id for z in zone_set.zones} == {"warn1", "danger1"}
     assert set(_verdicts(zone_set).values()) == {"not_evaluated"}
+
+
+def test_separation_required_is_off_when_the_file_does_not_say_so():
+    # decided: off by default, so a zones file written before the separation distance existed keeps its verdict
+    assert _set([_zone()]).separation_required is False
+    assert _set([_zone()], separation_required=True).separation_required is True

@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **`separation_required` stays off by default, with a test:** a zones file that does not set it keeps its verdict (a zone without K, T and C is reported as not evaluated and does not inhibit); `"separation_required": true` is the stricter choice for a cell whose risk assessment gives the figures.
+
 - **The manifest declares the uniform `GET /health` route:** `service.health_path` is `/health` now. The route stays closed (404) until the service switch opens it, and the health checks of the server and of the family ask `/stats` after a 404 on `/health`.
 
 - **`GET /state` lists the zones that are breached:** next to the verdict it carries `breaches` (at most 20 entries, each with `zone_id`, `level` and `object_id`, no positions), `breachCount` and `estopRequestCount`, so a panel can show which zone an object is in and whether a stop was asked. The signed `sdkSafetyState` is not changed. 1 new test.
