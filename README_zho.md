@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
   <img src="https://img.shields.io/badge/Tests-980%20passing-2ea44f.svg" alt="Tests">
-  <img src="https://img.shields.io/badge/Version-0.2.2-0f6cbd.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-0.2.3-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
 
@@ -33,7 +33,7 @@ GPL-3.0-or-later - see LICENSE
 
 | | |
 |---|---|
-| 版本 | `0.2.2` |
+| 版本 | `0.2.3` |
 | 成熟度 | 可用 |
 | 测试 | 980 (`python -m pytest -q tests`) |
 | 技术栈 | Python / 3D vision / Hailo-8 |
@@ -274,7 +274,7 @@ CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档�
 无参数调用会打印名称 + 版本 + 角色：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.2.2
+HYDRA-UMC-SAFETY-ZONES v0.2.3
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
@@ -435,7 +435,7 @@ HYDRA-UMC-SAFETY-ZONES/
 （`geometry.py`/`zones.py`/`breach.py`）、在任何越界逻辑之前就安全故障切换
 到 `INHIBITED` 的真实校准新鲜度强制检查（`calibration.py`/`safety_state.py`）、
 一个在设计上就恪守检测与执行边界的真实 E-STOP*请求*流水线（`estop.py`）、
-一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 953 个通过的
+一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 980 个通过的
 测试——完整的真实构建/运行输出见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 **仍待完成的内容（顺序不分先后，无既定时间表）：**

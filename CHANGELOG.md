@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+## [0.2.3] - The service publishes fault-event/1 when its safety state changes (off by default, faultEvents in the zones file): a verdict that is no longer READY raises the fault safetystate (INHIBITED is a warning, FAULT an error,... (and 3 more changes)
+
 - **The service publishes `fault-event/1` when its safety state changes (off by default, `faultEvents` in the zones file):** a verdict that is no longer READY raises the fault `safety_state` (`INHIBITED` is a warning, `FAULT` an error, `SAFE_STOP` critical, with the reason as text) and the next READY clears it, on `hydra/faults/safety-zones` of the broker where HYDRA-UMC-SERVER reads `hydra/faults/#`. Only a change is published, at most once per `minIntervalS`; the message is retained and sent with quality of service 1; the broker, topic, source, code, robot and credentials (files) are configuration values. It only observes: a broker that is down or a publish that fails never changes or delays a verdict. 12 tests. See `docs/FAULT_EVENTS.md`.
 
 - **The test of the stateful flag gives a fresh proof of life:** the heartbeat of `test_serve_stateful_flag_turns_the_heartbeat_route_on_and_the_default_leaves_it_off` was stamped before two services started, so a slow start made it older than the allowed two seconds; it is now stamped when it is sent.

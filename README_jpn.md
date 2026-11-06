@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
   <img src="https://img.shields.io/badge/Tests-980%20passing-2ea44f.svg" alt="Tests">
-  <img src="https://img.shields.io/badge/Version-0.2.2-0f6cbd.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-0.2.3-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
 
@@ -33,7 +33,7 @@ GPL-3.0-or-later - see LICENSE
 
 | | |
 |---|---|
-| バージョン | `0.2.2` |
+| バージョン | `0.2.3` |
 | 成熟度 | 機能する |
 | テスト | 980 (`python -m pytest -q tests`) |
 | 技術 | Python / 3D vision / Hailo-8 |
@@ -293,7 +293,7 @@ CI は `HYDRA_UMC_CI=1 python tools/ci_validate.py` を実行し、マニフェ�
 引数なしで呼び出すと名前・バージョン・役割を表示します：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.2.2
+HYDRA-UMC-SAFETY-ZONES v0.2.3
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
@@ -462,7 +462,7 @@ HYDRA-UMC-SAFETY-ZONES/
 `INHIBITED` にフェイルする実際のキャリブレーション鮮度強制
 （`calibration.py`/`safety_state.py`）、構造上検知と執行の境界を守る
 実際の E-STOP *リクエスト*パイプライン（`estop.py`）、ゾーン/検知 JSON
-ファイルに対する実際の CLI サブコマンド `check`、そして通過した 953 件の
+ファイルに対する実際の CLI サブコマンド `check`、そして通過した 980 件の
 テスト——完全な実際のビルド/実行出力は
 [`CHANGELOG.md`](CHANGELOG.md) を参照してください。
 
