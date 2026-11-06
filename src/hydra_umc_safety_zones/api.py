@@ -42,6 +42,7 @@ from .signing import Signer
 from .observation import ObservationError, parse_observation_status
 from .robot_body import RobotBody, RobotBodyError
 from .safety_state import SafetyEvaluation, SafetyState, collect_breaches, evaluate_safety, to_sdk_safety_state
+from .fault_events import FaultEventEmitter
 from .stateful import StatefulMonitor, StatefulSettings, format_event
 from .zones import ZoneSet
 
@@ -512,6 +513,8 @@ class SafetyZonesServer(ThreadingHTTPServer):
         self.estop_requester = estop_requester
         # Off unless the zones file switches armorAlarm.enabled on (see armor_alarm.py).
         self.armor_gate = armor_gate
+        # Off unless the zones file switches faultEvents.enabled on: publishes fault-event/1 when the state changes (see fault_events.py).
+        self.fault_emitter: FaultEventEmitter | None = None
 
     def start_watcher(self, interval_s: float = 0.25) -> None:
         """Starts the thread that publishes INHIBITED when a verdict or the heartbeat expires (stateful mode only)."""
@@ -579,6 +582,8 @@ class SafetyZonesServer(ThreadingHTTPServer):
         """Remember the verdict for GET /state and, when a destination is set, append one JSON line (state, reason, configuration hash, counts); never raises."""
         self._sign(response)
         self._remember_verdict(response)
+        if self.fault_emitter is not None:
+            self.fault_emitter.observe(response)
         if self.monitor is not None:
             self.monitor.record_verdict(response, self.clock())
         if self._decision_log is None:

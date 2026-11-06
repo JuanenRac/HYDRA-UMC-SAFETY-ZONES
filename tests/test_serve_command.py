@@ -168,6 +168,7 @@ def test_serve_stateful_flag_turns_the_heartbeat_route_on_and_the_default_leaves
     try:
         base = f"http://127.0.0.1:{port}"
         assert _call(f"{base}/check", {"detections": {"objects": []}})[1]["state"] == "inhibited"
+        beat = dict(beat, observedAt=datetime.now(timezone.utc).isoformat())  # the first service took seconds to start: the proof must be fresh
         assert _call(f"{base}/heartbeat", beat)[0] == 200
         assert _call(f"{base}/check", {"detections": {"objects": []}})[1]["state"] == "ready"
     finally:

@@ -4,6 +4,10 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The service publishes `fault-event/1` when its safety state changes (off by default, `faultEvents` in the zones file):** a verdict that is no longer READY raises the fault `safety_state` (`INHIBITED` is a warning, `FAULT` an error, `SAFE_STOP` critical, with the reason as text) and the next READY clears it, on `hydra/faults/safety-zones` of the broker where HYDRA-UMC-SERVER reads `hydra/faults/#`. Only a change is published, at most once per `minIntervalS`; the message is retained and sent with quality of service 1; the broker, topic, source, code, robot and credentials (files) are configuration values. It only observes: a broker that is down or a publish that fails never changes or delays a verdict. 12 tests. See `docs/FAULT_EVENTS.md`.
+
+- **The test of the stateful flag gives a fresh proof of life:** the heartbeat of `test_serve_stateful_flag_turns_the_heartbeat_route_on_and_the_default_leaves_it_off` was stamped before two services started, so a slow start made it older than the allowed two seconds; it is now stamped when it is sent.
+
 - **`POST /hold` and `GET /holds` let a service that has the identity of the server hold one robot (off by default):** `--hold` starts the routes (without it they answer `404`), they never answer without a credential, and a hold is only recorded and listed. Only with `--hold-actuate` (which needs the CAN stop requester) does a hold also hand a stop request to the requester. Described in `docs/HOLD.md`. 8 tests.
 
 - **The build test of the repository compiles only on CI or when allowed:** for the stacks that compile (`rust`, `go`, `android`, `flutter`, `firmware-c`), `tools/build_test.py` prints `BUILD_TEST=SKIPPED` with exit status 2 on a plain PC, never a pass; `ALLOW_LOCAL_BUILD=1` allows it and a CI runner always may. The `python` and `node` stacks are not locked.

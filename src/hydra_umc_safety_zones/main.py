@@ -65,6 +65,7 @@ from hydra_umc_safety_zones.safety_state import SafetyState, collect_breaches, e
 from hydra_umc_safety_zones.stateful import StatefulSettings, parse_stateful_settings
 from hydra_umc_safety_zones.armor_alarm import ArmorAlarmConfigError, ArmorAlarmGate, parse_settings as parse_armor_alarm_settings
 from hydra_umc_safety_zones.armor_alarm_mqtt import ArmorAlarmSubscriber
+from hydra_umc_safety_zones.fault_events import FaultEventEmitter, FaultEventsConfigError, MqttFaultPublisher, parse_fault_event_settings
 
 PROJECT_NAME = "HYDRA-UMC-SAFETY-ZONES"
 DIST_NAME = "hydra-umc-safety-zones"
@@ -242,6 +243,18 @@ def _start_armor_alarm(zones_file: str) -> tuple[ArmorAlarmGate, ArmorAlarmSubsc
     return gate, ArmorAlarmSubscriber(gate)
 
 
+def _start_fault_events(zones_file: str) -> tuple[FaultEventEmitter, MqttFaultPublisher] | None:
+    """The emitter and the (not yet started) publisher when the zones file switches ``faultEvents.enabled`` on; None when it is off or absent."""
+    if not zones_file:
+        return None
+    raw = json.loads(Path(zones_file).read_text(encoding="utf-8"))
+    settings = parse_fault_event_settings(raw.get("faultEvents") if isinstance(raw, dict) else None)
+    if not settings.enabled:
+        return None
+    publisher = MqttFaultPublisher(settings)
+    return FaultEventEmitter(settings, publisher.publish, log=lambda message: print(message, file=sys.stderr, flush=True)), publisher
+
+
 def _start_can(path: str):
     """Reads the CAN configuration and opens the bus: the requester, the heartbeat sender (not started) and the configuration. None-like when it is not enabled is an error: a file given is a file meant."""
     config = load_can_config(path)
@@ -294,6 +307,12 @@ def _run_serve(args: argparse.Namespace) -> int:
         armor_runtime = _start_armor_alarm(args.zones_file)
     except (ArmorAlarmConfigError, OSError, ValueError) as exc:
         print(f"[safety-zones] fatal: invalid armorAlarm settings: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+    fault_runtime = None
+    try:
+        fault_runtime = _start_fault_events(args.zones_file)
+    except (FaultEventsConfigError, OSError, ValueError) as exc:
+        print(f"[safety-zones] fatal: invalid faultEvents settings: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
     can_runtime = None
     if args.can_estop_config:
@@ -350,6 +369,16 @@ def _run_serve(args: argparse.Namespace) -> int:
             + (" except by the safe stop that the installation switched on" if gate.settings.safe_stop else "")
             + " (not tried with a real alarm)"
         )
+    if fault_runtime is not None:
+        emitter, fault_publisher = fault_runtime
+        try:
+            fault_publisher.start()
+        except (FaultEventsConfigError, OSError) as exc:
+            print(f"[safety-zones] fatal: the fault events could not start: {exc}", file=sys.stderr)
+            server.server_close()
+            return 2
+        server.fault_emitter = emitter
+        print(f"[safety-zones] fault events: a change of the safety state is published as fault-event/1 on {emitter.settings.topic} (not tried with a real broker)")
     if signer is not None:
         print(f"[safety-zones] every verdict is signed ({signer.alg}, key id {signer.key_id})")
     print(f"[safety-zones] HTTP API listening on {addr}:{port}")
@@ -379,6 +408,8 @@ def _run_serve(args: argparse.Namespace) -> int:
     finally:
         if armor_runtime is not None:
             armor_runtime[1].stop()
+        if fault_runtime is not None:
+            fault_runtime[1].stop()
         server.server_close()
         print("[safety-zones] shutting down")
     return 0
