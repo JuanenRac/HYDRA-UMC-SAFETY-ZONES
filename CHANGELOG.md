@@ -4,6 +4,8 @@ All notable changes to this project are documented here.
 
 ## [Unreleased]
 
+- **The service publishes the occupied zones (off by default, `zoneOccupancy` in the zones file):** the zones named by the breaches of each verdict go to `hydra/safety/zones/occupied` as `{"occupied": [...], "observed_at": ms}`, the format the zone interlock of the AMR bridge reads. The message is not retained, goes out at once when the set changes and is repeated every `refreshS` seconds; a verdict whose breaches cannot be read publishes nothing, never "free". It only observes and never changes a verdict. `zone_occupancy.py`, `docs/ZONE_OCCUPANCY.md`, `tests/test_zone_occupancy.py` (fake MQTT client and the running service; not tried with a real broker and a vehicle).
+
 ## [0.2.3] - The service publishes fault-event/1 when its safety state changes (off by default, faultEvents in the zones file): a verdict that is no longer READY raises the fault safetystate (INHIBITED is a warning, FAULT an error,... (and 3 more changes)
 
 - **The service publishes `fault-event/1` when its safety state changes (off by default, `faultEvents` in the zones file):** a verdict that is no longer READY raises the fault `safety_state` (`INHIBITED` is a warning, `FAULT` an error, `SAFE_STOP` critical, with the reason as text) and the next READY clears it, on `hydra/faults/safety-zones` of the broker where HYDRA-UMC-SERVER reads `hydra/faults/#`. Only a change is published, at most once per `minIntervalS`; the message is retained and sent with quality of service 1; the broker, topic, source, code, robot and credentials (files) are configuration values. It only observes: a broker that is down or a publish that fails never changes or delays a verdict. 12 tests. See `docs/FAULT_EVENTS.md`.
