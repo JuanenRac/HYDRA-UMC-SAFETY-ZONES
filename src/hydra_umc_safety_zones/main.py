@@ -65,6 +65,7 @@ from hydra_umc_safety_zones.safety_state import SafetyState, collect_breaches, e
 from hydra_umc_safety_zones.stateful import StatefulSettings, parse_stateful_settings
 from hydra_umc_safety_zones.armor_alarm import ArmorAlarmConfigError, ArmorAlarmGate, parse_settings as parse_armor_alarm_settings
 from hydra_umc_safety_zones.armor_alarm_mqtt import ArmorAlarmSubscriber
+from hydra_umc_safety_zones.record_trigger import RecordTriggerClient, RecordTriggerConfigError, build_client as build_record_trigger, parse_record_trigger_settings
 from hydra_umc_safety_zones.zone_occupancy import ZoneOccupancyConfigError, ZoneOccupancyEmitter, build_publisher as build_occupancy_publisher, parse_zone_occupancy_settings
 from hydra_umc_safety_zones.fault_events import FaultEventEmitter, FaultEventsConfigError, MqttFaultPublisher, parse_fault_event_settings
 
@@ -268,6 +269,17 @@ def _start_zone_occupancy(zones_file: str) -> tuple[ZoneOccupancyEmitter, MqttFa
     return ZoneOccupancyEmitter(settings, publisher.publish, log=lambda message: print(message, file=sys.stderr, flush=True)), publisher
 
 
+def _start_record_trigger(zones_file: str) -> RecordTriggerClient | None:
+    """The client when the zones file switches ``recordTrigger.enabled`` on; None when it is off or absent."""
+    if not zones_file:
+        return None
+    raw = json.loads(Path(zones_file).read_text(encoding="utf-8"))
+    settings = parse_record_trigger_settings(raw.get("recordTrigger") if isinstance(raw, dict) else None)
+    if not settings.enabled:
+        return None
+    return build_record_trigger(settings, log=lambda message: print(message, file=sys.stderr, flush=True))
+
+
 def _start_can(path: str):
     """Reads the CAN configuration and opens the bus: the requester, the heartbeat sender (not started) and the configuration. None-like when it is not enabled is an error: a file given is a file meant."""
     config = load_can_config(path)
@@ -332,6 +344,12 @@ def _run_serve(args: argparse.Namespace) -> int:
         occupancy_runtime = _start_zone_occupancy(args.zones_file)
     except (ZoneOccupancyConfigError, OSError, ValueError) as exc:
         print(f"[safety-zones] fatal: invalid zoneOccupancy settings: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+    trigger_client = None
+    try:
+        trigger_client = _start_record_trigger(args.zones_file)
+    except (RecordTriggerConfigError, OSError, ValueError) as exc:
+        print(f"[safety-zones] fatal: invalid recordTrigger settings: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
     can_runtime = None
     if args.can_estop_config:
@@ -408,6 +426,9 @@ def _run_serve(args: argparse.Namespace) -> int:
             return 2
         server.occupancy_emitter = occupancy_emitter
         print(f"[safety-zones] zone occupancy: the zones with something inside are published on {occupancy_emitter.settings.topic} (not tried with a real broker)")
+    if trigger_client is not None:
+        server.record_trigger = trigger_client
+        print(f"[safety-zones] record trigger: a safe stop asks {len(trigger_client.settings.targets)} camera(s) to keep their frames (not tried with a real camera)")
     if signer is not None:
         print(f"[safety-zones] every verdict is signed ({signer.alg}, key id {signer.key_id})")
     print(f"[safety-zones] HTTP API listening on {addr}:{port}")
