@@ -25,6 +25,7 @@ import sys
 
 from .health_route import health_open_requested
 from .hold import HoldRegistry
+from .tool_arms import ToolArmRegistry
 from .server_identity import identity_key_from
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
@@ -384,6 +385,9 @@ def _run_serve(args: argparse.Namespace) -> int:
         server.holds = HoldRegistry()
         server.hold_actuate = bool(args.hold_actuate)
         print(f"[safety-zones] holds on: POST /hold records a hold{' and requests a stop' if server.hold_actuate else ' (recorded only; --hold-actuate would also request a stop)'}")
+    if args.tool_arms:
+        server.tool_arms = ToolArmRegistry(server.clock)
+        print("[safety-zones] tool arms on: POST /tool-arms records the arm state of a tool, GET /tool-arms lists it (recorded only; no stop is requested)")
     if can_runtime is not None:
         _, heartbeat, can_config = can_runtime
         heartbeat.is_safe = lambda: state_is_safe(server.last_verdict(), can_config.state_max_age_ms)
@@ -592,6 +596,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=os.environ.get("SAFETY_ZONES_HOLD_ACTUATE", "") in ("1", "true", "yes"),
         help="with --hold, a hold also hands a stop request to the CAN requester (needs --can-estop-config; off by default, a hold is then only recorded)",
+    )
+    serve_parser.add_argument(
+        "--tool-arms",
+        action="store_true",
+        default=os.environ.get("SAFETY_ZONES_TOOL_ARMS", "") in ("1", "true", "yes"),
+        help="POST /tool-arms lets a caller with the identity of the server (or the token) report the arm state of a URTC tool and GET /tool-arms lists the reports; "
+             "they are only recorded (off by default, the routes answer 404)",
     )
     serve_parser.add_argument(
         "--stateful",
