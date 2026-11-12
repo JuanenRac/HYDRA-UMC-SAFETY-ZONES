@@ -412,7 +412,7 @@ Dieses Projekt ist Teil des HYDRA-UMC-Robotik-Ökosystems desselben Autors (Juan
 - **[HYDRA-UMC-VISUAL-SERVOING-API](https://github.com/JuanenRac/HYDRA-UMC-VISUAL-SERVOING-API)** — Position-Based-Visual-Servoing-Korrekturgesetz mit Freigabe abhängig vom Zonenstatus; noch keine Posenschätzung per Kamera.
 
 **Direkt verwandt**
-- **[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)** — der Entwurf des Motherboards des Roboterarms: CM5-Host + Dual-Core-STM32H745, gedacht zur Koordination von bis zu 8 Werkzeugarmen über CAN-OTA/SPI-OTA (Firmware in einer frühen Phase; noch keine bestückte Platine); dieses Projekt kann einen E-STOP anfordern, aber die Firmware hat noch keinen E-STOP-Pfad.
+- **[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)** — der Entwurf des Motherboards des Roboterarms: NVIDIA-Jetson-Orin-NX-Host + Dual-Core-STM32H757 (die CM5 bleibt der Pilot-Prüfstand), gedacht zur Koordination von bis zu 8 Werkzeugarmen über CAN-OTA/SPI-OTA (Firmware in einer frühen Phase; noch keine bestückte Platine); dieses Projekt kann einen E-STOP anfordern, aber die Firmware hat noch keinen E-STOP-Pfad.
 
 **Ebenfalls Teil des Ökosystems**
 

@@ -494,7 +494,7 @@ HYDRA-UMC-SAFETY-ZONES/
 - **[HYDRA-UMC-VISUAL-SERVOING-API](https://github.com/JuanenRac/HYDRA-UMC-VISUAL-SERVOING-API)** — ゾーン状態を条件に承認する Position-Based Visual Servoing 補正則。カメラによる姿勢推定はまだない。
 
 **直接関連**
-- **[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)** — ロボットアームのマザーボードの設計——CM5 ホスト + デュアルコア STM32H745、CAN-OTA/SPI-OTA 経由で最大 8 本のツールアームを統括することを目指す(ファームウェアは初期段階で、実装済みの基板はまだない)。本プロジェクトは E-STOP を要求できるが、ファームウェアにはまだ E-STOP の経路がない。
+- **[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)** — ロボットアームのマザーボードの設計——NVIDIA Jetson Orin NX ホスト + デュアルコア STM32H757(CM5 はパイロット試験台として残る)、CAN-OTA/SPI-OTA 経由で最大 8 本のツールアームを統括することを目指す(ファームウェアは初期段階で、実装済みの基板はまだない)。本プロジェクトは E-STOP を要求できるが、ファームウェアにはまだ E-STOP の経路がない。
 
 **エコシステムの他のプロジェクト**
 

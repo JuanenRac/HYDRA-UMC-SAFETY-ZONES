@@ -465,7 +465,7 @@ HYDRA-UMC-SAFETY-ZONES/
 - **[HYDRA-UMC-VISUAL-SERVOING-API](https://github.com/JuanenRac/HYDRA-UMC-VISUAL-SERVOING-API)** — 以区域状态为授权条件的 Position-Based Visual Servoing 修正律;尚无摄像头位姿估计。
 
 **直接相关**
-- **[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)** — 机器人手臂主板设计——CM5 主机 + 双核 STM32H745,目标是通过 CAN-OTA/SPI-OTA 协调最多 8 条工具臂(固件处于早期阶段,尚无已组装的电路板);本项目可以请求 E-STOP,但固件目前还没有 E-STOP 通路。
+- **[HYDRA-UMC](https://github.com/JuanenRac/HYDRA-UMC)** — 机器人手臂主板设计——NVIDIA Jetson Orin NX 主机 + 双核 STM32H757(CM5 保留为试验台),目标是通过 CAN-OTA/SPI-OTA 协调最多 8 条工具臂(固件处于早期阶段,尚无已组装的电路板);本项目可以请求 E-STOP,但固件目前还没有 E-STOP 通路。
 
 **生态系统中的其他项目**
 
