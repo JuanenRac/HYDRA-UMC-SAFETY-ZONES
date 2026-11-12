@@ -2,6 +2,7 @@
 
 ## [Unreleased]
 
+- **README: the platform statement:** a note says that where the README speaks of the CM5 it means the pilot bench that runs today, and that the target platform of HYDRA-UMC, an NVIDIA Jetson Orin NX 16 GB, is a design that has not been built or tested.
 - **The stop request now speaks the emergency-stop frame of HYDRA-UMC on identifier 0x001:** a danger verdict sends a TRIP (reason safety zone, source CM5, an epoch that goes up with each new stop and its own sequence number on every frame, complement bytes) instead of the older frame with a check byte. ALIVE and RELEASE belong to the kinematic brain, so the service sends no heartbeat on 0x001. The older frames on identifiers 1 and 2 and their safe heartbeat stay as a secondary path with `"protocol": "legacy"` in the CAN file, and `"legacy_heartbeat": true` keeps that heartbeat beside the new frame. New settings `protocol`, `episode_gap_ms` and `legacy_heartbeat`; with `hydra` the stop identifier must be 1. Described in `docs/CAN_ESTOP.md` and `docs/BENCH_TESTS.md`. 25 tests (1141 -> 1166). Not tried on a real bus.
 
 All notable changes to this project are documented here.

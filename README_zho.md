@@ -121,6 +121,8 @@ Python 服务中的一个漏洞可能导致*未能请求*停止，但绝不可�
 
 **HYDRA-UMC-SAFETY-ZONES** 是 Vision AI Node 系列的安全子系统：它把检测到的物体位置与机器人周围的警告和危险体积进行比对，并返回 READY、WARNING、DANGER 或 INHIBITED。它只会请求紧急停止；物理停止仍在控制器的硬件中完成。
 
+> **平台：** 本 README 中的 CM5 指的是目前正在运行的试验台；HYDRA-UMC 的目标平台是 NVIDIA Jetson Orin NX 16 GB，这是尚未制造或测试的设计。
+
 ## 🏛️ 架构
 
 <p align="center">

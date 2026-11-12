@@ -131,6 +131,8 @@ JSON からゾーン集合（ゾーン + オプションのキャリブレーシ
 
 **HYDRA-UMC-SAFETY-ZONES** は Vision AI Node ファミリーの安全サブシステムです。検出された物体の位置をロボット周囲の警告・危険ボリュームと照合し、READY、WARNING、DANGER、INHIBITED のいずれかを返します。非常停止は要求するだけで、物理的な停止はコントローラーのハードウェアに残ります。
 
+> **プラットフォーム：** この README の「CM5」は、現在動作している試験用ベンチを指します。HYDRA-UMC の目標プラットフォームは NVIDIA Jetson Orin NX 16 GB ですが、これは製作も試験もされていない設計です。
+
 ## 🏛️ アーキテクチャ
 
 <p align="center">

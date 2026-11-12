@@ -98,6 +98,8 @@ Questo è uno dei 4 figli di **[HYDRA-UMC-VISION-NODE](https://github.com/Juanen
 
 **HYDRA-UMC-SAFETY-ZONES** è il sottosistema di sicurezza della famiglia Vision AI Node: confronta le posizioni degli oggetti rilevati con volumi di avviso e di pericolo attorno ai robot e risponde READY, WARNING, DANGER o INHIBITED. Richiede soltanto un arresto di emergenza; l'arresto fisico resta nell'hardware del controllore.
 
+> **Piattaforma:** dove questo README dice CM5, intende il banco pilota che funziona oggi; la piattaforma di destinazione di HYDRA-UMC è un NVIDIA Jetson Orin NX da 16 GB, un progetto non costruito né provato.
+
 ## 🏛️ Architettura
 
 <p align="center">
