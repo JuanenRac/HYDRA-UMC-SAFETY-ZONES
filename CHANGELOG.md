@@ -1,8 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
 All notable changes to this project are documented here.
 
-## [Unreleased]
+## [0.2.4] - 34 more tests for the CAN link: `tests/test_can_estop_edges.py` checks the frame codec (the check byte against the standard vector, a seeded walk of frames, every length, the version, the kind and any changed byte), the opening of a bus with the library missin
 
 - **34 more tests for the CAN link:** `tests/test_can_estop_edges.py` checks the frame codec (the check byte against the standard vector, a seeded walk of frames, every length, the version, the kind and any changed byte), the opening of a bus with the library missing or failing, the stop frames (first zone named, count capped, one sequence per stop, a bus that fails every time is an error and one lost frame of several is not), the heartbeat (a check that raises is not safe, a failed send is counted, one thread) and `state_is_safe` for every shape of verdict (the age is inclusive in both directions, the house alarm alone keeps the heartbeat). Line coverage of `can_estop.py` goes from 91 % to 100 % and of the whole package from 95 % to 96 %.
 - **26 more tests for the start-up of the service and the reading of the ARMOR alarm:** `tests/test_serve_inprocess.py` (15) runs `serve` in the test process with the serving loop replaced by an immediate Ctrl-C, so every line of the start-up is tied to the thing it describes (a request that decides the zones, the hash of the zones file, the token never printed, the decision log, the stateful mode, holds recorded only, tool arms, signed verdicts, a taken port) and the helpers that read the optional blocks of the zones file are checked on their own; `tests/test_armor_alarm_transport_edges.py` (11) covers the MQTT side of the alarm reading (the library missing, the client the library makes, a user without a password, TLS, the asynchronous connect, every shape of a connection result, a stop with nothing to stop). Line coverage of `main.py` goes from 70 % to 88 %, of `armor_alarm_mqtt.py` from 84 % to 100 %, and of the whole package from 93 % to 95 %.
