@@ -286,7 +286,7 @@ def test_the_configuration_is_checked(tmp_path) -> None:
     ):
         with pytest.raises(CanConfigError):
             parse_config(bad)
-    assert parse_config({"extended_id": True, "estop_id": 0x800, "heartbeat_id": 0x801}).extended_id
+    assert parse_config({"protocol": "legacy", "extended_id": True, "estop_id": 0x800, "heartbeat_id": 0x801}).extended_id
     path = tmp_path / "can_estop.json"
     path.write_text(json.dumps({"enabled": True, "interface": "virtual", "channel": "sim"}), encoding="utf-8")
     assert load_config(path).interface == "virtual"

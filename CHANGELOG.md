@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- **The stop request now speaks the emergency-stop frame of HYDRA-UMC on identifier 0x001:** a danger verdict sends a TRIP (reason safety zone, source CM5, an epoch that goes up with each new stop and its own sequence number on every frame, complement bytes) instead of the older frame with a check byte. ALIVE and RELEASE belong to the kinematic brain, so the service sends no heartbeat on 0x001. The older frames on identifiers 1 and 2 and their safe heartbeat stay as a secondary path with `"protocol": "legacy"` in the CAN file, and `"legacy_heartbeat": true` keeps that heartbeat beside the new frame. New settings `protocol`, `episode_gap_ms` and `legacy_heartbeat`; with `hydra` the stop identifier must be 1. Described in `docs/CAN_ESTOP.md` and `docs/BENCH_TESTS.md`. 25 tests (1141 -> 1166). Not tried on a real bus.
+
 All notable changes to this project are documented here.
 
 ## [0.2.4] - 34 more tests for the CAN link: `tests/test_can_estop_edges.py` checks the frame codec (the check byte against the standard vector, a seeded walk of frames, every length, the version, the kind and any changed byte), the opening of a bus with the library missin

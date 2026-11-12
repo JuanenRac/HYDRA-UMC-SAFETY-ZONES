@@ -3,7 +3,10 @@
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 # GPL-3.0-or-later - see LICENSE
 # =============================================================================
-"""The E-STOP request on a CAN bus, and the "safe" heartbeat that makes the chain fail safe.
+"""The OLDER E-STOP frames of this service on a CAN bus (identifiers 1 and 2 with a check byte), and the "safe" heartbeat that makes the chain fail safe.
+
+The stop frame of the stack is the one HYDRA-UMC defines on identifier 0x001 (`hydra_estop.py`), and it is what the service sends by default (`"protocol": "hydra"`).
+The frames below stay as a secondary path, selected with `"protocol": "legacy"`; this module also holds the configuration of both.
 
 This implements the `EStopRequester` of `estop.py` over python-can. It still only REQUESTS a stop: the board that receives the frame
 decides what to do with it and is the one that cuts power. Two frames, both with 8 data bytes:
@@ -64,9 +67,18 @@ class CanEStopConfig:
     state_max_age_ms: int = 1000
     # how many times a stop frame is sent in a row (a bus may drop a frame)
     repeat: int = 3
+    # "hydra": the TRIP of identifier 0x001 of HYDRA-UMC (hydra_estop.py); "legacy": the older frames below (identifiers estop_id and heartbeat_id)
+    protocol: str = "hydra"
+    # hydra: a request this long after the previous one starts a new stop (the epoch of the frame goes up by one)
+    episode_gap_ms: int = 1000
+    # hydra: also send the older heartbeat on heartbeat_id as a secondary path (ALIVE on 0x001 belongs to the brain alone and is never sent from here)
+    legacy_heartbeat: bool = False
 
+
+PROTOCOLS = ("hydra", "legacy")
 
 _INT_BOUNDS = {
+    "episode_gap_ms": (50, 60_000),
     "bitrate": (10_000, 1_000_000),
     "heartbeat_period_ms": (10, 5_000),
     "state_max_age_ms": (50, 60_000),
@@ -83,9 +95,11 @@ def parse_config(raw: object) -> CanEStopConfig:
     if unknown:
         raise CanConfigError(f"unknown field(s) in the CAN configuration: {', '.join(unknown)}")
     values: dict[str, Any] = dict(raw)
-    for name in ("enabled", "extended_id"):
+    for name in ("enabled", "extended_id", "legacy_heartbeat"):
         if name in values and not isinstance(values[name], bool):
             raise CanConfigError(f"{name} must be true or false")
+    if "protocol" in values and values["protocol"] not in PROTOCOLS:
+        raise CanConfigError(f"protocol must be one of: {', '.join(PROTOCOLS)}")
     for name in ("interface", "channel"):
         if name in values and (not isinstance(values[name], str) or not values[name] or len(values[name]) > 64):
             raise CanConfigError(f"{name} must be a non-empty text of at most 64 characters")
@@ -106,6 +120,8 @@ def parse_config(raw: object) -> CanEStopConfig:
         raise CanConfigError("estop_id must be lower than heartbeat_id: the stop has to win arbitration")
     if config.state_max_age_ms < config.heartbeat_period_ms:
         raise CanConfigError("state_max_age_ms must not be shorter than heartbeat_period_ms")
+    if config.protocol == "hydra" and (config.estop_id != 0x001 or config.extended_id):
+        raise CanConfigError('with protocol "hydra" the stop is on the standard identifier 1 (the contract of HYDRA-UMC); use protocol "legacy" for other identifiers')
     return config
 
 

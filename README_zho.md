@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-1141%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-1166%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.2.4-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | 版本 | `0.2.4` |
 | 成熟度 | 可用 |
-| 测试 | 1141 (`python -m pytest -q tests`) |
+| 测试 | 1166 (`python -m pytest -q tests`) |
 | 技术栈 | Python / 3D vision / Hailo-8 |
 | 目标 | HYDRA-UMC 工作单元的 Raspberry Pi CM5 |
 | 真实硬件 | 尚未：此版本没有在真实硬件上运行的记录 |
@@ -51,7 +51,7 @@ GPL-3.0-or-later - see LICENSE
 | 领域 | 状态 | 在这里的含义 |
 |---|---|---|
 | 软件 | 🟡 | 主要用途可用；上面的诚实性检查列出了仍然缺少的内容 |
-| 测试 | 🟢 | 1141 项自动测试，每次变更都会运行 |
+| 测试 | 🟢 | 1166 项自动测试，每次变更都会运行 |
 | 真实硬件 | 🔴 | 尚未：此版本没有在真实硬件上运行的记录 |
 | 接口与协议 | 🟡 | 提供的路由或消息已有文档，并用客户端测试过；尚未被所有客户端使用 |
 | 集成 | 🟠 | 在 CM5 测试台上与其他服务一起运行，其消息遵循 SDK 的共享契约 |
@@ -89,7 +89,7 @@ GPL-3.0-or-later - see LICENSE
 * 🔍 **异物检测（计划中）：** 识别遗留在工作空间中的工具或碎屑。
 * 🎥 **基于 Hailo-8 的真实 3D 占用地图（计划中）：** v0 的 `check` 子命令从 JSON 文件读取检测对象位置，正是因为真正会产生这些位置的 Hailo-8 空间分割流水线在本环境中尚不存在——详见下方"诚实说明"。
 * 🧩 **为何作为独立项目存在：** 安全逻辑相较于感知系统的其他部分有着不同的验证标准——将其隔离为独立服务，意味着可以独立于系列内其他摄像头流水线或模型编译方面的变更，对其进行测试、审计并最终认证（见上方 ISO 13849-1 徽章，目前仅为目标，尚未实现）。
-* 🔏 **签名判定与 CAN 急停请求（均为可选）：** 使用 `--state-key-file` 时，每个判定都带有 `sdkSafetyStateSignature`（对状态、只增不减的计数器和密钥 ID 做 HMAC-SHA256），`effective_state` 会把未签名、伪造、过期或重放的内容一律视为 `INHIBITED`；使用 `--can-estop-config` 时，危险判定会通过 python-can 在 CAN 总线上发送停止帧，而心跳仅在最近一次判定为 READY 时才发出，因此失声的服务会使机器停下。只在模拟总线上试过；帧格式仍需与固件商定。
+* 🔏 **签名判定与 CAN 急停请求（均为可选）：** 使用 `--state-key-file` 时，每个判定都带有 `sdkSafetyStateSignature`（对状态、只增不减的计数器和密钥 ID 做 HMAC-SHA256），`effective_state` 会把未签名、伪造、过期或重放的内容一律视为 `INHIBITED`；使用 `--can-estop-config` 时，危险判定会通过 python-can 在 CAN 总线的标识符 0x001 上发送 TRIP，这是 HYDRA-UMC 为整个堆栈定义的紧急停止帧（原因：安全区；带纪元和序列号）。本服务带校验字节的旧帧，以及仅在最近一次判定为 READY 时才发出的心跳，通过 `"protocol": "legacy"` 作为次要路径保留。只在模拟总线上试过。
 * 🔑 **Ed25519 作为签名判定的可选方案（默认关闭，默认仍为 HMAC）：** `serve --state-signing-alg ed25519 --state-key-file KEY.pem` 使用存放在仓库之外、绝不输出的私钥签名（`state-keygen` 生成密钥对且不会覆盖任何文件），因此使用方只持有公钥，无法签名；`signing.verify` 接受 `expected_alg`，所以用另一种算法签名、未签名、被篡改、过期或重放的判定都是 `INHIBITED`。需要 `cryptography` 包。
 * 🩺 **统一的 `GET /health`，默认关闭：** `serve --health-open`（或 `HYDRA_UMC_SAFETY_ZONES_HEALTH_OPEN=1`）使服务以 `{"status": "ok", "service": ..., "version": ...}` 响应 `GET /health`，家族中每个服务的响应体相同；没有该开关时，该路由像不存在的路由一样返回 `404`。非回环地址的调用方必须出示服务的 bearer 令牌，响应体不含路径、配置或密钥。
 * 🪪 **HYDRA-UMC-SERVER 的身份（默认关闭）：** `serve --identity-key-file 文件`（或 `HYDRA_UMC_SAFETY_ZONES_IDENTITY_KEY_FILE=文件`）会让服务在自己的令牌之外，也接受服务器在登录时签发的已签名令牌：查看者只能读取而不能更改，没有凭据的请求即使在环回地址上也会被拒绝。不开启该开关时一切照旧。
@@ -236,7 +236,7 @@ HTTP 服务通过选项配置；其中两项也可以来自环境变量。
 
 ## 🧪 测试
 
-运行 `python -m pytest -q tests` 会执行 1141 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
+运行 `python -m pytest -q tests` 会执行 1166 个自动测试。 不需要硬件，也不需要这台机器以外的任何东西。
 
 CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档、八个 README 和图片。
 
@@ -259,7 +259,7 @@ CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档�
 2. **虚拟环境** —— 若 `.venv/` 不存在则创建；否则复用。
 3. **可编辑安装（含 dev 附加依赖）** —— `pip install -e ".[dev]"`，使 `src/` 下的修改立即生效，安装 `pytest`，并注册 `hydra-umc-safety-zones` 控制台入口点。
 4. **编译检查** —— `python -m compileall -q src` 对 `src/` 下每个文件进行字节码编译，在整个生态系统范围内捕获语法错误。
-5. **真实测试套件** —— `pytest tests/` 运行全部 1141 个测试。
+5. **真实测试套件** —— `pytest tests/` 运行全部 1166 个测试。
 
 `set -euo pipefail` 会在第一个失败步骤处停止脚本；如果是通过双击而非从已
 打开的终端运行的，窗口会保持打开（`Press Enter to close...`）。
@@ -405,7 +405,8 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── armor_alarm.py            A.R.M.O.R.警报禁止启动（可选）
 │   ├── armor_alarm_mqtt.py       为警报读取提供数据的MQTT链路（可选）
 │   ├── signing.py                安全状态的 HMAC 签名（可选）
-│   ├── can_estop.py              通过 CAN 的急停请求与安全心跳（可选）
+│   ├── can_estop.py              通过 CAN 的旧急停帧（次要）
+│   ├── hydra_estop.py            标识符 0x001 的急停 TRIP（CAN，可选）
 │   └── main.py                   入口点 + 真实的 `check` 子命令
 ├── tests/                        真实测试：几何、越界、校准、观测、safety_state、estop、配置、api、CLI
 ├── docs/                         文档与安全标准
@@ -435,7 +436,7 @@ HYDRA-UMC-SAFETY-ZONES/
 （`geometry.py`/`zones.py`/`breach.py`）、在任何越界逻辑之前就安全故障切换
 到 `INHIBITED` 的真实校准新鲜度强制检查（`calibration.py`/`safety_state.py`）、
 一个在设计上就恪守检测与执行边界的真实 E-STOP*请求*流水线（`estop.py`）、
-一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 1141 个通过的
+一个基于区域/检测 JSON 文件的真实 `check` CLI 子命令，以及 1166 个通过的
 测试——完整的真实构建/运行输出见 [`CHANGELOG.md`](CHANGELOG.md)。
 
 **仍待完成的内容（顺序不分先后，无既定时间表）：**

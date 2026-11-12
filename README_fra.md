@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-1141%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-1166%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.2.4-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | Version | `0.2.4` |
 | Maturité | Fonctionnel |
-| Tests | 1141 (`python -m pytest -q tests`) |
+| Tests | 1166 (`python -m pytest -q tests`) |
 | Technologie | Python / 3D vision / Hailo-8 |
 | Cible | Le Raspberry Pi CM5 d'une cellule HYDRA-UMC |
 | Sur matériel réel | Pas encore : aucune exécution sur du matériel réel n'est consignée pour cette version |
@@ -51,7 +51,7 @@ Chaque ligne est une partie de ce dépôt et le feu dit où elle en est aujourd'
 | Domaine | État | Ce que cela veut dire ici |
 |---|---|---|
 | Logiciel | 🟡 | Fonctionne pour son usage principal ; la vérification d'honnêteté ci-dessus liste ce qui manque encore |
-| Tests | 🟢 | 1141 tests automatiques, exécutés à chaque modification |
+| Tests | 🟢 | 1166 tests automatiques, exécutés à chaque modification |
 | Matériel réel | 🔴 | Pas encore : aucune exécution sur du matériel réel n'est consignée pour cette version |
 | Interface et protocoles | 🟡 | Les routes ou les messages proposés sont documentés et testés avec un client ; tous les clients ne les ont pas encore utilisés |
 | Intégration | 🟠 | Il fonctionne avec les autres services sur le banc d'essai CM5 et ses messages suivent les contrats partagés du SDK |
@@ -85,7 +85,7 @@ C'est l'un des 4 enfants de **[HYDRA-UMC-VISION-NODE](https://github.com/JuanenR
 * 🔍 **Détection d'objets étrangers (prévu) :** identifier les outils ou débris laissés dans l'espace de travail.
 * 🎥 **Cartographie réelle d'occupation 3D depuis Hailo-8 (prévu) :** le sous-commande `check` de v0 prend les positions d'objets détectés depuis un fichier JSON précisément parce que le vrai pipeline de segmentation spatiale Hailo-8 qui les produirait n'existe pas encore dans cet environnement - voir « Vérification d'honnêteté » ci-dessous.
 * 🧩 **Pourquoi c'est un projet séparé :** la logique de sécurité a une barre de vérification différente du reste de la perception - l'isoler dans son propre service permet de la tester, l'auditer et éventuellement la certifier (voir le badge ISO 13849-1 ci-dessus, aspirationnel à ce stade) indépendamment des changements du pipeline caméra ou de la compilation de modèles ailleurs dans la famille.
-* 🔏 **Verdicts signés et demande d'arrêt par CAN (les deux optionnels) :** avec `--state-key-file`, chaque verdict porte `sdkSafetyStateSignature` (HMAC-SHA256 sur l'état, un compteur qui ne fait que monter et l'id de clé), et `effective_state` lit tout ce qui est non signé, falsifié, ancien ou rejoué comme `INHIBITED` ; avec `--can-estop-config`, un verdict de danger envoie la trame d'arrêt sur un bus CAN avec python-can et un battement n'est émis que tant que le dernier verdict est READY, si bien qu'un service muet arrête la machine. Essayé seulement avec un bus simulé ; la trame doit encore être convenue avec le firmware.
+* 🔏 **Verdicts signés et demande d'arrêt par CAN (les deux optionnels) :** avec `--state-key-file`, chaque verdict porte `sdkSafetyStateSignature` (HMAC-SHA256 sur l'état, un compteur qui ne fait que monter et l'id de clé), et `effective_state` lit tout ce qui est non signé, falsifié, ancien ou rejoué comme `INHIBITED` ; avec `--can-estop-config`, un verdict de danger envoie un TRIP sur l'identifiant 0x001 d'un bus CAN avec python-can, la trame d'arrêt d'urgence que HYDRA-UMC définit pour toute la pile (motif : zone de sécurité ; avec une époque et un numéro de séquence). Les anciennes trames de ce service, avec un octet de contrôle et un battement émis seulement tant que le dernier verdict est READY, restent une voie secondaire avec `"protocol": "legacy"`. Essayé seulement avec un bus simulé.
 * 🔑 **Ed25519 en option pour les verdicts signés (désactivé par défaut, HMAC reste le défaut) :** `serve --state-signing-alg ed25519 --state-key-file KEY.pem` signe avec une clé privée gardée hors du dépôt et jamais affichée (`state-keygen` crée la paire sans rien écraser), si bien qu'un consommateur ne détient que la clé publique et ne peut pas signer ; `signing.verify` prend `expected_alg`, donc un verdict signé avec l'autre algorithme, non signé, altéré, ancien ou rejoué est `INHIBITED`. Nécessite le paquet `cryptography`.
 * 🩺 **Un `GET /health` uniforme, fermé par défaut :** `serve --health-open` (ou `HYDRA_UMC_SAFETY_ZONES_HEALTH_OPEN=1`) fait répondre le service à `GET /health` par `{"status": "ok", "service": ..., "version": ...}`, le même corps dans chaque service de la famille ; sans l'interrupteur la route répond `404` comme une route inexistante. Un appelant hors loopback doit présenter le jeton bearer du service, et le corps ne contient ni chemin, ni configuration, ni secret.
 * 🪪 **L'identité de HYDRA-UMC-SERVER, désactivée par défaut :** `serve --identity-key-file FICHIER` (ou `HYDRA_UMC_SAFETY_ZONES_IDENTITY_KEY_FILE=FICHIER`) fait accepter au service le jeton signé que le serveur émet à la connexion, en plus de son propre jeton : un lecteur peut consulter mais pas modifier, et une requête sans justificatif est refusée même en loopback. Sans l'interrupteur, rien ne change.
@@ -201,7 +201,7 @@ Nécessite Python 3.10 ou plus récent.
 
 ## 🧪 Tests
 
-1141 tests automatiques s'exécutent avec `python -m pytest -q tests`. Ils n'ont besoin ni de matériel ni de rien en dehors de cette machine.
+1166 tests automatiques s'exécutent avec `python -m pytest -q tests`. Ils n'ont besoin ni de matériel ni de rien en dehors de cette machine.
 
 La CI exécute `HYDRA_UMC_CI=1 python tools/ci_validate.py`, qui vérifie le manifeste, les documents, les huit README et les images.
 
@@ -224,7 +224,7 @@ La CI exécute `HYDRA_UMC_CI=1 python tools/ci_validate.py`, qui vérifie le man
 2. **Environnement virtuel** - crée `.venv/` s'il manque ; le réutilise sinon.
 3. **Installation éditable (avec extras dev)** - `pip install -e ".[dev]"` pour que les modifications sous `src/` prennent effet immédiatement, installe `pytest`, et enregistre le point d'entrée console `hydra-umc-safety-zones`.
 4. **Compile-check** - `python -m compileall -q src` compile en bytecode chaque fichier sous `src/`.
-5. **Vraie suite de tests** - `pytest tests/` exécute les 1141 tests.
+5. **Vraie suite de tests** - `pytest tests/` exécute les 1166 tests.
 
 `set -euo pipefail` arrête le script à la première étape en échec ; la fenêtre reste ouverte (`Press Enter to close...`) si elle a été lancée par double-clic plutôt que depuis un terminal déjà ouvert.
 
@@ -360,7 +360,8 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── armor_alarm.py            L'alarme d'A.R.M.O.R. inhibe les démarrages (optionnel)
 │   ├── armor_alarm_mqtt.py       Liaison MQTT qui alimente la lecture de l'alarme (optionnel)
 │   ├── signing.py                Signature HMAC de l'état de sécurité (optionnel)
-│   ├── can_estop.py              Demande d'arrêt et battement sûr par CAN (optionnel)
+│   ├── can_estop.py              Anciennes trames d'arrêt par CAN (secondaire)
+│   ├── hydra_estop.py            TRIP d'arrêt sur id 0x001 (CAN, optionnel)
 │   └── main.py                   Point d'entrée + vrai sous-commande `check`
 ├── tests/                        Vrais tests : géométrie, franchissements, calibration, observation, safety_state, estop, config, api, CLI
 ├── docs/                         Documentation et normes de sécurité
@@ -386,7 +387,7 @@ HYDRA-UMC-SAFETY-ZONES/
 
 **Limites connues aujourd'hui**
 
-**Ce qui fonctionne aujourd'hui :** de vraies définitions de zones Warning/Danger et une vraie vérification des franchissements (`geometry.py`/`zones.py`/`breach.py`), une vraie application de la fraîcheur de calibration qui échoue de façon sûre vers `INHIBITED` avant toute logique de franchissement (`calibration.py`/`safety_state.py`), un vrai pipeline de *demande* d'E-STOP qui respecte la frontière détecter-vs-appliquer par construction (`estop.py`), un vrai sous-commande CLI `check` sur des fichiers JSON de zones/détections, et 1141 tests qui passent - voir [`CHANGELOG.md`](CHANGELOG.md) pour la sortie complète réelle de build/run.
+**Ce qui fonctionne aujourd'hui :** de vraies définitions de zones Warning/Danger et une vraie vérification des franchissements (`geometry.py`/`zones.py`/`breach.py`), une vraie application de la fraîcheur de calibration qui échoue de façon sûre vers `INHIBITED` avant toute logique de franchissement (`calibration.py`/`safety_state.py`), un vrai pipeline de *demande* d'E-STOP qui respecte la frontière détecter-vs-appliquer par construction (`estop.py`), un vrai sous-commande CLI `check` sur des fichiers JSON de zones/détections, et 1166 tests qui passent - voir [`CHANGELOG.md`](CHANGELOG.md) pour la sortie complète réelle de build/run.
 
 **Ce qui reste ouvert, sans ordre particulier et sans calendrier engagé :**
 

@@ -435,24 +435,47 @@
         {
           "name": "can_estop.py",
           "desc": {
-            "en": "E-STOP request and safe heartbeat over CAN (optional)",
-            "es": "Petición de paro y latido seguro por CAN (opcional)",
-            "de": "Not-Halt-Anforderung und sicherer Heartbeat über CAN (optional)",
-            "fr": "Demande d'arrêt et battement sûr par CAN (optionnel)",
-            "it": "Richiesta di arresto e heartbeat sicuro via CAN (opzionale)",
-            "ja": "CAN による非常停止要求とセーフハートビート（任意）",
-            "zh": "通过 CAN 的急停请求与安全心跳（可选）",
-            "pt": "Pedido de paragem e batimento seguro por CAN (opcional)"
+            "en": "Older E-STOP frames over CAN (secondary)",
+            "es": "Tramas de paro anteriores por CAN (secundaria)",
+            "de": "Ältere Not-Halt-Frames über CAN (zweiter Weg)",
+            "fr": "Anciennes trames d'arrêt par CAN (secondaire)",
+            "it": "Vecchi frame di arresto via CAN (secondaria)",
+            "ja": "CAN の従来の非常停止フレーム（副経路）",
+            "zh": "通过 CAN 的旧急停帧（次要）",
+            "pt": "Tramas de paragem anteriores por CAN (secundária)"
           },
           "tree_desc": {
-            "en": "E-STOP request and safe heartbeat over CAN (optional)",
-            "es": "Petición de paro y latido seguro por CAN (opcional)",
-            "de": "Not-Halt-Anforderung und sicherer Heartbeat über CAN (optional)",
-            "fr": "Demande d'arrêt et battement sûr par CAN (optionnel)",
-            "it": "Richiesta di arresto e heartbeat sicuro via CAN (opzionale)",
-            "ja": "CAN による非常停止要求とセーフハートビート（任意）",
-            "zh": "通过 CAN 的急停请求与安全心跳（可选）",
-            "pt": "Pedido de paragem e batimento seguro por CAN (opcional)"
+            "en": "Older E-STOP frames over CAN (secondary)",
+            "es": "Tramas de paro anteriores por CAN (secundaria)",
+            "de": "Ältere Not-Halt-Frames über CAN (zweiter Weg)",
+            "fr": "Anciennes trames d'arrêt par CAN (secondaire)",
+            "it": "Vecchi frame di arresto via CAN (secondaria)",
+            "ja": "CAN の従来の非常停止フレーム（副経路）",
+            "zh": "通过 CAN 的旧急停帧（次要）",
+            "pt": "Tramas de paragem anteriores por CAN (secundária)"
+          }
+        },
+        {
+          "name": "hydra_estop.py",
+          "desc": {
+            "en": "E-STOP TRIP on id 0x001 (CAN, optional)",
+            "es": "TRIP de paro en id 0x001 (CAN, opcional)",
+            "de": "Not-Halt-TRIP auf Kennung 0x001 (CAN, optional)",
+            "fr": "TRIP d'arrêt sur id 0x001 (CAN, optionnel)",
+            "it": "TRIP di arresto su id 0x001 (CAN, opzionale)",
+            "ja": "識別子 0x001 の非常停止 TRIP（CAN、任意）",
+            "zh": "标识符 0x001 的急停 TRIP（CAN，可选）",
+            "pt": "TRIP de paragem no id 0x001 (CAN, opcional)"
+          },
+          "tree_desc": {
+            "en": "E-STOP TRIP on id 0x001 (CAN, optional)",
+            "es": "TRIP de paro en id 0x001 (CAN, opcional)",
+            "de": "Not-Halt-TRIP auf Kennung 0x001 (CAN, optional)",
+            "fr": "TRIP d'arrêt sur id 0x001 (CAN, optionnel)",
+            "it": "TRIP di arresto su id 0x001 (CAN, opzionale)",
+            "ja": "識別子 0x001 の非常停止 TRIP（CAN、任意）",
+            "zh": "标识符 0x001 的急停 TRIP（CAN，可选）",
+            "pt": "TRIP de paragem no id 0x001 (CAN, opcional)"
           }
         },
         {

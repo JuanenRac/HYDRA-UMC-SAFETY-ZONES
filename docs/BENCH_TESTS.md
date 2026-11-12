@@ -1,6 +1,6 @@
 # Bench tests
 
-Every test below is **not executed**. The emergency-stop request and the safe heartbeat over CAN (`docs/CAN_ESTOP.md`) have run only against a simulated bus; the frame has not been agreed with the firmware or tried on a real CAN bus. Write a result only after a person ran the step.
+Every test below is **not executed**. The emergency-stop request (the TRIP of identifier 0x001 and, on the secondary path, the older frame and the safe heartbeat) over CAN (`docs/CAN_ESTOP.md`) have run only against a simulated bus; the frame has not been agreed with the firmware or tried on a real CAN bus. Write a result only after a person ran the step.
 
 ## What the software already covers (no bus needed)
 
@@ -23,6 +23,9 @@ Every test below is **not executed**. The emergency-stop request and the safe he
 | 4 | Unplug the adapter while the heartbeat runs. | The send is reported as `estopTransportError`, never as sent; the service stays up. | not executed |
 | 5 | Restore the bus and the verdict. | The heartbeat resumes only after a fresh READY. | not executed |
 | 6 | With the firmware listening, repeat steps 1 to 3. | The firmware stops its actuators when the heartbeat stops and on the request frame; record the delay measured on the bus. | not executed |
+| 7 | With the default protocol (`hydra`), send a danger verdict. | The logger sees `repeat` frames on identifier 0x001 with the bytes `01 04 10 <epoch> <seq lo> <seq hi> FE FB`, each with the next sequence number; no frame of kind ALIVE or RELEASE ever comes from this service. | not executed |
+| 8 | Send a second danger verdict after more than `episode_gap_ms` of silence. | The epoch byte is one higher; a request sooner than that keeps the epoch. | not executed |
+| 9 | With HYDRA-UMC controller boards on the bus, send a danger verdict. | Every board latches within `node_reaction_max` of the frame and reports `ESTOP_STATE` LATCHED; the tool heads of URTC do not honour 0x001 yet (dependency of that repository). | not executed |
 
 ## What this bench cannot show
 

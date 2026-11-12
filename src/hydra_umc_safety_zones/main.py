@@ -51,6 +51,7 @@ from hydra_umc_safety_zones.can_estop import (
     open_bus,
     state_is_safe,
 )
+from hydra_umc_safety_zones.hydra_estop import HydraStopRequester
 from hydra_umc_safety_zones.signing import (
     Ed25519StateSigner,
     Signer,
@@ -287,7 +288,7 @@ def _start_can(path: str):
     if not config.enabled:
         raise CanConfigError('the file says "enabled": false')
     bus = open_bus(config)
-    requester = CanEStopRequester(bus, config)
+    requester = HydraStopRequester(bus, config) if config.protocol == "hydra" else CanEStopRequester(bus, config)
     heartbeat = HeartbeatSender(bus, config, lambda: False)
     return requester, heartbeat, config
 
@@ -390,12 +391,17 @@ def _run_serve(args: argparse.Namespace) -> int:
         print("[safety-zones] tool arms on: POST /tool-arms records the arm state of a tool, GET /tool-arms lists it (recorded only; no stop is requested)")
     if can_runtime is not None:
         _, heartbeat, can_config = can_runtime
-        heartbeat.is_safe = lambda: state_is_safe(server.last_verdict(), can_config.state_max_age_ms)
-        heartbeat.start()
-        print(
-            f"[safety-zones] CAN: stop requests on id {can_config.estop_id:#x}, safe heartbeat on id {can_config.heartbeat_id:#x} every "
-            f"{can_config.heartbeat_period_ms} ms only while the last verdict is READY (not tried on a real bus)"
-        )
+        if can_config.protocol == "hydra":
+            print("[safety-zones] CAN: stop requests as TRIP frames on id 0x001 (the stack frame of HYDRA-UMC; not tried on a real bus)")
+        if can_config.protocol == "legacy" or can_config.legacy_heartbeat:
+            heartbeat.is_safe = lambda: state_is_safe(server.last_verdict(), can_config.state_max_age_ms)
+            heartbeat.start()
+            print(
+                f"[safety-zones] CAN: {'older ' if can_config.protocol == 'hydra' else ''}safe heartbeat on id {can_config.heartbeat_id:#x} every "
+                f"{can_config.heartbeat_period_ms} ms only while the last verdict is READY (not tried on a real bus)"
+            )
+            if can_config.protocol == "legacy":
+                print(f"[safety-zones] CAN: older stop frames on id {can_config.estop_id:#x}")
     if armor_runtime is not None:
         gate, subscriber = armor_runtime
         try:
@@ -581,7 +587,7 @@ def build_parser() -> argparse.ArgumentParser:
     serve_parser.add_argument(
         "--can-estop-config",
         default=os.environ.get("SAFETY_ZONES_CAN_ESTOP_CONFIG", ""),
-        help="a JSON file (identifiers, channel, heartbeat period) that turns on the E-STOP request and the safe heartbeat over CAN with python-can; "
+        help="a JSON file (channel, protocol, repeat) that turns on the E-STOP request over CAN with python-can: by default the TRIP frame on identifier 0x001 of HYDRA-UMC, or with protocol legacy the older frames and the safe heartbeat; "
              "off by default, a stop is then only recorded",
     )
     serve_parser.add_argument(

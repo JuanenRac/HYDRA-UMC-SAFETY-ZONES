@@ -18,7 +18,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/License-GPL%203.0--or--later-blue.svg" alt="GPL 3.0 or later">
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
-  <img src="https://img.shields.io/badge/Tests-1141%20passing-2ea44f.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-1166%20passing-2ea44f.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Version-0.2.4-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
@@ -35,7 +35,7 @@ GPL-3.0-or-later - see LICENSE
 |---|---|
 | バージョン | `0.2.4` |
 | 成熟度 | 機能する |
-| テスト | 1141 (`python -m pytest -q tests`) |
+| テスト | 1166 (`python -m pytest -q tests`) |
 | 技術 | Python / 3D vision / Hailo-8 |
 | 対象 | HYDRA-UMC セルの Raspberry Pi CM5 |
 | 実機での確認 | まだです：このバージョンについて実機での動作記録はありません |
@@ -51,7 +51,7 @@ GPL-3.0-or-later - see LICENSE
 | 領域 | 状態 | ここでの意味 |
 |---|---|---|
 | ソフトウェア | 🟡 | 主な目的では動作します。足りない点は上の正直さの確認に書かれています |
-| テスト | 🟢 | 自動テスト 1141 件。変更のたびに実行されます |
+| テスト | 🟢 | 自動テスト 1166 件。変更のたびに実行されます |
 | 実機 | 🔴 | まだです：このバージョンについて実機での動作記録はありません |
 | インターフェースとプロトコル | 🟡 | 提供するルートやメッセージは文書化され、クライアントで試験済みです。すべてのクライアントがまだ使ったわけではありません |
 | 連携 | 🟠 | CM5 のテストベンチで他のサービスと一緒に動作し、メッセージは SDK の共通契約に従います |
@@ -90,7 +90,7 @@ GPL-3.0-or-later - see LICENSE
 * 🔍 **異物検知（計画中）：** 作業スペースに残された工具や破片を識別します。
 * 🎥 **Hailo-8 による実際の 3D 占有マッピング（計画中）：** v0 の `check` サブコマンドが検知対象位置を JSON ファイルから取得するのは、まさにそれらを実際に生成する Hailo-8 空間セグメンテーションパイプラインがこの環境にまだ存在しないためです——詳細は下記「正直な現状確認」を参照してください。
 * 🧩 **独立したプロジェクトとして存在する理由：** 安全ロジックは他の知覚処理とは異なる検証基準を持ちます——独自のサービスとして切り離すことで、ファミリー内の他のカメラパイプラインやモデルコンパイルの変更とは独立して、テスト、監査、そして最終的な認証（上記の ISO 13849-1 バッジ参照、現段階では目標に過ぎません）が可能になります。
-* 🔏 **署名付き判定と CAN による非常停止要求（どちらも任意）：** `--state-key-file` を指定すると、すべての判定に `sdkSafetyStateSignature`（状態、上がるだけのカウンター、鍵 ID に対する HMAC-SHA256）が付き、`effective_state` は署名なし・偽造・古い・再送されたものをすべて `INHIBITED` として扱います。`--can-estop-config` を指定すると、危険の判定で python-can が CAN バスに停止フレームを送り、ハートビートは直近の判定が READY の間だけ送出されるため、沈黙したサービスは機械を止めます。シミュレートしたバスでのみ試験済みで、フレームはファームウェアとの取り決めがまだ必要です。
+* 🔏 **署名付き判定と CAN による非常停止要求（どちらも任意）：** `--state-key-file` を指定すると、すべての判定に `sdkSafetyStateSignature`（状態、上がるだけのカウンター、鍵 ID に対する HMAC-SHA256）が付き、`effective_state` は署名なし・偽造・古い・再送されたものをすべて `INHIBITED` として扱います。`--can-estop-config` を指定すると、危険の判定で python-can が CAN バスの識別子 0x001 に TRIP を送ります。これは HYDRA-UMC がスタック全体に定める非常停止フレームです（理由：安全ゾーン、エポックとシーケンス番号付き）。チェックバイトを持つこのサービスの従来のフレームと、直近の判定が READY の間だけ送出されるハートビートは、`"protocol": "legacy"` で副経路として残ります。シミュレートしたバスでのみ試験済みです。
 * 🔑 **署名付き判定の任意オプションとしての Ed25519（既定はオフ、既定は引き続き HMAC）：** `serve --state-signing-alg ed25519 --state-key-file KEY.pem` は、リポジトリの外に置かれ決して表示されない秘密鍵で署名します（`state-keygen` は何も上書きせず鍵ペアを作ります）。利用側は公開鍵だけを持つので署名できません。`signing.verify` は `expected_alg` を受け取り、別のアルゴリズムで署名された判定、署名なし、改ざん、古い、再送された判定は `INHIBITED` になります。`cryptography` パッケージが必要です。
 * 🩺 **統一された `GET /health`（既定では閉じています）：** `serve --health-open`（または `HYDRA_UMC_SAFETY_ZONES_HEALTH_OPEN=1`）を指定すると、サービスは `GET /health` に `{"status": "ok", "service": ..., "version": ...}` で応答します。ファミリーのすべてのサービスで同じ本文です。スイッチがなければ、ルートは存在しないルートと同じく `404` を返します。ループバック以外の呼び出し元はサービスのベアラートークンが必要で、本文にはパス・設定・秘密情報は含まれません。
 * 🪪 **HYDRA-UMC-SERVER の ID（既定ではオフ）:** `serve --identity-key-file FILE`（または `HYDRA_UMC_SAFETY_ZONES_IDENTITY_KEY_FILE=FILE`）を指定すると、サービスは自身のトークンに加えて、サーバーがログイン時に発行する署名付きトークンを受け付けます。閲覧者は読み取りだけで変更はできず、資格情報のないリクエストはループバックでも拒否されます。スイッチがなければ何も変わりません。
@@ -253,7 +253,7 @@ Python 3.10 以上が必要です。
 
 ## 🧪 テスト
 
-`python -m pytest -q tests` で自動テスト 1141 件を実行します。 ハードウェアも、このマシンの外にあるものも必要ありません。
+`python -m pytest -q tests` で自動テスト 1166 件を実行します。 ハードウェアも、このマシンの外にあるものも必要ありません。
 
 CI は `HYDRA_UMC_CI=1 python tools/ci_validate.py` を実行し、マニフェスト、文書、8 つの README、図を検査します。
 
@@ -276,7 +276,7 @@ CI は `HYDRA_UMC_CI=1 python tools/ci_validate.py` を実行し、マニフェ�
 2. **仮想環境** — `.venv/` が存在しない場合は作成し、存在する場合は再利用します。
 3. **Editable インストール（dev エクストラ付き）** — `pip install -e ".[dev]"` により `src/` 下の変更が即座に反映され、`pytest` がインストールされ、`hydra-umc-safety-zones` コンソールエントリポイントが登録されます。
 4. **コンパイルチェック** — `python -m compileall -q src` が `src/` 下の各ファイルをバイトコンパイルし、エコシステム全体にわたる構文エラーを検出します。
-5. **実際のテストスイート** — `pytest tests/` が全 1141 件のテストを実行します。
+5. **実際のテストスイート** — `pytest tests/` が全 1166 件のテストを実行します。
 
 `set -euo pipefail` は最初に失敗したステップでスクリプトを停止させます。
 ダブルクリックで起動された場合（既に開いているターミナルからではなく）は、
@@ -431,7 +431,8 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── armor_alarm.py            A.R.M.O.R.の警報で開始を禁止（任意）
 │   ├── armor_alarm_mqtt.py       警報の読み取りに使うMQTT接続（任意）
 │   ├── signing.py                安全状態の HMAC 署名（任意）
-│   ├── can_estop.py              CAN による非常停止要求とセーフハートビート（任意）
+│   ├── can_estop.py              CAN の従来の非常停止フレーム（副経路）
+│   ├── hydra_estop.py            識別子 0x001 の非常停止 TRIP（CAN、任意）
 │   └── main.py                   エントリポイント + 実際の `check` サブコマンド
 ├── tests/                        実際のテスト：幾何、越境、キャリブレーション、観測、safety_state、estop、設定、api、CLI
 ├── docs/                         ドキュメントと安全基準
@@ -462,7 +463,7 @@ HYDRA-UMC-SAFETY-ZONES/
 `INHIBITED` にフェイルする実際のキャリブレーション鮮度強制
 （`calibration.py`/`safety_state.py`）、構造上検知と執行の境界を守る
 実際の E-STOP *リクエスト*パイプライン（`estop.py`）、ゾーン/検知 JSON
-ファイルに対する実際の CLI サブコマンド `check`、そして通過した 1141 件の
+ファイルに対する実際の CLI サブコマンド `check`、そして通過した 1166 件の
 テスト——完全な実際のビルド/実行出力は
 [`CHANGELOG.md`](CHANGELOG.md) を参照してください。
 
