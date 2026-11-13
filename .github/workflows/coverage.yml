@@ -1,0 +1,38 @@
+# =============================================================================
+# HYDRA-UMC-SAFETY-ZONES - Coverage floor
+# Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
+# GPL-3.0-or-later - see LICENSE
+#
+# Measures the line and branch coverage of src/ with the whole test suite and fails when it falls under the floor (92 %).
+# =============================================================================
+name: Coverage floor
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    name: Measure the coverage of the tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Install the project
+        run: python -m pip install -e ".[dev]" coverage
+      - name: Run the tests under coverage
+        run: python -m coverage run --branch --source=src -m pytest tests -q
+      - name: Report the coverage and hold the floor
+        run: |
+          python -m coverage report -m --fail-under=92

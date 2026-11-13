@@ -12,7 +12,7 @@
   ],
   "deployment_target": "cm5",
   "maturity": "functional",
-  "evidence": "none",
+  "evidence": "simulator",
   "family": "Vision AI Node",
   "parent": "HYDRA-UMC-VISION-NODE",
   "build": "python tools/build_test.py",
