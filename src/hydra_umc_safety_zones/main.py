@@ -27,6 +27,7 @@ from .health_route import health_open_requested
 from .hold import HoldRegistry
 from .tool_arms import ToolArmRegistry
 from .server_identity import identity_key_from
+from .zones_signature import ZonesSignatureError, sign_zones, verify_zones
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -293,10 +294,37 @@ def _start_can(path: str):
     return requester, heartbeat, config
 
 
+ALLOW_REQUEST_ZONES_ENVIRONMENT = "SAFETY_ZONES_ALLOW_REQUEST_ZONES"
+
+
+def _allow_request_zones(args: argparse.Namespace) -> bool:
+    """The test setting: the zones and the calibration come from each request (a service that says READY for whatever zones the caller brings)."""
+    return bool(args.allow_request_zones) or os.environ.get(ALLOW_REQUEST_ZONES_ENVIRONMENT, "").strip() == "1"
+
+
+def _is_loopback_address(address: str) -> bool:
+    import ipaddress  # noqa: PLC0415
+
+    if address in {"localhost"}:
+        return True
+    try:
+        return ipaddress.ip_address(address.split("%", 1)[0]).is_loopback
+    except ValueError:
+        return False
+
+
 def _run_serve(args: argparse.Namespace) -> int:
     addr, port = args.addr, args.port
     zone_set = None
     config_sha256 = None
+    if not args.zones_file and not _allow_request_zones(args):
+        # The service decides whether the robot is safe: its zones are fixed on this machine, not brought by whoever reaches the port.
+        print(
+            "[safety-zones] fatal: --zones-file is required: without it the zones and the calibration come from each request and whoever reaches this port decides "
+            "them (--allow-request-zones, or SAFETY_ZONES_ALLOW_REQUEST_ZONES=1, is the setting for tests only)",
+            file=sys.stderr,
+        )
+        return 2
     if args.zones_file:
         # Authoritative mode: the zones and the calibration come from a file
         # on this machine, read once at start, and a request cannot bring
@@ -306,6 +334,18 @@ def _run_serve(args: argparse.Namespace) -> int:
             config_sha256 = hashlib.sha256(Path(args.zones_file).read_bytes()).hexdigest()
         except Exception as exc:  # noqa: BLE001
             print(f"[safety-zones] fatal: could not load --zones-file {args.zones_file}: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 2
+        if args.zones_key_file:
+            # the zones must be the ones somebody approved: a signature made with the key of --zones-key-file, next to the file unless told otherwise
+            signature_file = args.zones_signature_file or f"{args.zones_file}.sig"
+            try:
+                signed_by = verify_zones(args.zones_file, signature_file, args.zones_key_file)
+            except (ZonesSignatureError, SigningError) as exc:
+                print(f"[safety-zones] fatal: --zones-key-file: {exc}", file=sys.stderr)
+                return 2
+            print(f"[safety-zones] the zones file is signed (key id {signed_by})")
+        elif args.zones_signature_file:
+            print("[safety-zones] fatal: --zones-signature-file needs --zones-key-file", file=sys.stderr)
             return 2
     stateful: StatefulSettings | None = None
     if args.stateful or (args.zones_file and _stateful_enabled_in(args.zones_file)):
@@ -328,6 +368,12 @@ def _run_serve(args: argparse.Namespace) -> int:
         identity_key = identity_key_from(args.identity_key_file)
     except ValueError as exc:
         print(f"[safety-zones] fatal: --identity-key-file: {exc}", file=sys.stderr)
+        return 2
+    if not _is_loopback_address(addr) and not (args.token or identity_key is not None):
+        print(
+            f"[safety-zones] fatal: --addr {addr} is not loopback: set --token (or SAFETY_ZONES_TOKEN), or --identity-key-file, so that only a caller that proves who it is can use the API",
+            file=sys.stderr,
+        )
         return 2
     armor_runtime = None
     try:
@@ -543,6 +589,21 @@ def build_parser() -> argparse.ArgumentParser:
         help="zones JSON (with its calibration) that the server holds fixed; a request cannot bring its own zones",
     )
     serve_parser.add_argument(
+        "--allow-request-zones",
+        action="store_true",
+        help="TESTS ONLY: start without --zones-file, so that the zones and the calibration come from each request (or set SAFETY_ZONES_ALLOW_REQUEST_ZONES=1); off by default and announced as a warning",
+    )
+    serve_parser.add_argument(
+        "--zones-key-file",
+        default=os.environ.get("SAFETY_ZONES_ZONES_KEY_FILE", ""),
+        help="file with the key that signs the zones file (32+ characters): the service starts only when --zones-file has a valid signature made with it by sign-zones (off by default)",
+    )
+    serve_parser.add_argument(
+        "--zones-signature-file",
+        default="",
+        help="where the signature of --zones-file is (default: the zones file with .sig added); needs --zones-key-file",
+    )
+    serve_parser.add_argument(
         "--token",
         default=os.environ.get("SAFETY_ZONES_TOKEN", ""),
         help="bearer token POST /check requires (default: the SAFETY_ZONES_TOKEN environment variable)",
@@ -618,6 +679,15 @@ def build_parser() -> argparse.ArgumentParser:
              "(the tuning values are in the 'stateful' object of the zones file; off by default)",
     )
 
+    sign_zones_parser = subparsers.add_parser(
+        "sign-zones",
+        help="Sign a zones file with a key file, so that serve --zones-key-file accepts it. The signature is written to --out (default: the zones file with .sig added); never overwrites a file.",
+    )
+    sign_zones_parser.add_argument("--zones", required=True, help="the zones file to sign")
+    sign_zones_parser.add_argument("--key-file", required=True, help="file with the signing key (32+ characters)")
+    sign_zones_parser.add_argument("--key-id", default="default", help="the name of the key, recorded in the signature")
+    sign_zones_parser.add_argument("--out", default="", help="where the signature is written (default: the zones file with .sig added)")
+
     keygen_parser = subparsers.add_parser(
         "state-keygen",
         help="Create an Ed25519 key pair for signing verdicts: the private key (owner-only, never printed) and the public key to give to the consumers. Never overwrites a file.",
@@ -643,6 +713,19 @@ def main(argv: list[str] | None = None) -> int:
         return _run_check(args.zones, args.detections, args.observation, velocity, args.body)
     if args.command == "serve":
         return _run_serve(args)
+    if args.command == "sign-zones":
+        destination = Path(args.out or f"{args.zones}.sig")
+        if destination.exists():
+            print(f"[safety-zones] fatal: {destination} exists: sign-zones never overwrites a file", file=sys.stderr)
+            return 2
+        try:
+            document = sign_zones(args.zones, args.key_file, args.key_id)
+            destination.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+        except (OSError, SigningError) as exc:
+            print(f"[safety-zones] fatal: sign-zones: {exc}", file=sys.stderr)
+            return 2
+        print(f"[safety-zones] {args.zones} signed with key id {args.key_id}: {destination}")
+        return 0
     if args.command == "state-keygen":
         try:
             generate_keypair(args.private_out, args.public_out)

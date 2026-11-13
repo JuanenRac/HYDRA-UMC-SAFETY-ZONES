@@ -243,7 +243,7 @@ Two clock tolerances keep a healthy cell from being inhibited by rounding: an ob
 timestamped up to 0.25 s ahead of this machine's clock is not "in the future", and a calibration
 dated one day ahead (a local date written east of UTC) is not expired. Anything further ahead is.
 
-### `serve [--addr ADDR] [--port PORT] [--zones-file PATH] [--token T] [--max-observation-age-seconds S] [--max-calibration-age-days D] [--decision-log FILE] [--stateful] [--state-key-file FILE] [--state-signing-alg hmac|ed25519] [--state-key-id ID] [--can-estop-config FILE]`
+### `serve [--addr ADDR] [--port PORT] [--zones-file PATH] [--allow-request-zones] [--zones-key-file FILE] [--zones-signature-file FILE] [--token T] [--max-observation-age-seconds S] [--max-calibration-age-days D] [--decision-log FILE] [--stateful] [--state-key-file FILE] [--state-signing-alg hmac|ed25519] [--state-key-id ID] [--can-estop-config FILE]`
 
 ```
 $ hydra-umc-safety-zones serve -h
@@ -298,8 +298,16 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
   An observer that reports an `error` is published as SDK state `FAULT` (a broken detector), a stale
   or missing one as `INHIBITED` (not verified); both keep the internal `state` `"inhibited"`.
 
-  **Who decides the zones.** By default the request brings its own `zones` and calibration, so
-  whoever can reach the port decides them: keep it on loopback, or use the options below.
+  **Who decides the zones.** The zones are fixed on this machine: `serve` does not start without
+  `--zones-file` (exit status `2`). `--allow-request-zones` (or `SAFETY_ZONES_ALLOW_REQUEST_ZONES=1`) is the
+  setting for tests only: the request then brings its own `zones` and calibration, whoever can reach the port
+  decides them, and the start says so as a warning. An address that is not loopback also needs `--token` or
+  `--identity-key-file`, or the service does not start.
+  `--zones-key-file FILE` (or `SAFETY_ZONES_ZONES_KEY_FILE`; the key is read from a file and never printed) also
+  demands a signature of the zones file, `<zones file>.sig` or `--zones-signature-file`: the service starts only when
+  it verifies (an HMAC-SHA256 over the exact bytes of the file, so a changed byte breaks it) and says the key id.
+  Off unless the key is given. `sign-zones --zones FILE --key-file KEY [--key-id ID] [--out SIGNATURE]` makes the
+  signature and never overwrites a file.
   `--zones-file PATH` (or `SAFETY_ZONES_FILE`) loads the zones and calibration once at start and a
   request that sends `zones` is refused with `400`; every verdict then carries `configSha256`, the
   hash of that file. `--max-observation-age-seconds` and `--max-calibration-age-days` refuse a request

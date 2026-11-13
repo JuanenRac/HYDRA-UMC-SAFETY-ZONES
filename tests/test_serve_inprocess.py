@@ -59,6 +59,7 @@ def interrupted_loop(monkeypatch):
 
 
 def serve(*arguments: str) -> int:
+    arguments = ("--allow-request-zones", *arguments)  # a start without a zones file is refused on its own (test_serve_authority.py)
     return main(["serve", "--port", str(free_port()), *arguments])
 
 
@@ -133,7 +134,7 @@ def test_a_start_that_can_not_open_the_api_says_so_and_returns_2(capsys) -> None
         busy.bind(("127.0.0.1", 0))
         busy.listen(1)
         port = busy.getsockname()[1]
-        assert main(["serve", "--port", str(port)]) == 2
+        assert main(["serve", "--port", str(port), "--allow-request-zones"]) == 2
     assert "could not start the HTTP API" in capsys.readouterr().err
 
 
