@@ -407,6 +407,33 @@ def test_body_from_fk_refuses_everything_it_cannot_resolve(fk, spec) -> None:
         body_from_fk(fk, spec)
 
 
+def _envelope(**changes):
+    envelope = {"schema_version": "1.0", "frame": "base", "poses": FK, "checked": True, "note": ""}
+    envelope.update(changes)
+    return envelope
+
+
+def test_body_from_fk_reads_the_joint_poses_object_the_same_as_the_bare_array() -> None:
+    assert body_from_fk(_envelope(), SPEC) == body_from_fk(FK, SPEC)
+
+
+@pytest.mark.parametrize(
+    "fk",
+    [
+        _envelope(schema_version="2.0"),
+        _envelope(schema_version=None),
+        _envelope(frame=""),
+        _envelope(frame=None),
+        _envelope(poses=[]),
+        _envelope(poses="not a list"),
+        {"poses": FK},
+    ],
+)
+def test_body_from_fk_refuses_a_joint_poses_object_it_cannot_trust(fk) -> None:
+    with pytest.raises(FkInputError):
+        body_from_fk(fk, SPEC)
+
+
 def test_body_from_fk_command_and_the_whole_chain(tmp_path: Path, capsys) -> None:
     (tmp_path / "fk.json").write_text(json.dumps(FK), encoding="utf-8")
     (tmp_path / "spec.json").write_text(json.dumps(SPEC), encoding="utf-8")

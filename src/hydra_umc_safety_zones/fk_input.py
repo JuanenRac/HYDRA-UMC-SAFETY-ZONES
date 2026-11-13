@@ -3,7 +3,7 @@
 # Copyright (C) 2026 JuanenRac (Electro Hobby 3D) <electrohobby3d@gmail.com>
 # GPL-3.0-or-later - see LICENSE
 # =============================================================================
-"""Turns the JSON that ``hydra-umc-physics-replica fk --json`` prints (one pose per joint) into a robot-body file.
+"""Turns the JSON that ``hydra-umc-physics-replica fk --json`` prints (one pose per joint, or the ``JointPoses`` object of ``--envelope``) into a robot-body file.
 
 This module reads two JSON documents that are already in memory. It never runs
 the other program: whoever chains them runs ``fk`` first and hands the file over.
@@ -41,7 +41,28 @@ def _coordinates(value: object, what: str) -> dict[str, float]:
     return out
 
 
+SUPPORTED_JOINT_POSES_VERSION = "1.0"
+
+
+def _unwrap(fk: object) -> object:
+    """The array of joint poses, whether ``fk --json`` printed the bare array or ``fk --envelope`` printed the ``JointPoses`` object.
+
+    The object names its ``schema_version`` and the ``frame`` its positions are in. A version other than the one read here, or a missing or
+    empty frame, is refused: the numbers would not mean what this program takes them to mean.
+    """
+    if not isinstance(fk, dict):
+        return fk
+    version = fk.get("schema_version")
+    if version != SUPPORTED_JOINT_POSES_VERSION:
+        raise FkInputError(f"the fk output is a JointPoses object of schema_version {version!r}; only {SUPPORTED_JOINT_POSES_VERSION!r} is read")
+    frame = fk.get("frame")
+    if not isinstance(frame, str) or not frame.strip():
+        raise FkInputError("the fk output names no frame for its positions")
+    return fk.get("poses")
+
+
 def _poses(fk: object) -> dict[str, dict[str, float]]:
+    fk = _unwrap(fk)
     if not isinstance(fk, list) or not fk:
         raise FkInputError("the fk output must be a non-empty array of joint poses")
     poses: dict[str, dict[str, float]] = {}
