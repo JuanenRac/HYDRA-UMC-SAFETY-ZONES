@@ -22,6 +22,12 @@ COPY pyproject.toml README.md LICENSE.md ./
 COPY src ./src
 RUN pip install --no-cache-dir .
 
+# The service starts only with zones fixed on the machine (and, off loopback, a token): a container is given its zones file
+# (mount it at /etc/hydra-umc-safety-zones/zones.json) and SAFETY_ZONES_TOKEN. Without them it refuses to start and says why.
+# The example below is a template with a calibration date that is deliberately old: copy it, fill it in from a risk assessment, mount the copy.
+COPY docs/zones.separation.example.json /etc/hydra-umc-safety-zones/zones.example.json
+ENV SAFETY_ZONES_FILE=/etc/hydra-umc-safety-zones/zones.json
+
 RUN useradd --system --create-home --home-dir /home/hydra hydra
 USER hydra
 
