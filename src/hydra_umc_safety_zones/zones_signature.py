@@ -52,7 +52,7 @@ def verify_zones(zones_file: str | Path, signature_file: str | Path, key_file: s
     if not isinstance(document, dict) or document.get("alg") != ALGORITHM:
         raise ZonesSignatureError(f"the signature is not an {ALGORITHM} signature")
     key_id, claimed, sig = document.get("key_id"), document.get("sha256"), document.get("sig")
-    if not all(isinstance(value, str) and value for value in (key_id, claimed, sig)):
+    if not (isinstance(key_id, str) and key_id and isinstance(claimed, str) and claimed and isinstance(sig, str) and sig):
         raise ZonesSignatureError("the signature lacks key_id, sha256 or sig")
     digest = hashlib.sha256(Path(zones_file).read_bytes()).hexdigest()
     if not hmac.compare_digest(claimed.encode("utf-8"), digest.encode("utf-8")):
