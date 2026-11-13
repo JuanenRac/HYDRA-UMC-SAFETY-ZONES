@@ -60,7 +60,7 @@ def test_serve_refuses_to_start_when_the_port_is_taken(capsys) -> None:
         holder.bind(("127.0.0.1", 0))
         holder.listen(1)
         port = holder.getsockname()[1]
-        assert main(["serve", "--port", str(port)]) == 2
+        assert main(["serve", "--port", str(port), "--allow-request-zones"]) == 2
     assert "could not start the HTTP API" in capsys.readouterr().err
 
 

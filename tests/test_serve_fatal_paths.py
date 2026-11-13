@@ -36,7 +36,8 @@ def zones_file(tmp_path: Path, **extra) -> Path:
 
 
 def serve(*arguments: str) -> int:
-    return main(["serve", "--port", str(free_port()), *arguments])
+    # --allow-request-zones: these tests are about other options, and a start without a zones file is refused on its own (test_serve_authority.py)
+    return main(["serve", "--port", str(free_port()), "--allow-request-zones", *arguments])
 
 
 def test_a_state_key_file_that_is_missing_or_too_short_is_refused(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
@@ -115,5 +116,5 @@ def test_a_port_that_is_taken_is_refused(tmp_path: Path, capsys: pytest.CaptureF
         taken.bind(("127.0.0.1", 0))
         taken.listen(1)
         port = taken.getsockname()[1]
-        assert main(["serve", "--port", str(port)]) == 2
+        assert main(["serve", "--port", str(port), "--allow-request-zones"]) == 2
     assert "could not start the HTTP API" in capsys.readouterr().err
