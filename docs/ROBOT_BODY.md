@@ -177,6 +177,9 @@ hydra-umc-safety-zones check --zones zones.json --detections detections.json --o
 - `body-from-fk` refuses what it cannot resolve (an unknown name, a joint called
   `base`, a duplicated joint, a missing or non-positive radius, `NaN`) and prints
   nothing on the standard output, exit status 3.
+- When `fk` prints the `JointPoses` object (`--envelope`) instead of the bare array, it is checked against its contract: closed, frame `base`, 1 to 256 poses,
+  every pose with a joint name, a position and a quaternion of finite numbers whose length is 1 within 1e-5. An object that breaks a rule exits `3` like any
+  other input that cannot be used; the bare array is read as before.
 - `predict-collision` of PHYSICS-REPLICA answers whether a short trajectory touches
   the zones and prints the contacts, not the poses; use `fk` for the poses. The two
   models are alike (a capsule per segment, cut into spheres that contain it) but are
