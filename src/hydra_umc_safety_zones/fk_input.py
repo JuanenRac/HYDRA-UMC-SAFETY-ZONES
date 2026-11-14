@@ -58,7 +58,61 @@ def _unwrap(fk: object) -> object:
     frame = fk.get("frame")
     if not isinstance(frame, str) or not frame.strip():
         raise FkInputError("the fk output names no frame for its positions")
+    _check_joint_poses(fk)
     return fk.get("poses")
+
+
+JOINT_POSES_FRAMES = ("base",)
+JOINT_POSES_MAX = 256
+JOINT_NAME_MAX = 128
+QUATERNION_TOLERANCE = 1e-5
+
+
+def _check_joint_poses(document: dict[str, Any]) -> None:
+    """The rules of the ``JointPoses`` contract that the shape of an envelope can break, applied when it is read.
+
+    The object is closed (``schema_version``, ``frame``, ``poses``, and optionally ``checked`` and ``note``), the frame is one the contract names, there are 1 to
+    256 poses, each one is closed (``joint``, ``position``, ``quaternion``) with finite numbers, and the quaternion has length 1 within 1e-5. A bare array printed
+    by ``fk --json`` is not an envelope and keeps the lenient reading it always had.
+    """
+    unknown = sorted(set(document) - {"schema_version", "frame", "poses", "checked", "note"})
+    if unknown:
+        raise FkInputError(f"the fk output has unknown field(s): {unknown}")
+    if document["frame"] not in JOINT_POSES_FRAMES:
+        raise FkInputError(f"the fk output is in frame {document['frame']!r}; only {list(JOINT_POSES_FRAMES)} is read")
+    if "checked" in document and not isinstance(document["checked"], bool):
+        raise FkInputError("checked must be true or false")
+    if "note" in document and (not isinstance(document["note"], str) or len(document["note"]) > 1000):
+        raise FkInputError("note must be a text of at most 1000 characters")
+    poses = document.get("poses")
+    if not isinstance(poses, list) or not 1 <= len(poses) <= JOINT_POSES_MAX:
+        raise FkInputError(f"the fk output must hold 1 to {JOINT_POSES_MAX} poses")
+    for index, entry in enumerate(poses):
+        label = f"poses[{index}]"
+        if not isinstance(entry, dict):
+            raise FkInputError(f"{label} must be an object")
+        extra = sorted(set(entry) - {"joint", "position", "quaternion"})
+        if extra:
+            raise FkInputError(f"{label} has unknown field(s): {extra}")
+        name = entry.get("joint")
+        if isinstance(name, str) and len(name) > JOINT_NAME_MAX:
+            raise FkInputError(f"{label}.joint is longer than {JOINT_NAME_MAX} characters")
+        if "quaternion" not in entry:
+            raise FkInputError(f"{label} has no quaternion")
+        quaternion = entry["quaternion"]
+        if not isinstance(quaternion, dict) or set(quaternion) != {"w", "x", "y", "z"}:
+            raise FkInputError(f"{label}.quaternion must be an object with exactly w, x, y and z")
+        squares = []
+        for axis in ("w", "x", "y", "z"):
+            number = quaternion[axis]
+            if isinstance(number, bool) or not isinstance(number, (int, float)) or not math.isfinite(number):
+                raise FkInputError(f"{label}.quaternion.{axis} must be a finite number, got {number!r}")
+            squares.append(float(number) ** 2)
+        if abs(math.fsum(squares) - 1.0) > QUATERNION_TOLERANCE:
+            raise FkInputError(f"{label}.quaternion is not a unit quaternion (its squares add up to {math.fsum(squares):.9f})")
+        position = entry.get("position")
+        if isinstance(position, dict) and set(position) != {"x", "y", "z"}:
+            raise FkInputError(f"{label}.position must be an object with exactly x, y and z")
 
 
 def _poses(fk: object) -> dict[str, dict[str, float]]:
