@@ -6,7 +6,7 @@ It is **off by default**. Switch it on in the zones file (it needs `pip install 
 
 ```json
 { "faultEvents": { "enabled": true, "robotId": "arm-1", "topic": "hydra/faults/safety-zones", "retain": true, "minIntervalS": 1.0,
-  "broker": { "host": "127.0.0.1", "port": 1883, "usernameFile": "/etc/hydra-umc/faults.user", "passwordFile": "/etc/hydra-umc/faults.pass" } } }
+  "broker": { "host": "127.0.0.1", "port": 1883, "usernameFile": "/etc/hydra-umc-safety-zones/faults.user", "passwordFile": "/etc/hydra-umc-safety-zones/faults.pass" } } }
 ```
 
 Every value is in the file, none in the code. A broker that is not on this machine needs `"internal": true` (the installation says that network is its own); `tls` and `caFile` are available. The credentials are read from files and never printed.

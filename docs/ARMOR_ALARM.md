@@ -18,7 +18,7 @@ The reading lives in this service (`armor_alarm.py`, the MQTT link in `armor_ala
 
 ## The switch and the settings
 
-Off unless asked: `"armorAlarm": { "enabled": true, "signatureKeyFile": "/etc/hydra-umc/alarm-state.key" }` in the zones file (and `pip install "hydra-umc-safety-zones[mqtt]"` for the broker link). Nothing is
+Off unless asked: `"armorAlarm": { "enabled": true, "signatureKeyFile": "/etc/hydra-umc-safety-zones/alarm-state.key" }` in the zones file (and `pip install "hydra-umc-safety-zones[mqtt]"` for the broker link). Nothing is
 hard-coded; every value is in the `armorAlarm` object:
 
 | field | default | meaning |

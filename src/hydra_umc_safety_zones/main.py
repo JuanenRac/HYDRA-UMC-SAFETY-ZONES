@@ -24,6 +24,7 @@ import json
 import os
 import sys
 
+from .config_access import DEFAULT_ZONES_FILE, LEGACY_ZONES_FILE, check_access, diagnose_access, group_exists, migrate_legacy_zones
 from .health_route import health_open_requested
 from .hold import HoldRegistry
 from .tool_arms import ToolArmRegistry
@@ -352,7 +353,8 @@ def _run_serve(args: argparse.Namespace) -> int:
             zone_set = load_zone_set(args.zones_file)
             config_sha256 = hashlib.sha256(Path(args.zones_file).read_bytes()).hexdigest()
         except Exception as exc:  # noqa: BLE001
-            print(f"[safety-zones] fatal: could not load --zones-file {args.zones_file}: {type(exc).__name__}: {exc}", file=sys.stderr)
+            hint = diagnose_access(args.zones_file) if isinstance(exc, OSError) else ""
+            print(f"[safety-zones] fatal: could not load --zones-file {args.zones_file}: {type(exc).__name__}: {exc}" + (f" ({hint})" if hint else ""), file=sys.stderr)
             return 2
         if args.zones_key_file:
             # the zones must be the ones somebody approved: a signature made with the key of --zones-key-file, next to the file unless told otherwise
@@ -731,6 +733,22 @@ def build_parser() -> argparse.ArgumentParser:
              "(the tuning values are in the 'stateful' object of the zones file; off by default)",
     )
 
+    prepare_parser = subparsers.add_parser(
+        "prepare-config",
+        help="Run as root before serve: copy the zones file (and its signature) of the earlier layout to --zones-file once, with the group of the service, "
+             "never overwriting and never deleting the old file. Exit 0 whether it copied, kept or found nothing; the zones are still required by serve.",
+    )
+    prepare_parser.add_argument("--zones-file", default=DEFAULT_ZONES_FILE, help=f"the zones file of the service (default: {DEFAULT_ZONES_FILE})")
+    prepare_parser.add_argument("--legacy-file", default=LEGACY_ZONES_FILE, help=f"the earlier place of the zones file (default: {LEGACY_ZONES_FILE})")
+    prepare_parser.add_argument("--group", default="hydra-umc-safety-zones", help="the group that owns the copy (default: hydra-umc-safety-zones; ignored if it does not exist)")
+
+    access_parser = subparsers.add_parser(
+        "check-access",
+        help="Check that the account that runs this command can read --zones-file; an installer runs it as the service account (runuser -u hydra-umc-safety-zones) "
+             "BEFORE it stops the running service. Exit 0 when readable, 2 with the reason when not.",
+    )
+    access_parser.add_argument("--zones-file", default=os.environ.get("SAFETY_ZONES_FILE", DEFAULT_ZONES_FILE), help=f"the zones file (default: SAFETY_ZONES_FILE or {DEFAULT_ZONES_FILE})")
+
     sign_zones_parser = subparsers.add_parser(
         "sign-zones",
         help="Sign a zones file with a key file, so that serve --zones-key-file accepts it. The signature is written to --out (default: the zones file with .sig added); never overwrites a file.",
@@ -765,6 +783,18 @@ def main(argv: list[str] | None = None) -> int:
         return _run_check(args.zones, args.detections, args.observation, velocity, args.body)
     if args.command == "serve":
         return _run_serve(args)
+    if args.command == "prepare-config":
+        try:
+            outcome = migrate_legacy_zones(args.legacy_file, args.zones_file, args.group if group_exists(args.group) else "")
+        except OSError as exc:
+            print(f"[safety-zones] fatal: prepare-config: {type(exc).__name__}: {exc}", file=sys.stderr)
+            return 2
+        print(f"[safety-zones] prepare-config: {outcome} ({args.zones_file})")
+        return 0
+    if args.command == "check-access":
+        code, message = check_access(args.zones_file)
+        print(message, file=sys.stderr if code else sys.stdout)
+        return code
     if args.command == "sign-zones":
         destination = Path(args.out or f"{args.zones}.sig")
         if destination.exists():

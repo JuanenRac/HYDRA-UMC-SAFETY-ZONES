@@ -220,7 +220,7 @@ HTTP 服务通过选项配置；其中两项也可以来自环境变量。
 |---|---|---|
 | `--addr` | `127.0.0.1` | API 绑定的地址 |
 | `--port` | `8108` | API 端口 |
-| `--zones-file` / `SAFETY_ZONES_FILE` | 无 | 服务器固定持有的区域和校准 |
+| `--zones-file` / `SAFETY_ZONES_FILE` | 无 | 服务器固定持有的区域和校准（单元读取 `/etc/hydra-umc-safety-zones/zones.json`） |
 | `--token` / `SAFETY_ZONES_TOKEN` | 无 | POST /check 所需的 Bearer 令牌 |
 | `--max-observation-age-seconds` | 无 | 请求可为其观察声明的时效上限 |
 | `--max-calibration-age-days` | 无 | 校准最长有效天数的上限 |
@@ -402,6 +402,7 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── safety_state.py           真实的故障安全决策：READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py                  真实的 E-STOP 请求（从不执行）
 │   ├── config.py                 真实的区域/检测/观测 JSON 加载
+│   ├── config_access.py          区域文件位置与访问检查
 │   ├── api.py                    简洁的 JSON/HTTP 接口(基于 stdlib http.server),桥接真实的 `check` 逻辑
 │   ├── stateful.py               心跳与推送状态（可选）
 │   ├── armor_alarm.py            A.R.M.O.R.警报禁止启动（可选）

@@ -6,7 +6,7 @@ It is **off by default**. Switch it on in the zones file (it needs `pip install 
 
 ```json
 { "zoneOccupancy": { "enabled": true, "topic": "hydra/safety/zones/occupied", "refreshS": 1.0,
-  "broker": { "host": "127.0.0.1", "port": 1883, "usernameFile": "/etc/hydra-umc/zones.user", "passwordFile": "/etc/hydra-umc/zones.pass" } } }
+  "broker": { "host": "127.0.0.1", "port": 1883, "usernameFile": "/etc/hydra-umc-safety-zones/zones.user", "passwordFile": "/etc/hydra-umc-safety-zones/zones.pass" } } }
 ```
 
 The message is `{"occupied": ["press-1"], "observed_at": <milliseconds>}`, the format the AMR bridge reads. A zone is occupied while a breach of any level names it in a verdict of `POST /check`.

@@ -185,7 +185,7 @@ El servicio HTTP se configura con opciones; dos de ellas pueden venir también d
 |---|---|---|
 | `--addr` | `127.0.0.1` | dirección en la que escucha la API |
 | `--port` | `8108` | puerto de la API |
-| `--zones-file` / `SAFETY_ZONES_FILE` | ninguno | zonas y calibración que el servidor mantiene fijas |
+| `--zones-file` / `SAFETY_ZONES_FILE` | ninguno | zonas y calibración que el servidor mantiene fijas (la unidad lee `/etc/hydra-umc-safety-zones/zones.json`) |
 | `--token` / `SAFETY_ZONES_TOKEN` | ninguno | token Bearer que exige POST /check |
 | `--max-observation-age-seconds` | ninguno | tope para la antigüedad que una petición puede declarar para su observación |
 | `--max-calibration-age-days` | ninguno | tope para la antigüedad máxima de la calibración en días |
@@ -357,6 +357,7 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── safety_state.py           Decisión real de fallo seguro: READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py                  Solicitud real de E-STOP (nunca lo dispara)
 │   ├── config.py                 Carga real de JSON para zonas/detecciones/observación
+│   ├── config_access.py          Ubicación del fichero de zonas y comprobación de acceso
 │   ├── api.py                    Superficie JSON/HTTP plana (http.server de stdlib) sobre la lógica real de `check`
 │   ├── stateful.py               Latidos y estado enviado (opcional)
 │   ├── armor_alarm.py            La alarma de A.R.M.O.R. inhibe arranques (opcional)

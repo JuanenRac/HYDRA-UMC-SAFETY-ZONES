@@ -318,6 +318,29 @@
           }
         },
         {
+          "name": "config_access.py",
+          "desc": {
+            "en": "Zones file location and access check",
+            "es": "Ubicación del fichero de zonas y comprobación de acceso",
+            "de": "Ort der Zonendatei und Zugriffsprüfung",
+            "fr": "Emplacement du fichier de zones et contrôle d'accès",
+            "it": "Posizione del file delle zone e verifica dell'accesso",
+            "ja": "ゾーンファイルの場所とアクセス確認",
+            "zh": "区域文件位置与访问检查",
+            "pt": "Localização do ficheiro de zonas e verificação de acesso"
+          },
+          "tree_desc": {
+            "en": "Zones file location and access check",
+            "es": "Ubicación del fichero de zonas y comprobación de acceso",
+            "de": "Ort der Zonendatei und Zugriffsprüfung",
+            "fr": "Emplacement du fichier de zones et contrôle d'accès",
+            "it": "Posizione del file delle zone e verifica dell'accesso",
+            "ja": "ゾーンファイルの場所とアクセス確認",
+            "zh": "区域文件位置与访问检查",
+            "pt": "Localização do ficheiro de zonas e verificação de acesso"
+          }
+        },
+        {
           "name": "api.py",
           "desc": {
             "en": "Plain JSON/HTTP surface",

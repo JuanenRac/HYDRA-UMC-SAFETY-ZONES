@@ -19,10 +19,19 @@ User=hydra-umc-safety-zones
 Group=hydra-umc-safety-zones
 WorkingDirectory=/opt/hydra-umc/safety-zones
 Environment=PYTHONPATH=/opt/hydra-umc/safety-zones/src
-# The zones are fixed on this machine (serve does not start without them): /etc/hydra-umc/safety-zones.zones.json, made from
-# docs/zones.separation.example.json. A token, if any, goes in /etc/hydra-umc/safety-zones.env as SAFETY_ZONES_TOKEN=...
+# The zones are fixed on this machine (serve does not start without them): /etc/hydra-umc-safety-zones/zones.json, made from
+# docs/zones.separation.example.json. That directory belongs to this service alone (systemd creates it, mode 0750, for this account), so the shared
+# /etc/hydra-umc directory, which only the group of the agent may enter, is not touched. A zones file of the earlier layout
+# (/etc/hydra-umc/safety-zones.zones.json) is copied there once, as root, by the first ExecStartPre, which never overwrites and never deletes.
+# A token, if any, goes in /etc/hydra-umc-safety-zones/safety-zones.env (or the earlier /etc/hydra-umc/safety-zones.env) as SAFETY_ZONES_TOKEN=...
+# systemd reads both as root. Without a readable zones file the service does not start: that is the safe state.
+ConfigurationDirectory=hydra-umc-safety-zones
+ConfigurationDirectoryMode=0750
 EnvironmentFile=-/etc/hydra-umc/safety-zones.env
-ExecStart=/usr/bin/python3 -m hydra_umc_safety_zones.main serve --addr 127.0.0.1 --port 8108 --zones-file /etc/hydra-umc/safety-zones.zones.json
+EnvironmentFile=-/etc/hydra-umc-safety-zones/safety-zones.env
+ExecStartPre=+/usr/bin/python3 -m hydra_umc_safety_zones.main prepare-config --zones-file /etc/hydra-umc-safety-zones/zones.json --legacy-file /etc/hydra-umc/safety-zones.zones.json
+ExecStartPre=/usr/bin/python3 -m hydra_umc_safety_zones.main check-access --zones-file /etc/hydra-umc-safety-zones/zones.json
+ExecStart=/usr/bin/python3 -m hydra_umc_safety_zones.main serve --addr 127.0.0.1 --port 8108 --zones-file /etc/hydra-umc-safety-zones/zones.json
 Restart=on-failure
 RestartSec=5
 NoNewPrivileges=true

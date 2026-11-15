@@ -5,7 +5,7 @@ The camera streamer keeps a ring of the last frames and writes nothing until a s
 It is **off by default**. Switch it on in the zones file:
 
 ```json
-{ "recordTrigger": { "enabled": true, "targets": ["http://127.0.0.1:8080/cam0/record/trigger"], "tokenFile": "/etc/hydra-umc/streamer.token", "timeoutS": 2.0, "minIntervalS": 5.0 } }
+{ "recordTrigger": { "enabled": true, "targets": ["http://127.0.0.1:8080/cam0/record/trigger"], "tokenFile": "/etc/hydra-umc-safety-zones/streamer.token", "timeoutS": 2.0, "minIntervalS": 5.0 } }
 ```
 
 - A target that is not on this machine needs `"internal": true`. The bearer token is read from `tokenFile` and never printed.
