@@ -46,6 +46,7 @@ import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
+from typing import Protocol
 
 SAFETY_STATES = ("READY", "INHIBITED", "FAULT", "SAFE_STOP")
 #: What an alarm phase means unless the installation chooses another table. Same table as ``DEFAULT_ALARM_TO_SAFETY`` of the SDK; SAFE_STOP is never in it.
@@ -257,6 +258,19 @@ class ArmorAlarmStatus:
         if self.signature is not None:
             out["signature"] = dict(self.signature)
         return out
+
+
+class _Inhibitor(Protocol):
+    """What ``combine`` needs from a source that can inhibit the verdict: the alarm status and the droid status both have it."""
+
+    @property
+    def inhibits(self) -> bool: ...
+
+    @property
+    def safe_stop(self) -> bool: ...
+
+    @property
+    def reason(self) -> str: ...
 
 
 DISABLED_STATUS = ArmorAlarmStatus("disabled", False, False, "the reading of the ARMOR alarm is switched off (armorAlarm.enabled)")
@@ -589,7 +603,7 @@ class ArmorAlarmGate:
                 pass
 
 
-def combine(base_state: str, base_reason: str, status: ArmorAlarmStatus) -> tuple[str, str]:
+def combine(base_state: str, base_reason: str, status: _Inhibitor) -> tuple[str, str]:
     """The state of the verdict once the alarm is taken into account: ``(state, reason)`` with the states of ``SafetyState`` (ready/warning/danger/inhibited).
 
     A DANGER verdict stays as it is, and so does an INHIBITED one unless the safe stop is on. A READY verdict becomes INHIBITED when the alarm inhibits, and DANGER only when the safe stop is on and

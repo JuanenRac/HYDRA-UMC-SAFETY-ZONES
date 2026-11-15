@@ -302,7 +302,7 @@ def state_is_safe(last_verdict: dict | None, max_age_ms: int, now_s: Callable[[]
     if not isinstance(sdk, dict):
         return False
     # A verdict that is INHIBITED only because the house alarm (A.R.M.O.R.) sounds keeps the heartbeat: it stops new starts, never a running machine.
-    if sdk.get("state") != "READY" and not (sdk.get("state") == "INHIBITED" and last_verdict.get("armorInhibitOnly") is True):
+    if sdk.get("state") != "READY" and not (sdk.get("state") == "INHIBITED" and (last_verdict.get("armorInhibitOnly") is True or last_verdict.get("droidInhibitOnly") is True)):
         return False
     stamp = sdk.get("timestamp_utc")
     if not isinstance(stamp, str):
