@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
   <img src="https://img.shields.io/badge/Tests-1233%20passing-2ea44f.svg" alt="Tests">
-  <img src="https://img.shields.io/badge/Version-0.2.5-0f6cbd.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-0.2.6-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
 
@@ -33,7 +33,7 @@ GPL-3.0-or-later - see LICENSE
 
 | | |
 |---|---|
-| 版本 | `0.2.5` |
+| 版本 | `0.2.6` |
 | 成熟度 | 可用 |
 | 测试 | 1233 (`python -m pytest -q tests`) |
 | 技术栈 | Python / 3D vision / Hailo-8 |
@@ -220,7 +220,7 @@ HTTP 服务通过选项配置；其中两项也可以来自环境变量。
 |---|---|---|
 | `--addr` | `127.0.0.1` | API 绑定的地址 |
 | `--port` | `8108` | API 端口 |
-| `--zones-file` / `SAFETY_ZONES_FILE` | 无 | 服务器固定持有的区域和校准（单元读取 `/etc/hydra-umc-safety-zones/zones.json`） |
+| `--zones-file` / `SAFETY_ZONES_FILE` | 无 | 服务器固定持有的区域和校准 |
 | `--token` / `SAFETY_ZONES_TOKEN` | 无 | POST /check 所需的 Bearer 令牌 |
 | `--max-observation-age-seconds` | 无 | 请求可为其观察声明的时效上限 |
 | `--max-calibration-age-days` | 无 | 校准最长有效天数的上限 |
@@ -276,7 +276,7 @@ CI 运行 `HYDRA_UMC_CI=1 python tools/ci_validate.py`，检查清单、文档�
 无参数调用会打印名称 + 版本 + 角色：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.2.5
+HYDRA-UMC-SAFETY-ZONES v0.2.6
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
