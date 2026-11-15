@@ -24,7 +24,7 @@ import json
 import os
 import sys
 
-from .config_access import DEFAULT_ZONES_FILE, LEGACY_ZONES_FILE, check_access, diagnose_access, group_exists, migrate_legacy_zones
+from .config_access import DEFAULT_ZONES_FILE, LEGACY_ZONES_FILE, check_access, diagnose_access, ensure_directory, group_exists, migrate_legacy_zones
 from .health_route import health_open_requested
 from .hold import HoldRegistry
 from .tool_arms import ToolArmRegistry
@@ -784,8 +784,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "serve":
         return _run_serve(args)
     if args.command == "prepare-config":
+        group = args.group if group_exists(args.group) else ""
         try:
-            outcome = migrate_legacy_zones(args.legacy_file, args.zones_file, args.group if group_exists(args.group) else "")
+            if Path(args.zones_file).parent.name == "hydra-umc-safety-zones":  # the directory of the service, never one the operator named
+                ensure_directory(str(Path(args.zones_file).parent), group)
+            outcome = migrate_legacy_zones(args.legacy_file, args.zones_file, group)
         except OSError as exc:
             print(f"[safety-zones] fatal: prepare-config: {type(exc).__name__}: {exc}", file=sys.stderr)
             return 2

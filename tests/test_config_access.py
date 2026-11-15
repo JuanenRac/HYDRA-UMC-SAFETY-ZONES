@@ -13,15 +13,18 @@ import re
 import socket
 import stat
 import sys
+import types
 from pathlib import Path
 
 import pytest
 
+from hydra_umc_safety_zones import config_access
 from hydra_umc_safety_zones.config_access import (
     DEFAULT_ZONES_FILE,
     LEGACY_ZONES_FILE,
     check_access,
     diagnose_access,
+    ensure_directory,
     migrate_legacy_zones,
 )
 from hydra_umc_safety_zones.main import main
@@ -165,3 +168,67 @@ def test_a_file_the_account_cannot_read_is_named(tmp_path: Path) -> None:
 
 def test_a_readable_file_has_nothing_to_diagnose(tmp_path: Path) -> None:
     assert diagnose_access(str(write_zones(tmp_path / "zones.json"))) == ""
+
+
+class _Recorder:
+    """Stands in for the calls that only root may make, and records them."""
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch, state: tuple[int, int, int]) -> None:
+        self.calls: list[tuple[str, object]] = []
+        monkeypatch.setattr(config_access.os, "geteuid", lambda: 0, raising=False)
+        monkeypatch.setitem(sys.modules, "grp", types.SimpleNamespace(getgrnam=lambda name: types.SimpleNamespace(gr_gid=1234)))
+        monkeypatch.setattr(config_access, "_ownership", lambda path: state)
+        monkeypatch.setattr(config_access.os, "chmod", lambda path, mode: self.calls.append(("chmod", mode)))
+        monkeypatch.setattr(config_access.shutil, "chown", lambda path, user=None, group=None: self.calls.append(("chown", (user, group))))
+
+
+def test_a_missing_directory_of_the_service_is_created_with_mode_0750(tmp_path: Path) -> None:
+    directory = tmp_path / "hydra-umc-safety-zones"
+    assert ensure_directory(str(directory)) == "created"
+    assert directory.is_dir()
+    if sys.platform != "win32":
+        assert stat.S_IMODE(directory.stat().st_mode) == 0o750
+
+
+def test_a_directory_systemd_made_root_root_is_given_the_group_of_the_service(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    directory = tmp_path / "hydra-umc-safety-zones"
+    directory.mkdir()
+    recorder = _Recorder(monkeypatch, (0o755, 0, 0))
+    assert ensure_directory(str(directory), "hydra-umc-safety-zones") == "fixed"
+    assert ("chmod", 0o750) in recorder.calls
+    assert ("chown", ("root", "hydra-umc-safety-zones")) in recorder.calls
+
+
+def test_a_directory_that_is_already_right_is_not_touched(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    directory = tmp_path / "hydra-umc-safety-zones"
+    directory.mkdir()
+    recorder = _Recorder(monkeypatch, (0o750, 0, 1234))
+    assert ensure_directory(str(directory), "hydra-umc-safety-zones") == "kept"
+    assert recorder.calls == []
+
+
+def test_without_the_right_to_change_owners_a_missing_directory_is_created_and_an_existing_one_is_left_alone(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(config_access.os, "geteuid", lambda: 1000, raising=False)
+    changed: list[str] = []
+    monkeypatch.setattr(config_access.shutil, "chown", lambda *args, **kwargs: changed.append("chown"))
+    directory = tmp_path / "hydra-umc-safety-zones"
+    assert ensure_directory(str(directory), "hydra-umc-safety-zones") == "created"
+    assert ensure_directory(str(directory), "hydra-umc-safety-zones") == "kept"
+    assert changed == []
+
+
+def test_the_shared_directory_is_refused(tmp_path: Path) -> None:
+    shared = tmp_path / "hydra-umc"
+    shared.mkdir()
+    with pytest.raises(ValueError):
+        ensure_directory(str(shared))
+
+
+def test_prepare_config_sets_up_the_directory_of_the_service_and_not_one_the_operator_named(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
+    own = tmp_path / "hydra-umc-safety-zones" / "zones.json"
+    assert main(["prepare-config", "--zones-file", str(own), "--legacy-file", str(tmp_path / "none.json")]) == 0
+    assert own.parent.is_dir()
+    other = tmp_path / "elsewhere" / "zones.json"
+    assert main(["prepare-config", "--zones-file", str(other), "--legacy-file", str(tmp_path / "none.json")]) == 0
+    assert not other.parent.exists()
+    capsys.readouterr()
