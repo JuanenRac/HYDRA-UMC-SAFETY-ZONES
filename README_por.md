@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
   <img src="https://img.shields.io/badge/Tests-1233%20passing-2ea44f.svg" alt="Tests">
-  <img src="https://img.shields.io/badge/Version-0.2.5-0f6cbd.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-0.2.6-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
 
@@ -33,7 +33,7 @@ GPL-3.0-or-later - see LICENSE
 
 | | |
 |---|---|
-| Versão | `0.2.5` |
+| Versão | `0.2.6` |
 | Maturidade | Funcional |
 | Testes | 1233 (`python -m pytest -q tests`) |
 | Tecnologia | Python / 3D vision / Hailo-8 |
@@ -185,7 +185,7 @@ O serviço HTTP configura-se com opções; duas delas podem vir também do ambie
 |---|---|---|
 | `--addr` | `127.0.0.1` | endereço onde a API escuta |
 | `--port` | `8108` | porta da API |
-| `--zones-file` / `SAFETY_ZONES_FILE` | nenhum | zonas e calibração que o servidor mantém fixas (a unidade lê `/etc/hydra-umc-safety-zones/zones.json`) |
+| `--zones-file` / `SAFETY_ZONES_FILE` | nenhum | zonas e calibração que o servidor mantém fixas |
 | `--token` / `SAFETY_ZONES_TOKEN` | nenhum | token Bearer exigido por POST /check |
 | `--max-observation-age-seconds` | nenhum | limite da idade que um pedido pode declarar para a sua observação |
 | `--max-calibration-age-days` | nenhum | limite da idade máxima da calibração em dias |
@@ -239,7 +239,7 @@ Localiza o interpretador dentro de `.venv` (tratando as disposições `.venv` de
 A invocação simples imprime nome + versão + função:
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.2.5
+HYDRA-UMC-SAFETY-ZONES v0.2.6
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 

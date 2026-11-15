@@ -19,7 +19,7 @@ GPL-3.0-or-later - see LICENSE
   <img src="https://img.shields.io/badge/Safety-ISO%2013849--1%20aspirational-red.svg" alt="Safety">
   <img src="https://img.shields.io/badge/Stage-Functional%20v0-yellow.svg" alt="Stage">
   <img src="https://img.shields.io/badge/Tests-1233%20passing-2ea44f.svg" alt="Tests">
-  <img src="https://img.shields.io/badge/Version-0.2.5-0f6cbd.svg" alt="Version">
+  <img src="https://img.shields.io/badge/Version-0.2.6-0f6cbd.svg" alt="Version">
   <img src="https://img.shields.io/badge/Maturity-functional-0F6CBD.svg" alt="Maturity">
 </p>
 
@@ -33,7 +33,7 @@ GPL-3.0-or-later - see LICENSE
 
 | | |
 |---|---|
-| バージョン | `0.2.5` |
+| バージョン | `0.2.6` |
 | 成熟度 | 機能する |
 | テスト | 1233 (`python -m pytest -q tests`) |
 | 技術 | Python / 3D vision / Hailo-8 |
@@ -237,7 +237,7 @@ HTTP サービスはオプションで設定します。うち 2 つは環境変
 |---|---|---|
 | `--addr` | `127.0.0.1` | API が待ち受けるアドレス |
 | `--port` | `8108` | API のポート |
-| `--zones-file` / `SAFETY_ZONES_FILE` | なし | サーバーが固定して保持するゾーンと校正（ユニットは `/etc/hydra-umc-safety-zones/zones.json` を読む） |
+| `--zones-file` / `SAFETY_ZONES_FILE` | なし | サーバーが固定して保持するゾーンと校正 |
 | `--token` / `SAFETY_ZONES_TOKEN` | なし | POST /check が要求する Bearer トークン |
 | `--max-observation-age-seconds` | なし | リクエストが観測について申告できる経過時間の上限 |
 | `--max-calibration-age-days` | なし | 校正の最大経過日数の上限 |
@@ -295,7 +295,7 @@ CI は `HYDRA_UMC_CI=1 python tools/ci_validate.py` を実行し、マニフェ�
 引数なしで呼び出すと名前・バージョン・役割を表示します：
 
 ```text
-HYDRA-UMC-SAFETY-ZONES v0.2.5
+HYDRA-UMC-SAFETY-ZONES v0.2.6
 Real-time 3D intrusion detection and E-STOP orchestration for robotic safe-working areas.
 ```
 
