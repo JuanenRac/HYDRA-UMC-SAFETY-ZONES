@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- **The zones file lives in a directory of the service, so the service account can always reach it:** the unit asks systemd for `ConfigurationDirectory=hydra-umc-safety-zones` (`/etc/hydra-umc-safety-zones`, mode `0750`) and starts `serve` with `--zones-file /etc/hydra-umc-safety-zones/zones.json`; the shared `/etc/hydra-umc` directory, which the account of this service cannot enter, is no longer used and its permissions are not changed. The `Dockerfile` already used this directory. A file of the earlier place is copied once, as root, by the new `prepare-config` command (group of the service, mode `0640`, signature included; it never overwrites and never deletes), and a missing or unreadable file still makes `serve` refuse to start with code `2`.
+- **`check-access` tells an installer, before it stops the running service, whether the account can read the zones file; a refusal to start now names the reason:** `check-access --zones-file FILE` exits `0` or `2`, and the unit runs it as its second `ExecStartPre`. A `serve` that cannot open its zones file names the directory it cannot enter, the file it cannot read, or that the file does not exist. `tests/test_config_access.py` covers the layout of the unit, the copy, the repeat and the refusals.
+- **The examples of the key and credential files in the documentation sit in the directory of the service.**
+
 
 ## [0.2.5]
 

@@ -237,7 +237,7 @@ HTTP サービスはオプションで設定します。うち 2 つは環境変
 |---|---|---|
 | `--addr` | `127.0.0.1` | API が待ち受けるアドレス |
 | `--port` | `8108` | API のポート |
-| `--zones-file` / `SAFETY_ZONES_FILE` | なし | サーバーが固定して保持するゾーンと校正 |
+| `--zones-file` / `SAFETY_ZONES_FILE` | なし | サーバーが固定して保持するゾーンと校正（ユニットは `/etc/hydra-umc-safety-zones/zones.json` を読む） |
 | `--token` / `SAFETY_ZONES_TOKEN` | なし | POST /check が要求する Bearer トークン |
 | `--max-observation-age-seconds` | なし | リクエストが観測について申告できる経過時間の上限 |
 | `--max-calibration-age-days` | なし | 校正の最大経過日数の上限 |
@@ -428,6 +428,7 @@ HYDRA-UMC-SAFETY-ZONES/
 │   ├── safety_state.py           実際のフェイルセーフ判定：READY/WARNING/DANGER/INHIBITED
 │   ├── estop.py                  実際の E-STOP リクエスト（実行は決してしない）
 │   ├── config.py                 ゾーン/検知/観測データの実際の JSON 読み込み
+│   ├── config_access.py          ゾーンファイルの場所とアクセス確認
 │   ├── api.py                    シンプルなJSON/HTTPサーフェス(stdlibのhttp.server)。実際の`check`ロジックを橋渡し
 │   ├── stateful.py               ハートビートと状態のプッシュ（任意）
 │   ├── armor_alarm.py            A.R.M.O.R.の警報で開始を禁止（任意）
