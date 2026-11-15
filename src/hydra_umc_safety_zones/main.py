@@ -18,6 +18,7 @@ means here, and their module docstrings for what is still out of scope
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import hashlib
 import json
 import os
@@ -68,7 +69,7 @@ from hydra_umc_safety_zones.safety_state import SafetyState, collect_breaches, e
 from hydra_umc_safety_zones.stateful import StatefulSettings, parse_stateful_settings
 from hydra_umc_safety_zones.armor_alarm import ArmorAlarmConfigError, ArmorAlarmGate, parse_settings as parse_armor_alarm_settings
 from hydra_umc_safety_zones.armor_alarm_mqtt import ArmorAlarmSubscriber
-from hydra_umc_safety_zones.droid_estop import DroidEstopConfigError, DroidEstopGate, parse_settings as parse_droid_estop_settings
+from hydra_umc_safety_zones.droid_estop import DroidEstopConfigError, DroidEstopGate, DroidSwitch, parse_settings as parse_droid_estop_settings, read_state_file
 from hydra_umc_safety_zones.record_trigger import RecordTriggerClient, RecordTriggerConfigError, build_client as build_record_trigger, parse_record_trigger_settings
 from hydra_umc_safety_zones.zone_occupancy import ZoneOccupancyConfigError, ZoneOccupancyEmitter, build_publisher as build_occupancy_publisher, parse_zone_occupancy_settings
 from hydra_umc_safety_zones.fault_events import FaultEventEmitter, FaultEventsConfigError, MqttFaultPublisher, parse_fault_event_settings
@@ -249,16 +250,21 @@ def _start_armor_alarm(zones_file: str) -> tuple[ArmorAlarmGate, ArmorAlarmSubsc
     return gate, ArmorAlarmSubscriber(gate)
 
 
-def _start_droid_estop(zones_file: str) -> tuple[DroidEstopGate, ArmorAlarmSubscriber] | None:
+def _start_droid_estop(zones_file: str) -> tuple[DroidEstopGate, ArmorAlarmSubscriber, DroidSwitch | None] | None:
     """The gate and the (not yet started) subscriber when the zones file switches ``droidEstop.enabled`` on; None when it is off or absent."""
     if not zones_file:
         return None
     raw = json.loads(Path(zones_file).read_text(encoding="utf-8"))
     settings = parse_droid_estop_settings(raw.get("droidEstop") if isinstance(raw, dict) else None)
-    if not settings.enabled:
+    if settings.state_file:
+        chosen = read_state_file(settings.state_file)  # the choice of the administrator wins over the zones file
+        if chosen is not None:
+            settings = dataclasses.replace(settings, enabled=chosen)
+    elif not settings.enabled:
         return None
     gate = DroidEstopGate(settings, _armor_audit_writer(settings.audit_log))
-    return gate, ArmorAlarmSubscriber(gate)
+    subscriber = ArmorAlarmSubscriber(gate)
+    return gate, subscriber, (DroidSwitch(gate, subscriber, settings.state_file) if settings.state_file else None)
 
 
 def _start_fault_events(zones_file: str) -> tuple[FaultEventEmitter, MqttFaultPublisher] | None:
@@ -440,6 +446,7 @@ def _run_serve(args: argparse.Namespace) -> int:
             estop_requester=can_runtime[0] if can_runtime else None,
             armor_gate=armor_runtime[0] if armor_runtime else None,
             droid_gate=droid_runtime[0] if droid_runtime else None,
+            droid_switch=droid_runtime[2] if droid_runtime else None,
         )
     except OSError as exc:
         print(f"[safety-zones] fatal: could not start the HTTP API on {addr}:{port}: {exc}", file=sys.stderr)
@@ -483,19 +490,25 @@ def _run_serve(args: argparse.Namespace) -> int:
             + " (not tried with a real alarm)"
         )
     if droid_runtime is not None:
-        droid_gate, droid_subscriber = droid_runtime
+        droid_gate, droid_subscriber, droid_switch = droid_runtime
         try:
-            droid_subscriber.start()
+            if droid_switch is not None:
+                droid_switch.start_if_enabled()
+            else:
+                droid_subscriber.start()
         except (DroidEstopConfigError, OSError) as exc:
             print(f"[safety-zones] fatal: the reading of the droid emergency stop could not start: {exc}", file=sys.stderr)
             server.server_close()
             return 2
-        droid_broker = droid_gate.settings.broker
-        print(
-            f"[safety-zones] droid emergency stop: reading {droid_gate.settings.topic} from {droid_broker.host}:{droid_broker.port}; a cut droid INHIBITS new starts and never stops a machine"
-            + (" except by the safe stop that the installation switched on" if droid_gate.settings.safe_stop else "")
-            + " (not tried with a real droid)"
-        )
+        if not droid_gate.settings.enabled:
+            print("[safety-zones] droid emergency stop: switched off; an administrator can switch it on (POST /settings/droid-estop)")
+        else:
+            droid_broker = droid_gate.settings.broker
+            print(
+                f"[safety-zones] droid emergency stop: reading {droid_gate.settings.topic} from {droid_broker.host}:{droid_broker.port}; a cut droid INHIBITS new starts and never stops a machine"
+                + (" except by the safe stop that the installation switched on" if droid_gate.settings.safe_stop else "")
+                + " (not tried with a real droid)"
+            )
     if fault_runtime is not None:
         emitter, fault_publisher = fault_runtime
         try:
@@ -549,7 +562,10 @@ def _run_serve(args: argparse.Namespace) -> int:
         if armor_runtime is not None:
             armor_runtime[1].stop()
         if droid_runtime is not None:
-            droid_runtime[1].stop()
+            if droid_runtime[2] is not None:
+                droid_runtime[2].stop()
+            else:
+                droid_runtime[1].stop()
         if fault_runtime is not None:
             fault_runtime[1].stop()
         server.server_close()
