@@ -29,9 +29,10 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import threading
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 
 from hydra_umc_safety_zones.armor_alarm import ArmorAlarmConfigError, BrokerSettings, _parse_broker
@@ -39,7 +40,7 @@ from hydra_umc_safety_zones.armor_alarm import ArmorAlarmConfigError, BrokerSett
 DEFAULT_TOPIC = "hydra/bridges/droids/state"
 AVAILABILITY_SUFFIX = "availability"
 MAX_MESSAGE_BYTES = 16 * 1024
-_FIELDS = {"enabled", "topic", "maxAgeS", "hysteresisS", "unknownInhibits", "safeStop", "auditLog", "broker"}
+_FIELDS = {"enabled", "topic", "maxAgeS", "hysteresisS", "unknownInhibits", "safeStop", "auditLog", "broker", "stateFile"}
 
 
 class DroidEstopConfigError(ArmorAlarmConfigError):
@@ -55,6 +56,8 @@ class DroidEstopSettings:
     - ``maxAgeS`` seconds of silence after which the bridge is ``unknown`` (0: not checked, which is the default because the bridge publishes on events, not on a timer).
     - ``hysteresisS`` seconds a "no cut" must last before the inhibition is lifted. ``unknownInhibits`` an unknown bridge inhibits (default true).
     - ``safeStop`` lets a cut droid reach SAFE_STOP (default false). ``auditLog`` file for the audit lines (``-``: standard error; empty: only memory).
+    - ``stateFile`` (empty by default) makes the switch ``enabled`` changeable while the service runs (``POST /settings/droid-estop``, administrator only): the file keeps the value the
+      administrator last chose, and a value in it wins over ``enabled`` of the zones file. Without it the switch is only the zones file.
     """
 
     enabled: bool = False
@@ -64,6 +67,7 @@ class DroidEstopSettings:
     unknown_inhibits: bool = True
     safe_stop: bool = False
     audit_log: str = ""
+    state_file: str = ""
     broker: BrokerSettings = field(default_factory=lambda: BrokerSettings(client_id="hydra-umc-safety-zones-droids"))
 
 
@@ -91,6 +95,9 @@ def parse_settings(data: object) -> DroidEstopSettings:
     audit = data.get("auditLog", "")
     if not isinstance(audit, str):
         raise DroidEstopConfigError("droidEstop.auditLog must be a text")
+    state_file = data.get("stateFile", "")
+    if not isinstance(state_file, str):
+        raise DroidEstopConfigError("droidEstop.stateFile must be a text (the path of a file)")
     broker_data = data.get("broker")
     if isinstance(broker_data, dict) and "clientId" not in broker_data:
         broker_data = {**broker_data, "clientId": "hydra-umc-safety-zones-droids"}
@@ -107,6 +114,7 @@ def parse_settings(data: object) -> DroidEstopSettings:
         unknown_inhibits=data.get("unknownInhibits", True),
         safe_stop=data.get("safeStop", False),
         audit_log=audit,
+        state_file=state_file,
         broker=broker if broker_data is not None else DroidEstopSettings().broker,
     )
 
@@ -148,6 +156,21 @@ class DroidEstopGate:
         self._offline = False
         self._clear_since: float | None = None
         self._last_status: tuple[str, bool] | None = None
+
+    def set_enabled(self, enabled: bool) -> None:
+        """Turn the reading on or off. Turning it off forgets what was heard, so turning it on again starts as 'nothing heard yet' (unknown), never from an old state."""
+        with self._lock:
+            self.settings = replace(self.settings, enabled=enabled)
+            if not enabled:
+                self._received_at = None
+                self._cut_reason = ""
+                self._link_lost = False
+                self._session_ready = False
+                self._fault = None
+                self._offline = False
+                self._clear_since = None
+                self._last_status = None
+            self._audit("switch", f"the reading of the droid emergency stop was switched {'on' if enabled else 'off'}")
 
     def topics(self) -> tuple[str, str]:
         """The state topic and its availability sibling."""
@@ -265,3 +288,89 @@ class DroidEstopGate:
                 self._audit_sink(record)
             except Exception:  # noqa: BLE001 - an audit that cannot be written never changes the answer
                 pass
+
+
+def read_state_file(path: str) -> bool | None:
+    """The value the administrator last chose, or None when there is no file yet. A file that cannot be read or is not ``{"enabled": true|false}`` is an error: it is never read as 'on' or 'off'."""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            raw = handle.read(4096)
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeDecodeError) as exc:
+        raise DroidEstopConfigError(f"droidEstop.stateFile cannot be read ({type(exc).__name__})") from exc
+    try:
+        data = json.loads(raw)
+    except ValueError as exc:
+        raise DroidEstopConfigError("droidEstop.stateFile is not valid JSON") from exc
+    if not isinstance(data, dict) or set(data) != {"enabled"} or not isinstance(data["enabled"], bool):
+        raise DroidEstopConfigError('droidEstop.stateFile must hold {"enabled": true or false}')
+    return data["enabled"]
+
+
+class DroidSwitch:
+    """The switch ``droidEstop.enabled`` while the service runs: it starts or stops the broker link, changes the gate and keeps the choice in the state file.
+
+    ``set_enabled`` is all or nothing: if the link cannot start or the file cannot be written, the earlier state is put back and the error is raised.
+    """
+
+    def __init__(self, gate: DroidEstopGate, subscriber: object, state_file: str) -> None:
+        self.gate = gate
+        self.subscriber = subscriber
+        self.state_file = state_file
+        self.running = False
+        self._lock = threading.Lock()
+
+    @property
+    def enabled(self) -> bool:
+        return self.gate.settings.enabled
+
+    def start_if_enabled(self) -> None:
+        """At start-up: start the link when the switch is on (the zones file, or the state file over it)."""
+        with self._lock:
+            if self.gate.settings.enabled and not self.running:
+                self.subscriber.start()  # type: ignore[attr-defined]
+                self.running = True
+
+    def stop(self) -> None:
+        with self._lock:
+            if self.running:
+                self.subscriber.stop()  # type: ignore[attr-defined]
+                self.running = False
+
+    def set_enabled(self, enabled: bool) -> bool:
+        """Returns True when the state changed. Raises ``DroidEstopConfigError`` or ``OSError`` (with the earlier state back) when it could not."""
+        with self._lock:
+            before = self.gate.settings.enabled
+            if enabled == before and enabled == self.running:
+                return False
+            if enabled:
+                self.gate.set_enabled(True)
+                try:
+                    self.subscriber.start()  # type: ignore[attr-defined]
+                except Exception:
+                    self.gate.set_enabled(False)
+                    raise
+                self.running = True
+            else:
+                if self.running:
+                    self.subscriber.stop()  # type: ignore[attr-defined]
+                    self.running = False
+                self.gate.set_enabled(False)
+            try:
+                self._persist(enabled)
+            except OSError:
+                if enabled:
+                    self.subscriber.stop()  # type: ignore[attr-defined]
+                    self.running = False
+                    self.gate.set_enabled(False)
+                else:
+                    self.gate.set_enabled(before)
+                raise
+            return enabled != before
+
+    def _persist(self, enabled: bool) -> None:
+        temporary = self.state_file + ".tmp"
+        with open(temporary, "w", encoding="utf-8") as handle:
+            json.dump({"enabled": enabled}, handle)
+        os.replace(temporary, self.state_file)

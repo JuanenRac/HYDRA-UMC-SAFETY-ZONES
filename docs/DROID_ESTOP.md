@@ -32,6 +32,7 @@ Off unless asked: `"droidEstop": { "enabled": true }` in the zones file (and `pi
 | `unknownInhibits` | `true` | a bridge never heard from, offline or silent inhibits too (false: it is only shown) |
 | `safeStop` | `false` | a cut droid becomes SAFE_STOP of the cell (see below) |
 | `auditLog` | `""` | file for the audit lines (`-`: standard error; empty: kept in memory and on `GET /droid-estop`) |
+| `stateFile` | `""` | a file that makes `enabled` changeable while the service runs (see below); empty: the switch is only the zones file |
 | `broker` | `127.0.0.1:1883` | `host`, `port`, `usernameFile`, `passwordFile`, `tls`, `caFile`, `internal`, `clientId` |
 
 The messages of the bridge are not signed, so a broker that is not on this machine is accepted only when the installation declares it `internal`.
@@ -47,9 +48,17 @@ The messages of the bridge are not signed, so a broker that is not on this machi
   never a running machine. Any other inhibition (an observer that is down, an expired verdict) still silences the heartbeat.
 - **SAFE_STOP only by the switch.** With `safeStop` on, a cut droid is a DANGER of the cell (SAFE_STOP) and the heartbeat stops.
 
+## The switch while the service runs
+
+With `droidEstop.stateFile` set, `GET /settings/droid-estop` shows the switch (`enabled`, `default` false, `running`) to any caller the service accepts, and `POST /settings/droid-estop` with
+`{"enabled": true|false, "confirm": true}` changes it. Only an administrator may change it (with the identity of the server on, a token of the role `admin`; a caller with the token of the
+service itself counts as one), a body of another shape is a 400, a missing `confirm: true` is a 400 with the code `CONFIRMATION_REQUIRED`, and a service with neither a token nor the
+identity of the server refuses with a 403. The change is all or nothing: switching on starts the broker link, switching off stops it and forgets what was heard (so switching on again starts from
+"nothing heard yet"), and the choice is written to the state file; if the link cannot start or the file cannot be written, the earlier state is put back and the answer is a 502. At start-up the
+value in the state file wins over `enabled` of the zones file; a state file that is damaged stops the start. Every change is audited with who made it. HYDRA-UMC-SERVER carries the change
+from Studio and the Suite (`/api/droid-estop/settings`).
+
 ## Not done yet
 
-The switch lives in the zones file of this service. Showing it in Studio and in the Suite (with the eight languages) needs a path from the server to this service that is not
-there for any of its other switches, and is the next piece. The bridge also publishes its state only when it handles an e-stop command or a status request: publishing it on
-every cut (a link lost, a global stop) is a change of HYDRA-UMC-BRIDGE-DROIDS. Bench: cut the session of a real Spot through the bridge and read `GET /droid-estop` and the verdict
+The bridge publishes its state at every cut only from the version of HYDRA-UMC-BRIDGE-DROIDS that carries that change; before it, only when it handles an e-stop command or a status request. Bench: cut the session of a real Spot through the bridge and read `GET /droid-estop` and the verdict
 of `/check` (it must be INHIBITED within a second and the heartbeat must go on).

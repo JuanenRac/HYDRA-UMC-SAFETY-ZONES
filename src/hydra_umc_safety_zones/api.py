@@ -38,7 +38,7 @@ from .server_identity import accepts
 from .service_metrics import MetricsHandlerMixin
 from .config import ConfigError, parse_detections, parse_robot_body, parse_tool_velocity, parse_zone_set, strict_json_loads
 from .armor_alarm import ArmorAlarmGate, combine
-from .droid_estop import DroidEstopGate
+from .droid_estop import DroidEstopConfigError, DroidEstopGate, DroidSwitch
 from .estop import EStopRequester, NullEStopRequester, request_estop_for
 from .signing import Signer
 from .observation import ObservationError, parse_observation_status
@@ -155,6 +155,11 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
             payload = gate.status(self.server.clock()).as_dict()
             payload["audit"] = list(gate.audit_records[-50:])
             _write_json(self, 200, payload)
+        elif path == "/settings/droid-estop" and self.server.droid_switch is not None:
+            if not self._authorized():
+                self._write_unauthorized()
+                return
+            _write_json(self, 200, self._droid_switch_view())
         elif path == "/droid-estop" and self.server.droid_gate is not None:
             if not self._authorized():
                 self._write_unauthorized()
@@ -232,13 +237,16 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
-        if (self.server.identity_key is not None or path in ("/check", "/hold", "/tool-arms") or (path == "/heartbeat" and self.server.monitor is not None)) and not self._authorized():
+        if (self.server.identity_key is not None or path in ("/check", "/hold", "/tool-arms", "/settings/droid-estop") or (path == "/heartbeat" and self.server.monitor is not None)) and not self._authorized():
             self._write_unauthorized()
             return
         try:
             body = _read_json_body(self)
         except (json.JSONDecodeError, ValueError) as e:
             _write_error(self, 400, f"malformed JSON body: {e}")
+            return
+        if path == "/settings/droid-estop" and self.server.droid_switch is not None:
+            self._handle_droid_switch(body)
             return
         if path == "/heartbeat" and self.server.monitor is not None:
             self._handle_heartbeat(body)
@@ -273,6 +281,38 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
                 )
             except OSError:
                 pass
+
+    def _droid_switch_view(self) -> dict:
+        switch = self.server.droid_switch
+        assert switch is not None
+        return {"enabled": switch.enabled, "default": False, "running": switch.running}
+
+    def _handle_droid_switch(self, body: dict) -> None:
+        """Switch the reading of the droid emergency stop on or off. An administrator only (a caller with the token of the service itself counts as one), with a confirmation, and it is audited."""
+        switch = self.server.droid_switch
+        assert switch is not None
+        if self.server.identity_key is None and not self.server.token:
+            _write_error(self, 403, "changing a setting needs a credential: start the service with the identity of the server or a token")
+            return
+        identity = getattr(self, "identity", None)
+        if identity is not None and identity.role != "admin":
+            _write_error(self, 403, "only an administrator may change this setting")
+            return
+        if not isinstance(body, dict) or set(body) != {"enabled", "confirm"} or not isinstance(body["enabled"], bool):
+            _write_error(self, 400, "the body must be an object with enabled (true or false) and confirm: true")
+            return
+        if body["confirm"] is not True:
+            _write_json(self, 400, {"error": "changing this setting needs confirm: true", "code": "CONFIRMATION_REQUIRED"})
+            return
+        by = str(getattr(identity, "username", None) or "token")[:64]
+        try:
+            changed = switch.set_enabled(body["enabled"])
+        except (DroidEstopConfigError, OSError) as exc:
+            _write_error(self, 502, f"the setting could not be changed ({type(exc).__name__}); it stays as it was")
+            return
+        if changed and self.server.droid_gate is not None:
+            self.server.droid_gate._audit("switch-by", f"changed by {by}")  # noqa: SLF001
+        _write_json(self, 200, {**self._droid_switch_view(), "changed": changed})
 
     def _handle_hold(self, body: dict) -> None:
         """Hold (or release) one robot. Never without a credential; a stop request leaves only when the operator turned that on."""
@@ -549,6 +589,7 @@ class SafetyZonesServer(ThreadingHTTPServer):
         estop_requester: EStopRequester | None = None,
         armor_gate: ArmorAlarmGate | None = None,
         droid_gate: DroidEstopGate | None = None,
+        droid_switch: DroidSwitch | None = None,
     ) -> None:
         # Set before the socket is bound: a failed bind calls server_close().
         self.stopping = threading.Event()
@@ -577,7 +618,9 @@ class SafetyZonesServer(ThreadingHTTPServer):
         # Off unless the zones file switches armorAlarm.enabled on (see armor_alarm.py).
         self.armor_gate = armor_gate
         # Off unless the zones file switches droidEstop.enabled on (see droid_estop.py).
-        self.droid_gate = droid_gate
+        self.droid_gate = droid_gate if droid_gate is not None or droid_switch is None else droid_switch.gate
+        # Off unless the zones file names droidEstop.stateFile: the administrator can switch the reading on or off while the service runs.
+        self.droid_switch = droid_switch
         # Off unless the zones file switches faultEvents.enabled on: publishes fault-event/1 when the state changes (see fault_events.py).
         self.fault_emitter: FaultEventEmitter | None = None
         # Off unless the zones file switches zoneOccupancy.enabled on: publishes the occupied zones for the vehicles (see zone_occupancy.py).
