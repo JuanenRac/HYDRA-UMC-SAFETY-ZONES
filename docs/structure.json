@@ -410,29 +410,6 @@
           }
         },
         {
-          "name": "droid_estop.py",
-          "desc": {
-            "en": "Droid emergency stop inhibits starts (optional)",
-            "es": "La parada de emergencia de un droide inhibe arranques (opcional)",
-            "de": "Not-Halt eines Droiden sperrt Starts (optional)",
-            "fr": "L'arrêt d'urgence d'un droïde inhibe les démarrages (optionnel)",
-            "it": "L'arresto di emergenza di un droide inibisce gli avvii (opzionale)",
-            "ja": "ドロイドの非常停止で開始を禁止（任意）",
-            "zh": "机器人紧急停止禁止启动（可选）",
-            "pt": "A paragem de emergência de um droide inibe os arranques (opcional)"
-          },
-          "tree_desc": {
-            "en": "Droid emergency stop inhibits starts (optional)",
-            "es": "La parada de emergencia de un droide inhibe arranques (opcional)",
-            "de": "Not-Halt eines Droiden sperrt Starts (optional)",
-            "fr": "L'arrêt d'urgence d'un droïde inhibe les démarrages (optionnel)",
-            "it": "L'arresto di emergenza di un droide inibisce gli avvii (opzionale)",
-            "ja": "ドロイドの非常停止で開始を禁止（任意）",
-            "zh": "机器人紧急停止禁止启动（可选）",
-            "pt": "A paragem de emergência de um droide inibe os arranques (opcional)"
-          }
-        },
-        {
           "name": "signing.py",
           "desc": {
             "en": "HMAC signature of the safety state (optional)",
