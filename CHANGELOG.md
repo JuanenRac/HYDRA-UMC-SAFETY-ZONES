@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+
+## [0.2.5]
+
 - **The SDK pin and the shared tools are up to date:** the SDK dependency names the newest release tag, and the shared tools are the canonical copies again.
 - **The reading of the droid emergency stop can be switched on and off while the service runs (`droidEstop.stateFile`, `GET` and `POST /settings/droid-estop`):** with a state file configured, an administrator (and nobody else) switches the reading with `{enabled, confirm: true}`; the change is all or nothing (the broker link starts or stops, what was heard is forgotten when it is switched off, the choice is written to the file, and if either step fails the earlier state is put back and the answer is a 502), it is audited with who made it, and at start-up the file wins over the zones file. Without a state file nothing changes and the route answers 404. Tested through the service with the token of the service, with the identity of the server in the three roles, with a link that fails and with a file that cannot be written; nothing was tried with a real broker or droid.
 
@@ -20,6 +23,8 @@
 - **The stop request now speaks the emergency-stop frame of HYDRA-UMC on identifier 0x001:** a danger verdict sends a TRIP (reason safety zone, source CM5, an epoch that goes up with each new stop and its own sequence number on every frame, complement bytes) instead of the older frame with a check byte. ALIVE and RELEASE belong to the kinematic brain, so the service sends no heartbeat on 0x001. The older frames on identifiers 1 and 2 and their safe heartbeat stay as a secondary path with `"protocol": "legacy"` in the CAN file, and `"legacy_heartbeat": true` keeps that heartbeat beside the new frame. New settings `protocol`, `episode_gap_ms` and `legacy_heartbeat`; with `hydra` the stop identifier must be 1. Described in `docs/CAN_ESTOP.md` and `docs/BENCH_TESTS.md`. 25 tests (1141 -> 1166). Not tried on a real bus.
 
 All notable changes to this project are documented here.
+
+- Build version synchronized with `hydra-umc.project.json` and the repository-native version source.
 
 ## [0.2.4] - 34 more tests for the CAN link: `tests/test_can_estop_edges.py` checks the frame codec (the check byte against the standard vector, a seeded walk of frames, every length, the version, the kind and any changed byte), the opening of a bus with the library missin
 
