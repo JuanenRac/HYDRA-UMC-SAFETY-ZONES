@@ -38,6 +38,7 @@ from .server_identity import accepts
 from .service_metrics import MetricsHandlerMixin
 from .config import ConfigError, parse_detections, parse_robot_body, parse_tool_velocity, parse_zone_set, strict_json_loads
 from .armor_alarm import ArmorAlarmGate, combine
+from .droid_estop import DroidEstopGate
 from .estop import EStopRequester, NullEStopRequester, request_estop_for
 from .signing import Signer
 from .observation import ObservationError, parse_observation_status
@@ -154,6 +155,14 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
             payload = gate.status(self.server.clock()).as_dict()
             payload["audit"] = list(gate.audit_records[-50:])
             _write_json(self, 200, payload)
+        elif path == "/droid-estop" and self.server.droid_gate is not None:
+            if not self._authorized():
+                self._write_unauthorized()
+                return
+            droid_gate = self.server.droid_gate
+            droid_payload = droid_gate.status(self.server.clock()).as_dict()
+            droid_payload["audit"] = list(droid_gate.audit_records[-50:])
+            _write_json(self, 200, droid_payload)
         elif path == "/holds" and self.server.holds is not None:
             if not self._authorized():
                 self._write_unauthorized()
@@ -420,6 +429,22 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
             elif armor.inhibits and before is SafetyState.WARNING:
                 evaluation = SafetyEvaluation(before, f"{evaluation.reason}; {armor.reason}", evaluation.fault, evaluation.separation)
 
+        # The emergency stop of a droid (off unless droidEstop.enabled): a cut robot, a lost link or a silent bridge INHIBITS a verdict that would be READY, like the alarm;
+        # it stops nothing that runs, except when the installation switched the safe stop on.
+        droid = None
+        droid_only = False
+        droid_stop = False
+        if self.server.droid_gate is not None:
+            droid = self.server.droid_gate.status(self.server.clock())
+            before_droid = evaluation.state
+            droid_state, droid_reason = combine(before_droid.value, evaluation.reason, droid)
+            if droid_state != before_droid.value:
+                evaluation = SafetyEvaluation(SafetyState(droid_state), droid_reason, evaluation.fault, evaluation.separation)
+                droid_only = before_droid is SafetyState.READY and evaluation.state is SafetyState.INHIBITED
+                droid_stop = evaluation.state is SafetyState.DANGER and before_droid is not SafetyState.DANGER
+            elif droid.inhibits and before_droid is SafetyState.WARNING:
+                evaluation = SafetyEvaluation(before_droid, f"{evaluation.reason}; {droid.reason}", evaluation.fault, evaluation.separation)
+
         response: dict = {
             "state": evaluation.state.value,
             "reason": evaluation.reason,
@@ -441,13 +466,17 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
             response["armorAlarm"] = armor.as_dict()
             if armor_only:
                 response["armorInhibitOnly"] = True
+        if droid is not None:
+            response["droidEstop"] = droid.as_dict()
+            if droid_only:
+                response["droidInhibitOnly"] = True
         if robot_body is not None:
             response["robotBody"] = {"segments": len(robot_body.segments)}
         if self.server.config_sha256:
             # which configuration this verdict was reached with
             response["configSha256"] = self.server.config_sha256
 
-        if armor_stop or evaluation.state in (SafetyState.INHIBITED, SafetyState.READY):
+        if armor_stop or droid_stop or evaluation.state in (SafetyState.INHIBITED, SafetyState.READY):
             self.server.log_decision(response)
             _write_json(self, 200, response)
             return
@@ -519,6 +548,7 @@ class SafetyZonesServer(ThreadingHTTPServer):
         signer: Signer | None = None,
         estop_requester: EStopRequester | None = None,
         armor_gate: ArmorAlarmGate | None = None,
+        droid_gate: DroidEstopGate | None = None,
     ) -> None:
         # Set before the socket is bound: a failed bind calls server_close().
         self.stopping = threading.Event()
@@ -546,6 +576,8 @@ class SafetyZonesServer(ThreadingHTTPServer):
         self.estop_requester = estop_requester
         # Off unless the zones file switches armorAlarm.enabled on (see armor_alarm.py).
         self.armor_gate = armor_gate
+        # Off unless the zones file switches droidEstop.enabled on (see droid_estop.py).
+        self.droid_gate = droid_gate
         # Off unless the zones file switches faultEvents.enabled on: publishes fault-event/1 when the state changes (see fault_events.py).
         self.fault_emitter: FaultEventEmitter | None = None
         # Off unless the zones file switches zoneOccupancy.enabled on: publishes the occupied zones for the vehicles (see zone_occupancy.py).
@@ -595,6 +627,9 @@ class SafetyZonesServer(ThreadingHTTPServer):
         if response.get("armorInhibitOnly") is True:
             # the only cause of the INHIBITED is the house alarm: it must not silence the safe heartbeat of a machine that is running
             record["armorInhibitOnly"] = True
+        if response.get("droidInhibitOnly") is True:
+            # the only cause of the INHIBITED is a cut droid: it must not silence the safe heartbeat of a machine that is running
+            record["droidInhibitOnly"] = True
         if response.get("configSha256"):
             record["configSha256"] = response["configSha256"]
         if isinstance(response.get("separation"), dict):
