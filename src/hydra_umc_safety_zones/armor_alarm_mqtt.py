@@ -18,7 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from hydra_umc_safety_zones.armor_alarm import ArmorAlarmConfigError, ArmorAlarmGate
+from hydra_umc_safety_zones.armor_alarm import ArmorAlarmConfigError
 
 
 def _read_secret(path: str, what: str) -> str:
@@ -31,7 +31,7 @@ def _read_secret(path: str, what: str) -> str:
 class ArmorAlarmSubscriber:
     """Connects to the broker of the settings and feeds the gate. ``client`` is a paho-like object (``connect``, ``subscribe``, ``loop_start``, ``loop_stop``...)."""
 
-    def __init__(self, gate: ArmorAlarmGate, clock: Callable[[], float] = time.monotonic, client: Any = None) -> None:
+    def __init__(self, gate: Any, clock: Callable[[], float] = time.monotonic, client: Any = None) -> None:
         self.gate = gate
         self.clock = clock
         self.client = client
@@ -70,7 +70,8 @@ class ArmorAlarmSubscriber:
         ok = getattr(reason_code, "is_failure", None)
         self.connected = not (ok if isinstance(ok, bool) else reason_code not in (0, None))
         if self.connected:
-            client.subscribe(self.gate.settings.topic, qos=1)
+            for topic in getattr(self.gate, "topics", lambda: (self.gate.settings.topic,))():
+                client.subscribe(topic, qos=1)
 
     def _on_disconnect(self, client: Any, userdata: Any, *args: Any) -> None:
         self.connected = False
