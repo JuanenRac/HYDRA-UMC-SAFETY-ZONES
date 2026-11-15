@@ -357,3 +357,197 @@ def test_the_start_helper_is_off_unless_the_zones_file_switches_it_on(tmp_path: 
     bad.write_text(json.dumps({**_zones(), "droidEstop": {"enabled": True, "topic": "x"}}), encoding="utf-8")
     with pytest.raises(DroidEstopConfigError):
         safety_main._start_droid_estop(str(bad))  # noqa: SLF001
+
+
+# -- the switch while the service runs -----------------------------------------------------------------------------------------------
+
+from hydra_umc_safety_zones.droid_estop import DroidSwitch, read_state_file  # noqa: E402
+from hydra_umc_safety_zones.server_identity import sign_token  # noqa: E402
+
+KEY = b"k" * 40
+
+
+class FlakyClient(FakeClient):
+    def __init__(self, fail_connect: bool = False) -> None:
+        super().__init__()
+        self.fail_connect = fail_connect
+
+    def connect(self, host: str, port: int, keepalive: int) -> None:
+        if self.fail_connect:
+            raise OSError("broker unreachable")
+        super().connect(host, port, keepalive)
+
+
+def make_switch(tmp_path: Path, *, enabled: bool = False, fail_connect: bool = False) -> tuple[DroidSwitch, FlakyClient]:
+    gate = DroidEstopGate(DroidEstopSettings(enabled=enabled, hysteresis_s=0.0, state_file=str(tmp_path / "droid.json")))
+    client = FlakyClient(fail_connect)
+    return DroidSwitch(gate, ArmorAlarmSubscriber(gate, client=client), str(tmp_path / "droid.json")), client
+
+
+def test_the_state_file_setting_is_a_text_and_the_file_is_read_strictly(tmp_path: Path) -> None:
+    assert parse_settings({"stateFile": "/var/lib/x/droid.json"}).state_file == "/var/lib/x/droid.json"
+    with pytest.raises(DroidEstopConfigError):
+        parse_settings({"stateFile": 3})
+    path = tmp_path / "s.json"
+    assert read_state_file(str(path)) is None
+    path.write_text('{"enabled": true}', encoding="utf-8")
+    assert read_state_file(str(path)) is True
+    path.write_text('{"enabled": false}', encoding="utf-8")
+    assert read_state_file(str(path)) is False
+    for bad in ("{not json", "[]", '{"enabled": 1}', '{"enabled": true, "x": 1}', "{}"):
+        path.write_text(bad, encoding="utf-8")
+        with pytest.raises(DroidEstopConfigError):
+            read_state_file(str(path))
+    with pytest.raises(DroidEstopConfigError):
+        read_state_file(str(tmp_path))  # a folder is not a file
+
+
+def test_the_switch_starts_and_stops_the_link_forgets_the_old_state_and_keeps_the_choice(tmp_path: Path) -> None:
+    switch, client = make_switch(tmp_path)
+    assert switch.enabled is False and switch.set_enabled(False) is False
+    assert switch.set_enabled(True) is True and switch.enabled and switch.running and client.started
+    assert read_state_file(str(tmp_path / "droid.json")) is True
+    switch.gate.ingest(STATE, state(cut="cut"), 0.0)
+    assert switch.gate.status(0.0).state == "cut"
+    assert switch.set_enabled(True) is False
+    assert switch.set_enabled(False) is True and not switch.enabled and not switch.running and not client.started
+    assert read_state_file(str(tmp_path / "droid.json")) is False
+    assert switch.gate.status(0.0).state == "disabled"
+    switch.gate.set_enabled(True)
+    assert switch.gate.status(0.0).state == "unknown", "switching on again starts from nothing heard"
+    switch.gate.set_enabled(False)
+    switch.stop()  # already stopped: nothing happens
+
+
+def test_a_link_that_cannot_start_leaves_the_switch_off_and_says_so(tmp_path: Path) -> None:
+    switch, client = make_switch(tmp_path, fail_connect=True)
+    with pytest.raises(OSError):
+        switch.set_enabled(True)
+    assert not switch.enabled and not switch.running
+    assert not (tmp_path / "droid.json").exists()
+
+
+def test_a_state_file_that_cannot_be_written_puts_the_earlier_state_back(tmp_path: Path) -> None:
+    missing = str(tmp_path / "missing" / "droid.json")
+    gate = DroidEstopGate(DroidEstopSettings(enabled=False, state_file=missing))
+    client = FlakyClient()
+    switch = DroidSwitch(gate, ArmorAlarmSubscriber(gate, client=client), missing)
+    with pytest.raises(OSError):
+        switch.set_enabled(True)
+    assert not switch.enabled and not switch.running and not client.started
+    on = DroidEstopGate(DroidEstopSettings(enabled=True, state_file=missing))
+    on_switch = DroidSwitch(on, ArmorAlarmSubscriber(on, client=FlakyClient()), missing)
+    on_switch.start_if_enabled()
+    assert on_switch.running
+    with pytest.raises(OSError):
+        on_switch.set_enabled(False)
+    assert on_switch.enabled, "the switch off was not saved, so it stays on"
+    on_switch.stop()
+
+
+def test_start_if_enabled_starts_only_an_enabled_switch(tmp_path: Path) -> None:
+    off, off_client = make_switch(tmp_path)
+    off.start_if_enabled()
+    assert not off.running and not off_client.started
+    on, on_client = make_switch(tmp_path, enabled=True)
+    on.start_if_enabled()
+    on.start_if_enabled()
+    assert on.running and on_client.started
+    on.stop()
+    assert not on_client.started
+
+
+@contextmanager
+def _switch_server(switch: DroidSwitch | None, clock: FakeClock, identity: bool = False):  # noqa: ANN202
+    server = SafetyZonesServer(("127.0.0.1", 0), "test", token=None if identity else TOKEN, clock=clock, droid_switch=switch)
+    if identity:
+        server.identity_key = KEY
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}", server
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_the_route_of_the_switch_exists_only_with_a_state_file() -> None:
+    with _server(None, FakeClock()) as (base, _):
+        assert _call(base, "GET", "/settings/droid-estop")[0] == 404
+        assert _call(base, "POST", "/settings/droid-estop", {"enabled": True, "confirm": True})[0] == 404
+
+
+def test_an_administrator_switches_the_reading_on_and_off_with_a_confirmation(tmp_path: Path) -> None:
+    switch, client = make_switch(tmp_path)
+    with _switch_server(switch, FakeClock()) as (base, server):
+        assert _call(base, "GET", "/settings/droid-estop") == (200, {"enabled": False, "default": False, "running": False})
+        assert _call(base, "GET", "/settings/droid-estop", token=None)[0] in (401, 403)
+        assert _call(base, "POST", "/settings/droid-estop", {"enabled": True, "confirm": True}, token=None)[0] in (401, 403)
+        for bad in ([], {}, {"enabled": "yes", "confirm": True}, {"enabled": True}, {"enabled": True, "confirm": True, "x": 1}):
+            assert _call(base, "POST", "/settings/droid-estop", bad)[0] == 400
+        status, answer = _call(base, "POST", "/settings/droid-estop", {"enabled": True, "confirm": False})
+        assert status == 400 and answer["code"] == "CONFIRMATION_REQUIRED" and not switch.enabled
+        status, answer = _call(base, "POST", "/settings/droid-estop", {"enabled": True, "confirm": True})
+        assert (status, answer["enabled"], answer["changed"], answer["running"]) == (200, True, True, True)
+        assert _call(base, "GET", "/droid-estop")[1]["state"] == "unknown"
+        assert any(r["event"] == "switch-by" and "token" in r["detail"] for r in server.droid_gate.audit_records)
+        status, answer = _call(base, "POST", "/settings/droid-estop", {"enabled": False, "confirm": True})
+        assert (status, answer["enabled"], answer["running"]) == (200, False, False)
+        assert _call(base, "POST", "/settings/droid-estop", {"enabled": False, "confirm": True})[1]["changed"] is False
+
+
+def test_with_the_identity_of_the_server_only_an_administrator_may_change_it(tmp_path: Path) -> None:
+    switch, _ = make_switch(tmp_path)
+    with _switch_server(switch, FakeClock(), identity=True) as (base, _):
+        body = {"enabled": True, "confirm": True}
+        for role in ("viewer", "operator"):
+            token = sign_token(KEY, "someone", role)
+            assert _call(base, "GET", "/settings/droid-estop", token=token)[0] == 200
+            assert _call(base, "POST", "/settings/droid-estop", body, token=token)[0] == (401 if role == "viewer" else 403)
+        assert not switch.enabled
+        admin = sign_token(KEY, "root", "admin")
+        assert _call(base, "POST", "/settings/droid-estop", body, token=admin)[0] == 200 and switch.enabled
+        assert any("root" in r["detail"] for r in switch.gate.audit_records if r["event"] == "switch-by")
+
+
+def test_a_link_that_fails_is_a_502_and_the_setting_stays(tmp_path: Path) -> None:
+    switch, _ = make_switch(tmp_path, fail_connect=True)
+    with _switch_server(switch, FakeClock()) as (base, _):
+        status, answer = _call(base, "POST", "/settings/droid-estop", {"enabled": True, "confirm": True})
+        assert status == 502 and "stays as it was" in answer["error"] and not switch.enabled
+
+
+def test_a_service_without_any_credential_does_not_change_settings(tmp_path: Path) -> None:
+    switch, _ = make_switch(tmp_path)
+    server = SafetyZonesServer(("127.0.0.1", 0), "test", clock=FakeClock(), droid_switch=switch)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        base = f"http://127.0.0.1:{server.server_address[1]}"
+        status, answer = _call(base, "POST", "/settings/droid-estop", {"enabled": True, "confirm": True}, token=None)
+        assert status == 403 and "credential" in answer["error"] and not switch.enabled
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_the_start_helper_builds_the_switch_and_the_state_file_wins_over_the_zones_file(tmp_path: Path) -> None:
+    state_file = tmp_path / "droid.json"
+    zones = tmp_path / "z.json"
+    zones.write_text(json.dumps({**_zones(), "droidEstop": {"enabled": False, "stateFile": str(state_file)}}), encoding="utf-8")
+    gate, subscriber, switch = safety_main._start_droid_estop(str(zones))  # noqa: SLF001
+    assert not gate.settings.enabled and isinstance(switch, DroidSwitch) and isinstance(subscriber, ArmorAlarmSubscriber)
+    state_file.write_text('{"enabled": true}', encoding="utf-8")
+    gate, _, switch = safety_main._start_droid_estop(str(zones))  # noqa: SLF001
+    assert gate.settings.enabled and switch is not None
+    zones.write_text(json.dumps({**_zones(), "droidEstop": {"enabled": True, "stateFile": str(state_file)}}), encoding="utf-8")
+    state_file.write_text('{"enabled": false}', encoding="utf-8")
+    assert safety_main._start_droid_estop(str(zones))[0].settings.enabled is False  # noqa: SLF001
+    state_file.write_text("garbage", encoding="utf-8")
+    with pytest.raises(DroidEstopConfigError):
+        safety_main._start_droid_estop(str(zones))  # noqa: SLF001
+    plain = tmp_path / "plain.json"
+    plain.write_text(json.dumps({**_zones(), "droidEstop": {"enabled": True}}), encoding="utf-8")
+    assert safety_main._start_droid_estop(str(plain))[2] is None  # noqa: SLF001
