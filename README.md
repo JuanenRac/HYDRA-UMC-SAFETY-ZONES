@@ -25,7 +25,7 @@ GPL-3.0-or-later - see LICENSE
 
 ---
 
-> **Safety and security status:** this ecosystem is not a certified safety system. There is no hardware E-STOP path, no firmware-enforced limits or interlocks and no verified motion command yet; firmware images are checked with CRC-32 and an Ed25519 signature, and a release build refuses the published development keys (the tool heads and expansion boards behind the relay still run URTC bootloaders, which take a shared-key HMAC-SHA256 instead of a signature); TLS and mutual TLS are optional and off by default; no custom board has been populated or tested yet. Read the [security baseline](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md) and the [threat model](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md) before relying on any statement here for the safety of a person.
+> **Safety and security status:** this ecosystem is not a certified safety system. There is no hardware E-STOP path, no firmware-enforced limits or interlocks and no verified motion command yet; firmware images are checked with CRC-32 and an Ed25519 signature, and a release build refuses the published development keys (the URTC bootloaders behind the relay no longer take a shared key: the main board verifies an Ed25519 record against a table of public keys, and an expansion board installs an image only when the main board has confirmed that exact image to it); TLS and mutual TLS are optional and off by default; no custom board has been populated or tested yet. Read the [security baseline](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md) and the [threat model](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md) before relying on any statement here for the safety of a person.
 
 ---
 
@@ -50,7 +50,7 @@ Each line is one part of this repository and the light says how far it is today.
 
 | Area | State | What it means here |
 |---|---|---|
-| Software | 🟡 | Works for its main purpose; the honesty check above lists what is still missing |
+| Software | 🟡 | Works for its main purpose; the honesty check of this README lists what is still missing |
 | Tests | 🟢 | 1233 automated tests, run on every change |
 | Real hardware | 🟠 | Simulated only: tested against emulators, fakes or simulators; no run on real hardware is recorded for this version |
 | Interface and protocols | 🟡 | The routes or messages it offers are documented and tested with a client; not every client has used them yet |
@@ -177,6 +177,8 @@ CM5 + Hailo-8 is off-the-shelf hardware with no board of its own to design, so -
 
 **Alarm of A.R.M.O.R. (optional).** `"armorAlarm": {"enabled": true}` in the zones file makes the service read `armor/alarm/<node_id>/state` from an MQTT broker (`pip install "hydra-umc-safety-zones[mqtt]"`) and turn each message into an SDK SafetyState with a table you set. A sounding alarm, a panel that has gone silent and a corrupt message **inhibit new starts** (the verdict is INHIBITED, shown in `armorAlarm` and on `GET /armor-alarm`) and never stop a machine that is running, not even the safe heartbeat; the inhibition is lifted only when the panel says there is no alarm and a configurable time goes by. SAFE_STOP is possible only with `safeStop` switched on, and it is off by default. The state must be signed by A.R.M.O.R. (`requireSignature`, on by default, with the key in a file outside the repository): an unsigned or wrongly signed state is refused, counted and audited, and can never lift an inhibition. Off by default; not tried with a real alarm. See `docs/ARMOR_ALARM.md`.
 
+**The state file of the cell (optional).** A zones file with `"cellState": {"enabled": true}` makes the service write the file that the bridges of the laser, the CNC and the 3D printer read as the state of the cell (`[cell_state] source = "file"`): `READY` only while the last verdict is `READY` and recent and no hold is in force, `INHIBITED` before the first verdict or when verdicts stop coming, `SAFE_STOP` at a clean stop, and a file that is no longer refreshed (the service died) is read as `SAFE_STOP` by the bridges. It is off by default; the path and the ages are in the zones file. See `docs/CELL_STATE.md`. Not tried with a real bridge.
+
 ## ⚙️ Configuration
 
 The HTTP service is configured with flags; two of them can also come from the environment.
@@ -185,7 +187,7 @@ The HTTP service is configured with flags; two of them can also come from the en
 |---|---|---|
 | `--addr` | `127.0.0.1` | address the API binds to |
 | `--port` | `8108` | port of the API |
-| `--zones-file` / `SAFETY_ZONES_FILE` | none | zones and calibration that the server holds fixed |
+| `--zones-file` / `SAFETY_ZONES_FILE` | none | zones and calibration that the server holds fixed (the unit reads `/etc/hydra-umc-safety-zones/zones.json`) |
 | `--token` / `SAFETY_ZONES_TOKEN` | none | Bearer token that POST /check requires |
 | `--max-observation-age-seconds` | none | ceiling for the age a request may declare for its observation |
 | `--max-calibration-age-days` | none | ceiling for the calibration's maximum age in days |

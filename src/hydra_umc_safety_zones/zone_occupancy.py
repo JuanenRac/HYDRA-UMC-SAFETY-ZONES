@@ -10,7 +10,8 @@ publishes exactly that, from the breaches of every verdict of ``POST /check``: a
 
 - Not retained: an occupancy that stays on the broker after this service has died would be believed for ever. A reader treats a message older than its own maximum
   age as UNKNOWN, so the message is repeated while the service runs: at once when the set changes and otherwise every ``refreshS`` seconds.
-- A verdict with no readable list of breaches publishes nothing (an unknown occupancy is not "free"). It only observes: it never changes a verdict, never blocks a
+- A verdict with no readable list of breaches publishes nothing (an unknown occupancy is not "free"), and neither does a verdict that is not READY and names no breach: it was reached
+  before the breaches were worked out (an expired calibration, a silent observer, a stop of the alarm). It only observes: it never changes a verdict, never blocks a
   request and never raises into the service; a failure to publish is counted and printed once.
 - Off by default (``zoneOccupancy.enabled`` in the zones file). paho-mqtt is optional and imported only when the switch is on. Credentials come from files.
   Nothing here has run against a real broker with a real vehicle behind it.
@@ -81,6 +82,12 @@ def occupied_zones(response: dict) -> list[str] | None:
     """The sorted ids of the zones that a verdict says have something inside, or None when the verdict does not say (no usable list of breaches)."""
     breaches = response.get("breaches")
     if not isinstance(breaches, list):
+        return None
+    # An empty list means "nothing inside" only for a verdict that looked: READY. A verdict that was reached before the breaches were worked out (an expired calibration, an observer
+    # that is off, silent or failing, a robot body that was refused, a stop that came from the alarm or from a droid) also carries an empty list, and that is NOT "every zone is free".
+    sdk = response.get("sdkSafetyState")
+    state = sdk.get("state") if isinstance(sdk, dict) else None
+    if not breaches and state != "READY":
         return None
     found: set[str] = set()
     for breach in breaches:

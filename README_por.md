@@ -25,7 +25,7 @@ GPL-3.0-or-later - see LICENSE
 
 ---
 
-> **Estado de segurança (safety e security):** este ecossistema não é um sistema de segurança certificado. Ainda não existe um caminho de E-STOP por hardware, nem limites ou interlocks impostos pelo firmware, nem um comando de movimento verificado; as imagens de firmware são verificadas com CRC-32 e uma assinatura Ed25519, e uma compilação de versão recusa as chaves de desenvolvimento publicadas (as cabeças de ferramenta e as placas de expansão atrás do relé ainda usam os bootloaders do URTC, que aceitam um HMAC-SHA256 de chave partilhada em vez de uma assinatura); TLS e TLS mútuo são opcionais e estão desativados por defeito; nenhuma placa própria foi ainda montada ou testada. Leia a [base de segurança](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md) e o [modelo de ameaças](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md) antes de confiar em qualquer afirmação aqui para a segurança de uma pessoa.
+> **Estado de segurança (safety e security):** este ecossistema não é um sistema de segurança certificado. Ainda não existe um caminho de E-STOP por hardware, nem limites ou interlocks impostos pelo firmware, nem um comando de movimento verificado; as imagens de firmware são verificadas com CRC-32 e uma assinatura Ed25519, e uma compilação de versão recusa as chaves de desenvolvimento publicadas (os bootloaders do URTC atrás do relé já não usam uma chave partilhada: a placa principal verifica um registo Ed25519 contra uma tabela de chaves públicas, e uma placa de expansão só instala uma imagem quando a placa principal lhe confirmou essa imagem exata); TLS e TLS mútuo são opcionais e estão desativados por defeito; nenhuma placa própria foi ainda montada ou testada. Leia a [base de segurança](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md) e o [modelo de ameaças](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md) antes de confiar em qualquer afirmação aqui para a segurança de uma pessoa.
 
 ---
 
@@ -50,7 +50,7 @@ Cada linha é uma parte deste repositório e a luz diz até onde chega hoje. É 
 
 | Área | Estado | O que significa aqui |
 |---|---|---|
-| Software | 🟡 | Funciona para o seu propósito principal; a verificação de honestidade acima lista o que ainda falta |
+| Software | 🟡 | Funciona para o seu propósito principal; a verificação de honestidade deste README lista o que ainda falta |
 | Testes | 🟢 | 1233 testes automáticos, executados a cada alteração |
 | Hardware real | 🟠 | Só simulado: testado com emuladores, dublês de teste ou simuladores; não há registo de execução em hardware real para esta versão |
 | Interface e protocolos | 🟡 | As rotas ou mensagens que oferece estão documentadas e testadas com um cliente; ainda nem todos os clientes as usaram |
@@ -177,6 +177,8 @@ O CM5 + Hailo-8 é hardware de prateleira sem placa própria a desenhar, pelo qu
 
 **Alarme do A.R.M.O.R. (opcional).** `"armorAlarm": {"enabled": true}` no ficheiro de zonas faz o serviço ler `armor/alarm/<node_id>/state` de um broker MQTT (`pip install "hydra-umc-safety-zones[mqtt]"`) e converter cada mensagem num SafetyState do SDK com uma tabela que define. Um alarme a tocar, um painel que deixou de falar e uma mensagem corrompida **inibem os arranques novos** (o veredicto é INHIBITED, mostrado em `armorAlarm` e em `GET /armor-alarm`) e nunca param uma máquina em funcionamento, nem sequer o batimento seguro; a inibição só é levantada quando o painel diz que não há alarme e passa um tempo configurável. SAFE_STOP só é possível com `safeStop` ativado, e vem desligado. O estado tem de ser assinado pelo A.R.M.O.R. (`requireSignature`, ativo por omissão, com a chave num ficheiro fora do repositório): um estado sem assinatura ou com assinatura errada é recusado, contado e auditado, e nunca pode levantar uma inibição. Desligado por omissão; não foi experimentado com um alarme real. Ver `docs/ARMOR_ALARM.md`.
 
+**O ficheiro de estado da célula (opcional).** Um ficheiro de zonas com `"cellState": {"enabled": true}` faz o serviço escrever o ficheiro que os bridges do laser, do CNC e da impressora 3D leem como estado da célula (`[cell_state] source = "file"`): `READY` só enquanto o último veredito é `READY` e recente e nenhuma retenção está em vigor, `INHIBITED` antes do primeiro veredito ou quando os vereditos deixam de chegar, `SAFE_STOP` numa paragem limpa, e um ficheiro que já não é atualizado (o serviço morreu) os bridges leem-no como `SAFE_STOP`. Está desativado por defeito; o caminho e as idades estão no ficheiro de zonas. Veja `docs/CELL_STATE.md`. Não testado com um bridge real.
+
 ## ⚙️ Configuração
 
 O serviço HTTP configura-se com opções; duas delas podem vir também do ambiente.
@@ -185,7 +187,7 @@ O serviço HTTP configura-se com opções; duas delas podem vir também do ambie
 |---|---|---|
 | `--addr` | `127.0.0.1` | endereço onde a API escuta |
 | `--port` | `8108` | porta da API |
-| `--zones-file` / `SAFETY_ZONES_FILE` | nenhum | zonas e calibração que o servidor mantém fixas |
+| `--zones-file` / `SAFETY_ZONES_FILE` | nenhum | zonas e calibração que o servidor mantém fixas (a unidade lê `/etc/hydra-umc-safety-zones/zones.json`) |
 | `--token` / `SAFETY_ZONES_TOKEN` | nenhum | token Bearer exigido por POST /check |
 | `--max-observation-age-seconds` | nenhum | limite da idade que um pedido pode declarar para a sua observação |
 | `--max-calibration-age-days` | nenhum | limite da idade máxima da calibração em dias |

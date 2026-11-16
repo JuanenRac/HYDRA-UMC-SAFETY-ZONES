@@ -47,7 +47,8 @@ class Sink:
 
 
 def verdict(*zones: str) -> dict[str, Any]:
-    return {"breaches": [{"zone_id": zone, "level": "danger", "object_id": "p"} for zone in zones]}
+    # a verdict that looked and found nothing is READY; one that found something carries its breaches
+    return {"breaches": [{"zone_id": zone, "level": "danger", "object_id": "p"} for zone in zones], "sdkSafetyState": {"state": "SAFE_STOP" if zones else "READY"}}
 
 
 def test_the_occupied_zones_are_the_zones_the_breaches_name() -> None:
@@ -199,3 +200,18 @@ def test_the_zones_file_switches_the_publisher_on_and_the_rest_of_the_file_still
     path.write_text(json.dumps({**_zones(), "zoneOccupancy": {"enabled": True, "topic": "elsewhere"}}), encoding="utf-8")
     with pytest.raises(ZoneOccupancyConfigError):
         _start_zone_occupancy(str(path))
+
+
+def test_a_verdict_reached_before_the_breaches_were_worked_out_is_not_published_as_every_zone_free() -> None:
+    sink = Sink()
+    emitter = ZoneOccupancyEmitter(ON, sink, clock=Clock())
+    for state in ("INHIBITED", "FAULT", "SAFE_STOP"):
+        emitter.observe({"breaches": [], "sdkSafetyState": {"state": state}, "reason": "calibration expired / observer silent / alarm"})
+    emitter.observe({"breaches": []})
+    emitter.observe({"breaches": [], "sdkSafetyState": "READY"})
+    assert sink.sent == [] and occupied_zones({"breaches": [], "sdkSafetyState": {"state": "INHIBITED"}}) is None
+    # a verdict that did look: READY with nothing inside is free, and an INHIBITED one that names a zone (a warning) still says which
+    assert occupied_zones({"breaches": [], "sdkSafetyState": {"state": "READY"}}) == []
+    assert occupied_zones({"breaches": [{"zone_id": "press-1", "level": "warning", "object_id": "p"}], "sdkSafetyState": {"state": "INHIBITED"}}) == ["press-1"]
+    emitter.observe({"breaches": [], "sdkSafetyState": {"state": "READY"}})
+    assert len(sink.sent) == 1

@@ -25,7 +25,7 @@ GPL-3.0-or-later - see LICENSE
 
 ---
 
-> **安全与安防现状:**本生态系统不是经认证的安全系统。目前尚无硬件 E-STOP 通路,没有由固件强制执行的限位或联锁,也没有经过验证的运动指令;固件映像使用 CRC-32 和 Ed25519 签名校验,发布构建会拒绝已公开的开发密钥(中继之后的工具头和扩展板仍运行 URTC 的引导程序,它们使用共享密钥的 HMAC-SHA256 而不是签名);TLS 与双向 TLS 均为可选项,默认关闭;自制电路板尚未组装或测试。在依赖此处任何说法来保障人身安全之前,请先阅读[安全基线](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md)和[威胁模型](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md)。
+> **安全与安防现状:**本生态系统不是经认证的安全系统。目前尚无硬件 E-STOP 通路,没有由固件强制执行的限位或联锁,也没有经过验证的运动指令;固件映像使用 CRC-32 和 Ed25519 签名校验,发布构建会拒绝已公开的开发密钥(中继之后的 URTC 引导程序不再使用共享密钥:主板用公钥表校验 Ed25519 记录,扩展板只有在主板确认了该确切映像之后才会安装它);TLS 与双向 TLS 均为可选项,默认关闭;自制电路板尚未组装或测试。在依赖此处任何说法来保障人身安全之前,请先阅读[安全基线](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/SECURITY_BASELINE.md)和[威胁模型](https://github.com/JuanenRac/HYDRA-UMC-DOCS/blob/main/docs/THREAT_MODEL.md)。
 
 ---
 
@@ -50,7 +50,7 @@ GPL-3.0-or-later - see LICENSE
 
 | 领域 | 状态 | 在这里的含义 |
 |---|---|---|
-| 软件 | 🟡 | 主要用途可用；上面的诚实性检查列出了仍然缺少的内容 |
+| 软件 | 🟡 | 主要用途可用；本 README 中的诚实性检查列出了仍然缺少的内容 |
 | 测试 | 🟢 | 1233 项自动测试，每次变更都会运行 |
 | 真实硬件 | 🟠 | 仅模拟：使用模拟器、替身或仿真测试；此版本没有在真实硬件上运行的记录 |
 | 接口与协议 | 🟡 | 提供的路由或消息已有文档，并用客户端测试过；尚未被所有客户端使用 |
@@ -212,6 +212,8 @@ Node 系列的其他项目一样——这里不存在 `hardware/`/`firmware/` �
 
 **A.R.M.O.R. 警报（可选）。** 在区域文件中写入 `"armorAlarm": {"enabled": true}`，服务会从 MQTT 代理读取 `armor/alarm/<node_id>/state`（`pip install "hydra-umc-safety-zones[mqtt]"`），并按你设定的表把每条消息转换为 SDK 的 SafetyState。警报鸣响、面板沉默和损坏的消息会**禁止新的启动**（判定为 INHIBITED，显示在 `armorAlarm` 和 `GET /armor-alarm` 中），但绝不会停止正在运行的机器，安全心跳也不受影响；只有面板报告无警报并且经过可配置的时间后，禁止才会解除。只有开启 `safeStop` 才可能出现 SAFE_STOP，默认关闭。状态必须由 A.R.M.O.R. 签名（`requireSignature`，默认开启，密钥放在仓库之外的文件中）：未签名或签名错误的状态会被拒绝、计数并审计，永远不能解除禁止。默认关闭；未用真实警报试过。参见 `docs/ARMOR_ALARM.md`。
 
+**单元状态文件（可选）。** 区域文件中写入 `"cellState": {"enabled": true}` 后，服务会写出激光、数控和 3D 打印机的 bridge 当作单元状态来读取的文件（`[cell_state] source = "file"`）：只有最近一次裁决为 `READY` 且足够新、并且没有任何保持（hold）时才写 `READY`，第一次裁决之前或裁决不再到来时写 `INHIBITED`，正常停止时写 `SAFE_STOP`，文件不再刷新（服务已终止）时 bridge 将其读作 `SAFE_STOP`。默认关闭；路径和时限都在区域文件中。参见 `docs/CELL_STATE.md`。尚未用真实 bridge 试验。
+
 ## ⚙️ 配置
 
 HTTP 服务通过选项配置；其中两项也可以来自环境变量。
@@ -220,7 +222,7 @@ HTTP 服务通过选项配置；其中两项也可以来自环境变量。
 |---|---|---|
 | `--addr` | `127.0.0.1` | API 绑定的地址 |
 | `--port` | `8108` | API 端口 |
-| `--zones-file` / `SAFETY_ZONES_FILE` | 无 | 服务器固定持有的区域和校准 |
+| `--zones-file` / `SAFETY_ZONES_FILE` | 无 | 服务器固定持有的区域和校准（单元读取 `/etc/hydra-umc-safety-zones/zones.json`） |
 | `--token` / `SAFETY_ZONES_TOKEN` | 无 | POST /check 所需的 Bearer 令牌 |
 | `--max-observation-age-seconds` | 无 | 请求可为其观察声明的时效上限 |
 | `--max-calibration-age-days` | 无 | 校准最长有效天数的上限 |
