@@ -232,3 +232,22 @@ def test_prepare_config_sets_up_the_directory_of_the_service_and_not_one_the_ope
     assert main(["prepare-config", "--zones-file", str(other), "--legacy-file", str(tmp_path / "none.json")]) == 0
     assert not other.parent.exists()
     capsys.readouterr()
+
+
+def test_a_link_in_place_of_the_earlier_file_or_at_the_target_is_never_followed(tmp_path: Path) -> None:
+    secret = tmp_path / "secret.txt"
+    secret.write_text("not a zones file", encoding="utf-8")
+    old = tmp_path / "old"
+    old.mkdir()
+    try:
+        (old / "zones.json").symlink_to(secret)
+    except (OSError, NotImplementedError):
+        pytest.skip("this system does not allow links without a privilege")
+    target = tmp_path / "new" / "zones.json"
+    assert migrate_legacy_zones(str(old / "zones.json"), str(target)) == "none"
+    assert not target.exists() and not target.parent.exists()
+    real = write_zones(tmp_path / "old2" / "zones.json")
+    target.parent.mkdir()
+    target.symlink_to(tmp_path / "nowhere.json")  # a link that points nowhere
+    assert migrate_legacy_zones(str(real), str(target)) == "kept"
+    assert not (tmp_path / "nowhere.json").exists()

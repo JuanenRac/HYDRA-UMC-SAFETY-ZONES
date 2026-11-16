@@ -55,16 +55,19 @@ def migrate_legacy_zones(legacy: str, target: str, group: str = "") -> str:
     """Copy the zones file (and its signature, if any) from the old place to `target` once. Returns what was done, in a word:
     `kept` (target already there), `none` (nothing to migrate) or `migrated`. Never overwrites, never deletes the old file."""
     destination = Path(target)
-    if destination.exists():
+    # A link is never followed: this runs as root, and a link left in a shared directory must not make root copy what it points to,
+    # or write through a link that is already at the destination.
+    if destination.exists() or destination.is_symlink():
         return "kept"
     source = Path(legacy)
-    if not source.is_file():
+    if source.is_symlink() or not source.is_file():
         return "none"
     destination.parent.mkdir(parents=True, exist_ok=True)
     for old, new in ((source, destination), (Path(f"{legacy}.sig"), Path(f"{target}.sig"))):
-        if not old.is_file() or new.exists():
+        if old.is_symlink() or not old.is_file() or new.exists() or new.is_symlink():
             continue
-        shutil.copyfile(old, new)
+        with open(old, "rb") as reader, open(new, "xb") as writer:  # "x": never opens a name that already exists
+            shutil.copyfileobj(reader, writer)
         os.chmod(new, 0o640)
         if group:
             shutil.chown(new, user="root", group=group)

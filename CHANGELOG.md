@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- **The preparation of the configuration folder, which runs as root, no longer follows a link:** copying the zones file of an earlier layout skips a link in place of the old file or of its signature, treats a link at the destination as "already there", and creates the new file with a mode that cannot open a name that already exists. The droid emergency stop module now says what it does: a bridge whose session is not open is not a cut, so it does not hold the cell. `tests/test_config_access.py` covers it.
+
 - **The zone occupancy is not published as "every zone free" by a verdict that did not look:** a verdict reached before the breaches were worked out (an expired calibration, an observer that is off, silent or failing, a robot body that was refused, a stop that came from the alarm or from a droid) carries an empty list of breaches, and the publisher took that for an empty cell and told the vehicles that every zone was free with a fresh time. It now publishes only when the verdict is `READY` or names at least one breach; otherwise nothing is published and a reader treats the occupancy as unknown. `tests/test_zone_occupancy.py` covers it.
 
 - **The README states the URTC bootloader check correctly and points to its own honesty check:** the shared safety notice no longer says that the URTC bootloaders behind the relay take a shared-key HMAC-SHA256 (the main board verifies an Ed25519 record and an expansion board installs only an image the main board confirmed), and the status lines no longer send the reader to a check "above" that is further down. README and its seven translations regenerated.
