@@ -45,6 +45,7 @@ from .observation import ObservationError, parse_observation_status
 from .robot_body import RobotBody, RobotBodyError
 from .safety_state import SafetyEvaluation, SafetyState, collect_breaches, evaluate_safety, to_sdk_safety_state
 from .fault_events import FaultEventEmitter
+from .cell_state_file import CellStateWriter
 from .record_trigger import RecordTriggerClient
 from .zone_occupancy import ZoneOccupancyEmitter
 from .stateful import StatefulMonitor, StatefulSettings, format_event
@@ -627,6 +628,8 @@ class SafetyZonesServer(ThreadingHTTPServer):
         self.occupancy_emitter: ZoneOccupancyEmitter | None = None
         # Off unless the zones file switches recordTrigger.enabled on: asks the camera streamers to keep their frames when a safe stop begins (see record_trigger.py).
         self.record_trigger: RecordTriggerClient | None = None
+        # Off unless the zones file switches cellState.enabled on: writes the file the bridges read as the state of the cell (see cell_state_file.py).
+        self.cell_state_writer: CellStateWriter | None = None
 
     def start_watcher(self, interval_s: float = 0.25) -> None:
         """Starts the thread that publishes INHIBITED when a verdict or the heartbeat expires (stateful mode only)."""
@@ -703,6 +706,8 @@ class SafetyZonesServer(ThreadingHTTPServer):
             self.occupancy_emitter.observe(response)
         if self.record_trigger is not None:
             self.record_trigger.observe(response)
+        if self.cell_state_writer is not None:
+            self.cell_state_writer.observe(response)
         if self.monitor is not None:
             self.monitor.record_verdict(response, self.clock())
         if self._decision_log is None:
