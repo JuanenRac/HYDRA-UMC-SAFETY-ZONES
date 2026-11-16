@@ -71,6 +71,7 @@ from hydra_umc_safety_zones.stateful import StatefulSettings, parse_stateful_set
 from hydra_umc_safety_zones.armor_alarm import ArmorAlarmConfigError, ArmorAlarmGate, parse_settings as parse_armor_alarm_settings
 from hydra_umc_safety_zones.armor_alarm_mqtt import ArmorAlarmSubscriber
 from hydra_umc_safety_zones.droid_estop import DroidEstopConfigError, DroidEstopGate, DroidSwitch, parse_settings as parse_droid_estop_settings, read_state_file
+from hydra_umc_safety_zones.cell_state_file import CellStateFileConfigError, CellStateFileSettings, CellStateWriter, parse_cell_state_file_settings
 from hydra_umc_safety_zones.record_trigger import RecordTriggerClient, RecordTriggerConfigError, build_client as build_record_trigger, parse_record_trigger_settings
 from hydra_umc_safety_zones.zone_occupancy import ZoneOccupancyConfigError, ZoneOccupancyEmitter, build_publisher as build_occupancy_publisher, parse_zone_occupancy_settings
 from hydra_umc_safety_zones.fault_events import FaultEventEmitter, FaultEventsConfigError, MqttFaultPublisher, parse_fault_event_settings
@@ -303,6 +304,14 @@ def _start_record_trigger(zones_file: str) -> RecordTriggerClient | None:
     return build_record_trigger(settings, log=lambda message: print(message, file=sys.stderr, flush=True))
 
 
+def _cell_state_settings(zones_file: str) -> CellStateFileSettings:
+    """The ``cellState`` settings of the zones file (the writer of the file the bridges read); off when absent."""
+    if not zones_file:
+        return CellStateFileSettings()
+    raw = json.loads(Path(zones_file).read_text(encoding="utf-8"))
+    return parse_cell_state_file_settings(raw.get("cellState") if isinstance(raw, dict) else None)
+
+
 def _start_can(path: str):
     """Reads the CAN configuration and opens the bus: the requester, the heartbeat sender (not started) and the configuration. None-like when it is not enabled is an error: a file given is a file meant."""
     config = load_can_config(path)
@@ -426,6 +435,12 @@ def _run_serve(args: argparse.Namespace) -> int:
     except (RecordTriggerConfigError, OSError, ValueError) as exc:
         print(f"[safety-zones] fatal: invalid recordTrigger settings: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 2
+    cell_state_settings = CellStateFileSettings()
+    try:
+        cell_state_settings = _cell_state_settings(args.zones_file)
+    except (CellStateFileConfigError, OSError, ValueError) as exc:
+        print(f"[safety-zones] fatal: invalid cellState settings: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
     can_runtime = None
     if args.can_estop_config:
         try:
@@ -531,6 +546,20 @@ def _run_serve(args: argparse.Namespace) -> int:
             return 2
         server.occupancy_emitter = occupancy_emitter
         print(f"[safety-zones] zone occupancy: the zones with something inside are published on {occupancy_emitter.settings.topic} (not tried with a real broker)")
+    cell_state_writer = None
+    if cell_state_settings.enabled:
+        cell_state_writer = CellStateWriter(
+            cell_state_settings,
+            zones_loaded=zone_set is not None,
+            holds=lambda: len(server.holds.listing()) if server.holds is not None else 0,
+            log=lambda message: print(message, file=sys.stderr, flush=True),
+        )
+        server.cell_state_writer = cell_state_writer
+        cell_state_writer.start()
+        print(
+            f"[safety-zones] cell state: {cell_state_settings.path} is READY only while the last verdict is READY and at most {cell_state_settings.verdict_max_age_s:g}s old; "
+            f"rewritten every {cell_state_settings.refresh_s:g}s, SAFE_STOP when this service stops (not tried with a real bridge)"
+        )
     if trigger_client is not None:
         server.record_trigger = trigger_client
         print(f"[safety-zones] record trigger: a safe stop asks {len(trigger_client.settings.targets)} camera(s) to keep their frames (not tried with a real camera)")
@@ -570,6 +599,8 @@ def _run_serve(args: argparse.Namespace) -> int:
                 droid_runtime[1].stop()
         if fault_runtime is not None:
             fault_runtime[1].stop()
+        if cell_state_writer is not None:
+            cell_state_writer.stop()
         server.server_close()
         print("[safety-zones] shutting down")
     return 0
