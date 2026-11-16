@@ -19,7 +19,7 @@ Rules, all of them fail-safe:
   like any other "clear" and is subject to the hysteresis;
 - no message is not "no cut": a bridge that was never heard from, that says ``offline``, or (when ``maxAgeS`` is above 0) that has been silent longer than that is ``unknown``
   and, by default, ``unknown`` inhibits too (``unknownInhibits``);
-- an inhibition is lifted ONLY when the bridge itself says the session is ready with no cut reason and no lost link, and ``hysteresisS`` seconds go by without anything else;
+- an inhibition is lifted ONLY when the bridge itself says there is no cut reason and no lost link (a session that is not open is not a cut: a bridge with no robot does not hold the cell), and ``hysteresisS`` seconds go by without anything else;
 - a message that is not a JSON object of the expected fields inhibits (and holds the inhibition until good messages come back and the hysteresis passes);
 - the broker must be on this machine unless the installation declares it internal (``broker.internal``): the messages of the bridge are not signed.
 
