@@ -18,7 +18,7 @@ from hydra_umc_safety_zones.zones import parse_separation_params, scale_zones_fo
 
 NOW = datetime.now(timezone.utc)
 CALIBRATION = {"version": "c", "source": "manual", "calibrated_at": NOW.date().isoformat(), "max_age_days": 30}
-OBSERVATION = ObservationStatus(active=True, observed_at=NOW, max_age_seconds=60)
+OBSERVATION = ObservationStatus(active=True, observed_at=NOW, max_age_seconds=3600)
 FIGURES = {"approach_speed_mps": 1.6, "total_stop_time_s": 0.5, "intrusion_distance_m": 0.1}  # S = 0.9 m
 
 
@@ -165,7 +165,7 @@ def test_state_route_exposes_the_separation_verdict():
         body = {
             "zones": zone_set,
             "detections": {"objects": []},
-            "observation": {"active": True, "observedAt": NOW.isoformat(), "maxAgeSeconds": 60},
+            "observation": {"active": True, "observedAt": NOW.isoformat(), "maxAgeSeconds": 3600},
         }
         request = urllib.request.Request(f"http://127.0.0.1:{port}/check", json.dumps(body).encode(), {"Content-Type": "application/json"})
         answer = json.loads(urllib.request.urlopen(request, timeout=10).read())
