@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.2.7] - Observer tokens, holds ended by who made them and an occupancy that never claims what it did not look at
+
 - **Observers can have a token of their own, and a hold is ended by who made it:** with `--observer-token` (off by default) `POST /check` and `/heartbeat` accept only that token or an administrator of the server, so a holder of the shared token cannot send what the service judges; observers then need the new token. A hold of an account can now be released only by that account or an administrator (the token of the service counts as one), and holding it again does not take it over. Tested over HTTP on loopback.
 - **The preparation of the configuration folder, which runs as root, no longer follows a link:** copying the zones file of an earlier layout skips a link in place of the old file or of its signature, treats a link at the destination as "already there", and creates the new file with a mode that cannot open a name that already exists. The droid emergency stop module now says what it does: a bridge whose session is not open is not a cut, so it does not hold the cell. `tests/test_config_access.py` covers it.
 
