@@ -27,12 +27,17 @@ class HoldError(ValueError):
     """The request is not a valid hold."""
 
 
+class HoldDenied(PermissionError):
+    """The hold belongs to somebody else: only who made it, or an administrator, ends it."""
+
+
 @dataclass(frozen=True)
 class Hold:
     robot: str
     reason: str
     by: str
     seq: int
+    service: bool = False  # made with the token of the service, not by a named account
 
     def as_dict(self) -> dict:
         return {"robot": self.robot, "reason": self.reason, "by": self.by, "seq": self.seq}
@@ -63,18 +68,33 @@ class HoldRegistry:
         self._seq = 0
         self._lock = threading.Lock()
 
-    def hold(self, robot: str, reason: str, by: str) -> Hold:
+    def hold(self, robot: str, reason: str, by: str, *, service: bool = False, privileged: bool = True) -> Hold:
+        """Record a hold. A caller without privilege who holds a robot that somebody else holds changes nothing: the first holder keeps it (and with it the right to end it)."""
         with self._lock:
-            if robot not in self._holds and len(self._holds) >= self._limit:
+            current = self._holds.get(robot)
+            if current is not None and not privileged and not self._made_by(current, by):
+                return current
+            if current is None and len(self._holds) >= self._limit:
                 raise HoldError(f"at most {self._limit} robots can be held at once")
             self._seq += 1
-            record = Hold(robot, reason, by, self._seq)
+            record = Hold(robot, reason, by, self._seq, service)
             self._holds[robot] = record
             return record
 
-    def release(self, robot: str) -> bool:
+    def release(self, robot: str, *, by: str = "", privileged: bool = True) -> bool:
+        """End a hold; False when the robot was not held. Without privilege only the holder ends it (HoldDenied otherwise)."""
         with self._lock:
-            return self._holds.pop(robot, None) is not None
+            current = self._holds.get(robot)
+            if current is None:
+                return False
+            if not privileged and not self._made_by(current, by):
+                raise HoldDenied("only who made the hold, or an administrator, can release it")
+            del self._holds[robot]
+            return True
+
+    @staticmethod
+    def _made_by(hold: Hold, by: str) -> bool:
+        return not hold.service and hold.by == by
 
     def listing(self) -> list[dict]:
         with self._lock:

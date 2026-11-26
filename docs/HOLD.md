@@ -19,7 +19,7 @@ Neither a token nor the identity key: the route answers `403`, because nobody co
 {"robot": "arm-3", "reason": "node lost"}
 ```
 
-`robot` is a robot id of letters, digits and `. _ : -` (at most 64 characters), `reason` a text of at most 200 characters (required to hold). `{"robot": "arm-3", "release": true}` ends the hold.
+`robot` is a robot id of letters, digits and `. _ : -` (at most 64 characters), `reason` a text of at most 200 characters (required to hold). `{"robot": "arm-3", "release": true}` ends the hold. Only who made it ends it, or an administrator of the server (the token of the service counts as one); another account gets `403`. Holding again a robot that another account holds changes nothing: the first holder keeps it.
 
 Answer `200`: `{"robot": "arm-3", "held": true, "seq": 1, "actuated": false}`. `actuated` is true only when `--hold-actuate` is on and the requester took the request. `400` for a body that does not fit, `429` when 64 robots are already held.
 

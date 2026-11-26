@@ -320,7 +320,7 @@ Runs the exact same `evaluate_safety()`/`check_breaches()`/
   `--zones-file PATH` (or `SAFETY_ZONES_FILE`) loads the zones and calibration once at start and a
   request that sends `zones` is refused with `400`; every verdict then carries `configSha256`, the
   hash of that file. `--max-observation-age-seconds` and `--max-calibration-age-days` refuse a request
-  whose evidence claims to stay valid longer. `--token` (or `SAFETY_ZONES_TOKEN`) makes `POST /check`
+  whose evidence claims to stay valid longer. `--observer-token` (or `SAFETY_ZONES_OBSERVER_TOKEN`, off by default) gives whoever observes a token of its own: `POST /check` and `POST /heartbeat` then accept only it, or an administrator of the server, and no longer `--token`; it opens no other route and must differ from `--token`. Observers that used the shared token need the new one. `--token` (or `SAFETY_ZONES_TOKEN`) makes `POST /check`
   demand `Authorization: Bearer <token>` (`401` otherwise); `GET /stats` stays open.
   `--decision-log FILE` (or `SAFETY_ZONES_DECISION_LOG`; `-` is standard error) appends one JSON line per
   verdict: `at`, `state`, `sdkSafetyState`, `reason`, `configSha256`, `breaches`, `estopRequests`. It is off

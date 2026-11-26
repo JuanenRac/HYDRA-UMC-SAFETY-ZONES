@@ -405,6 +405,9 @@ def _run_serve(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
+    if args.observer_token and args.observer_token == args.token:
+        print("[safety-zones] fatal: --observer-token must differ from --token: it exists so that whoever holds the token of the service cannot send observations", file=sys.stderr)
+        return 2
     armor_runtime = None
     try:
         armor_runtime = _start_armor_alarm(args.zones_file)
@@ -580,6 +583,9 @@ def _run_serve(args: argparse.Namespace) -> int:
         print("[safety-zones] POST /check requires a bearer token")
     if args.decision_log:
         print(f"[safety-zones] every verdict is logged as a JSON line to {'standard error' if args.decision_log == '-' else args.decision_log}")
+    server.observer_token = args.observer_token or None
+    if server.observer_token:
+        print("[safety-zones] observer token on: POST /check and /heartbeat accept only it (or an administrator of the server)")
     server.identity_key = identity_key
     if identity_key is not None:
         print("[safety-zones] tokens of HYDRA-UMC-SERVER accepted: every route needs an identity, and a viewer may read but not change")
@@ -692,6 +698,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--token",
         default=os.environ.get("SAFETY_ZONES_TOKEN", ""),
         help="bearer token POST /check requires (default: the SAFETY_ZONES_TOKEN environment variable)",
+    )
+    serve_parser.add_argument(
+        "--observer-token",
+        default=os.environ.get("SAFETY_ZONES_OBSERVER_TOKEN", ""),
+        help="a bearer token of its own for who observes: when set, POST /check and /heartbeat accept only it (or an administrator of the server), "
+             "no longer --token; it opens no other route (off by default; default: the SAFETY_ZONES_OBSERVER_TOKEN environment variable)",
     )
     serve_parser.add_argument(
         "--max-observation-age-seconds",
