@@ -32,7 +32,7 @@ from urllib.parse import urlparse
 
 from .estop import EStopRequest
 from .health_route import HealthRouteMixin
-from .hold import HoldError, HoldRegistry, parse_hold_request
+from .hold import HoldDenied, HoldError, HoldRegistry, parse_hold_request
 from .tool_arms import ToolArmError, ToolArmLimitError, ToolArmRegistry, parse_tool_arm_report
 from .server_identity import accepts
 from .service_metrics import MetricsHandlerMixin
@@ -227,6 +227,18 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
             return False
         return hmac.compare_digest(header[len("Bearer "):].strip().encode("utf-8"), token.encode("utf-8"))
 
+    def _observer_authorized(self) -> bool:
+        """Who may send what the service judges (``/check``, ``/heartbeat``) once an observer token is set: that token, or an administrator of the server. The token of the service no longer may."""
+        observer = self.server.observer_token
+        assert observer
+        header = self.headers.get("Authorization", "")
+        if header.startswith("Bearer ") and hmac.compare_digest(header[len("Bearer "):].strip().encode("utf-8"), observer.encode("utf-8")):
+            return True
+        if self.server.identity_key is None or not accepts(self, "", self.server.identity_key):
+            return False
+        identity = getattr(self, "identity", None)
+        return identity is not None and identity.role == "admin"
+
     def _write_unauthorized(self) -> None:
         self.send_response(401)
         self.send_header("WWW-Authenticate", "Bearer")
@@ -238,7 +250,11 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
-        if (self.server.identity_key is not None or path in ("/check", "/hold", "/tool-arms", "/settings/droid-estop") or (path == "/heartbeat" and self.server.monitor is not None)) and not self._authorized():
+        if self.server.observer_token and path in ("/check", "/heartbeat"):
+            if not self._observer_authorized():
+                self._write_unauthorized()
+                return
+        elif (self.server.identity_key is not None or path in ("/check", "/hold", "/tool-arms", "/settings/droid-estop") or (path == "/heartbeat" and self.server.monitor is not None)) and not self._authorized():
             self._write_unauthorized()
             return
         try:
@@ -327,13 +343,20 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
             return
         holds = self.server.holds
         assert holds is not None
-        if release:
-            _write_json(self, 200, {"robot": robot, "held": False, "released": holds.release(robot), "actuated": False})
-            return
         identity = getattr(self, "identity", None)
-        by = getattr(identity, "username", None) or "token"
+        by = str(getattr(identity, "username", None) or "token")[:64]
+        # the token of the service counts as an administrator, as it does for the settings
+        privileged = identity is None or identity.role == "admin"
+        if release:
+            try:
+                released = holds.release(robot, by=by, privileged=privileged)
+            except HoldDenied as e:
+                _write_error(self, 403, str(e))
+                return
+            _write_json(self, 200, {"robot": robot, "held": False, "released": released, "actuated": False})
+            return
         try:
-            record = holds.hold(robot, reason, str(by)[:64])
+            record = holds.hold(robot, reason, by, service=identity is None, privileged=privileged)
         except HoldError as e:
             _write_error(self, 429, str(e))
             return
@@ -567,6 +590,7 @@ _STATE_BREACHES_MAX = 20
 class SafetyZonesServer(ThreadingHTTPServer):
 
     health_open: bool = False  # GET /health answers only when the operator opens it (health_route.py)
+    observer_token: str | None = None  # when set, only it (or an administrator of the server) may use POST /check and /heartbeat
     holds: HoldRegistry | None = None  # POST /hold and GET /holds exist only when the operator started the service with --hold (hold.py)
     tool_arms: ToolArmRegistry | None = None  # POST /tool-arms and GET /tool-arms exist only when the operator started the service with --tool-arms (tool_arms.py)
     hold_actuate: bool = False  # a hold also hands a stop request to the requester only with --hold-actuate

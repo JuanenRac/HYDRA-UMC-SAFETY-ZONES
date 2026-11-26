@@ -18,7 +18,7 @@ import pytest
 from hydra_umc_safety_zones import server_identity
 from hydra_umc_safety_zones.api import SafetyZonesServer
 from hydra_umc_safety_zones.estop import NullEStopRequester
-from hydra_umc_safety_zones.hold import HoldError, HoldRegistry, parse_hold_request
+from hydra_umc_safety_zones.hold import HoldDenied, HoldError, HoldRegistry, parse_hold_request
 
 KEY = b"a-signing-key-of-the-server-0123456789"
 TOKEN = "own-token-of-the-service-0123"
@@ -131,3 +131,48 @@ def test_only_with_the_second_switch_does_a_hold_hand_a_stop_request_to_the_requ
     with _serve(token=TOKEN, actuate=True, requester=None) as (url, _):
         assert _call(url, "/hold", {"robot": "arm-3", "reason": "r"}, TOKEN)[1]["actuated"] is False
     assert other.sent == []
+
+
+def test_a_hold_is_ended_by_who_made_it_or_an_administrator():
+    with _serve(token=TOKEN, key=KEY) as (url, server):
+        first, second = (server_identity.sign_token(KEY, name, "operator") for name in ("healer", "other"))
+        admin = server_identity.sign_token(KEY, "boss", "admin")
+        assert _call(url, "/hold", {"robot": "arm-3", "reason": "node lost"}, first)[0] == 200
+        # holding it again does not take it over
+        assert _call(url, "/hold", {"robot": "arm-3", "reason": "mine now"}, second)[0] == 200
+        assert [(h["by"], h["reason"]) for h in server.holds.listing()] == [("healer", "node lost")]
+        status, body = _call(url, "/hold", {"robot": "arm-3", "release": True}, second)
+        assert status == 403 and "who made the hold" in body["error"]
+        assert _call(url, "/hold", {"robot": "arm-3", "release": True}, first)[1]["released"] is True
+        for releaser in (admin, TOKEN):
+            _call(url, "/hold", {"robot": "arm-3", "reason": "node lost"}, first)
+            assert _call(url, "/hold", {"robot": "arm-3", "release": True}, releaser)[1]["released"] is True
+        # a hold made with the token of the service is not released by an account that happens to be called like it
+        _call(url, "/hold", {"robot": "arm-4", "reason": "manual"}, TOKEN)
+        namesake = server_identity.sign_token(KEY, "token", "operator")
+        assert _call(url, "/hold", {"robot": "arm-4", "release": True}, namesake)[0] == 403
+
+
+def test_the_registry_refuses_a_release_by_somebody_else():
+    registry = HoldRegistry()
+    registry.hold("a", "one", "x", privileged=False)
+    with pytest.raises(HoldDenied):
+        registry.release("a", by="y", privileged=False)
+    assert registry.release("a", by="x", privileged=False) is True
+    assert registry.release("a", by="y", privileged=False) is False
+
+
+def test_with_an_observer_token_only_it_or_an_administrator_sends_observations():
+    observer = "observer-token-of-the-camera-0123"
+    with _serve(token=TOKEN, key=KEY, holds=True) as (url, server):
+        server.observer_token = observer
+        operator = server_identity.sign_token(KEY, "ana", "operator")
+        admin = server_identity.sign_token(KEY, "boss", "admin")
+        for refused in (None, TOKEN, operator):
+            assert _call(url, "/check", {}, refused)[0] == 401
+            assert _call(url, "/heartbeat", {}, refused)[0] == 401
+        for accepted in (observer, admin):
+            assert _call(url, "/check", {}, accepted)[0] != 401
+        # it opens nothing else
+        assert _call(url, "/hold", {"robot": "arm-3", "reason": "r"}, observer)[0] == 401
+        assert _call(url, "/holds", None, observer)[0] == 401
