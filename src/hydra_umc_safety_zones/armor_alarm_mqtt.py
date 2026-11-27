@@ -23,9 +23,11 @@ from hydra_umc_safety_zones.armor_alarm import ArmorAlarmConfigError
 
 def _read_secret(path: str, what: str) -> str:
     try:
-        return Path(path).read_text(encoding="utf-8").strip()
+        return Path(path).read_text(encoding="utf-8-sig").strip()  # a byte order mark is not part of the credential
     except OSError as exc:
         raise ArmorAlarmConfigError(f"armorAlarm.broker.{what} cannot be read: {exc.strerror or type(exc).__name__}") from exc
+    except UnicodeDecodeError:
+        raise ArmorAlarmConfigError(f"armorAlarm.broker.{what} cannot be read: it is not UTF-8 text") from None
 
 
 class ArmorAlarmSubscriber:

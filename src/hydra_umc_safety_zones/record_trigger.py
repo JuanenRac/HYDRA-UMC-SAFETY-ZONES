@@ -105,9 +105,11 @@ Send = Callable[[str, bytes, str], None]
 
 def _read_token(path: str) -> str:
     try:
-        return Path(path).read_text(encoding="utf-8").strip()
+        return Path(path).read_text(encoding="utf-8-sig").strip()  # a byte order mark is not part of the token
     except OSError as exc:
         raise RecordTriggerConfigError(f"recordTrigger.tokenFile cannot be read: {exc.strerror or type(exc).__name__}") from exc
+    except UnicodeDecodeError:
+        raise RecordTriggerConfigError("recordTrigger.tokenFile cannot be read: it is not UTF-8 text") from None
 
 
 def http_sender(timeout_s: float) -> Send:

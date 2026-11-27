@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- **Token and password files saved with a byte order mark are read:** a file written by an editor of Windows as "UTF-8 with BOM" kept the mark in front of the secret, so the credential was refused or could not be sent in a header. The mark is dropped now; a file in another encoding (UTF-16) is refused with a clear message. The same holds for the identity key file of the server (shared module of the SDK).
+
 ## [0.2.7] - Observer tokens, holds ended by who made them and an occupancy that never claims what it did not look at
 
 - **Observers can have a token of their own, and a hold is ended by who made it:** with `--observer-token` (off by default) `POST /check` and `/heartbeat` accept only that token or an administrator of the server, so a holder of the shared token cannot send what the service judges; observers then need the new token. A hold of an account can now be released only by that account or an administrator (the token of the service counts as one), and holding it again does not take it over. Tested over HTTP on loopback.
