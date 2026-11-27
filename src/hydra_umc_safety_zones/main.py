@@ -21,6 +21,7 @@ import argparse
 import dataclasses
 import hashlib
 import json
+import math
 import os
 import sys
 
@@ -34,7 +35,7 @@ from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-from hydra_umc_safety_zones.api import SafetyZonesServer
+from hydra_umc_safety_zones.api import DEFAULT_STATE_MAX_AGE_S, SafetyZonesServer
 from hydra_umc_safety_zones.config import (
     ConfigError,
     load_detections,
@@ -399,6 +400,9 @@ def _run_serve(args: argparse.Namespace) -> int:
     except ValueError as exc:
         print(f"[safety-zones] fatal: --identity-key-file: {exc}", file=sys.stderr)
         return 2
+    if not (math.isfinite(args.state_max_age_seconds) and 0 <= args.state_max_age_seconds <= 3600):
+        print("[safety-zones] fatal: --state-max-age-seconds must be from 0 to 3600", file=sys.stderr)
+        return 2
     if not _is_loopback_address(addr) and not (args.token or identity_key is not None):
         print(
             f"[safety-zones] fatal: --addr {addr} is not loopback: set --token (or SAFETY_ZONES_TOKEN), or --identity-key-file, so that only a caller that proves who it is can use the API",
@@ -583,6 +587,12 @@ def _run_serve(args: argparse.Namespace) -> int:
         print("[safety-zones] POST /check requires a bearer token")
     if args.decision_log:
         print(f"[safety-zones] every verdict is logged as a JSON line to {'standard error' if args.decision_log == '-' else args.decision_log}")
+    server.state_max_age_s = args.state_max_age_seconds
+    if server.state_max_age_s == 0:
+        print("[safety-zones] WARNING: --state-max-age-seconds 0: GET /state keeps serving the last verdict however old it is")
+    for source, what, _gate in server._gates_that_request():  # noqa: SLF001
+        where = "on the CAN bus" if can_runtime else "recorded only: there is no --can-estop-config"
+        print(f"[safety-zones] {source}: requestStop is on, the safe stop of the {what} is also requested as an E-STOP ({where})")
     server.observer_token = args.observer_token or None
     if server.observer_token:
         print("[safety-zones] observer token on: POST /check and /heartbeat accept only it (or an administrator of the server)")
@@ -718,6 +728,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="server ceiling for the calibration's max_age_days: a larger one is refused",
     )
 
+    serve_parser.add_argument(
+        "--state-max-age-seconds",
+        type=float,
+        default=float(os.environ.get("SAFETY_ZONES_STATE_MAX_AGE_S", "").strip() or DEFAULT_STATE_MAX_AGE_S),
+        help="how long GET /state serves a verdict that no check renewed before it answers INHIBITED (default 5; 0 never expires it). "
+             "In stateful mode the state_ttl_s of the zones file is the limit",
+    )
     serve_parser.add_argument(
         "--decision-log",
         default=os.environ.get("SAFETY_ZONES_DECISION_LOG", ""),

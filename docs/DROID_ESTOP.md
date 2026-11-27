@@ -47,6 +47,8 @@ The messages of the bridge are not signed, so a broker that is not on this machi
 - **The machines that run.** A verdict that is INHIBITED only because of a cut droid carries `droidInhibitOnly`, and the safe heartbeat on CAN keeps going: it stops new starts,
   never a running machine. Any other inhibition (an observer that is down, an expired verdict) still silences the heartbeat.
 - **SAFE_STOP only by the switch.** With `safeStop` on, a cut droid is a DANGER of the cell (SAFE_STOP) and the heartbeat stops.
+- **The stop on the bus, a switch of its own.** `requestStop` (off by default, needs `safeStop`) also asks for the E-STOP frame (`--can-estop-config`) with a reason of
+  its own, in the answer of `POST /check` and again every quarter of a second while the cut lasts. Without a CAN configuration the request is only recorded. Not tried on a real bus.
 
 ## The switch while the service runs
 

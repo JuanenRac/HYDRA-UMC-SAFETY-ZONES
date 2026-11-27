@@ -40,7 +40,7 @@ from hydra_umc_safety_zones.armor_alarm import ArmorAlarmConfigError, BrokerSett
 DEFAULT_TOPIC = "hydra/bridges/droids/state"
 AVAILABILITY_SUFFIX = "availability"
 MAX_MESSAGE_BYTES = 16 * 1024
-_FIELDS = {"enabled", "topic", "maxAgeS", "hysteresisS", "unknownInhibits", "safeStop", "auditLog", "broker", "stateFile"}
+_FIELDS = {"enabled", "topic", "maxAgeS", "hysteresisS", "unknownInhibits", "safeStop", "requestStop", "auditLog", "broker", "stateFile"}
 
 
 class DroidEstopConfigError(ArmorAlarmConfigError):
@@ -66,6 +66,7 @@ class DroidEstopSettings:
     hysteresis_s: float = 10.0
     unknown_inhibits: bool = True
     safe_stop: bool = False
+    request_stop: bool = False
     audit_log: str = ""
     state_file: str = ""
     broker: BrokerSettings = field(default_factory=lambda: BrokerSettings(client_id="hydra-umc-safety-zones-droids"))
@@ -86,9 +87,11 @@ def parse_settings(data: object) -> DroidEstopSettings:
     unknown = sorted(set(data) - _FIELDS)
     if unknown:
         raise DroidEstopConfigError(f"droidEstop has unknown field(s): {unknown}")
-    for key in ("enabled", "unknownInhibits", "safeStop"):
+    for key in ("enabled", "unknownInhibits", "safeStop", "requestStop"):
         if key in data and not isinstance(data[key], bool):
             raise DroidEstopConfigError(f"droidEstop.{key} must be true or false, got {data[key]!r}")
+    if data.get("requestStop", False) and not data.get("safeStop", False):
+        raise DroidEstopConfigError("droidEstop.requestStop needs droidEstop.safeStop: only a safe stop is requested on the bus")
     topic = data.get("topic", DEFAULT_TOPIC)
     if not isinstance(topic, str) or not topic.startswith("hydra/bridges/") or not topic.endswith("/state") or "+" in topic or "#" in topic:
         raise DroidEstopConfigError("droidEstop.topic must be hydra/bridges/<name>/state, without wildcards")
@@ -113,6 +116,7 @@ def parse_settings(data: object) -> DroidEstopSettings:
         hysteresis_s=_number(data.get("hysteresisS", 10.0), "hysteresisS", 0.0, 3600.0),
         unknown_inhibits=data.get("unknownInhibits", True),
         safe_stop=data.get("safeStop", False),
+        request_stop=data.get("requestStop", False),
         audit_log=audit,
         state_file=state_file,
         broker=broker if broker_data is not None else DroidEstopSettings().broker,
