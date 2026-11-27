@@ -81,6 +81,9 @@ the two when the SDK is next to this repository.
 - **Safe stop, only if the installation wants it.** `SAFE_STOP` happens only when `safeStop` is `true` AND the table maps a phase to `SAFE_STOP`. With the
   switch off, a table that says `SAFE_STOP` is read as `INHIBITED` and the downgrade is audited. With it on, the verdict is DANGER (SDK `SAFE_STOP`), signed
   like any other, and the safe heartbeat goes silent. The switch must be offered in Studio, off by default.
+- **The stop on the bus, a switch of its own.** With `safeStop` on, the verdict alone is only a state. `requestStop` (off by default, needs `safeStop`) also
+  asks for the E-STOP frame (`--can-estop-config`) with a reason of its own, in the answer of `POST /check` and again every quarter of a second while the safe
+  stop lasts, even if nobody calls `/check`. Without a CAN configuration the request is only recorded. Not tried on a real bus.
 - **Audit.** Every change of the answer, every corrupt message, every ignored message and every downgrade is a JSON line (`at`, `source`, `event`, `node`,
   `detail`).
 

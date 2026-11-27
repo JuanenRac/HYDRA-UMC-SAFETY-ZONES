@@ -260,6 +260,8 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
         try:
             body = _read_json_body(self)
         except (json.JSONDecodeError, ValueError) as e:
+            if path == "/check":
+                self._remember_refusal(f"a check was refused: malformed JSON body: {e}")
             _write_error(self, 400, f"malformed JSON body: {e}")
             return
         if path == "/settings/droid-estop" and self.server.droid_switch is not None:
@@ -283,6 +285,7 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
             # The caller must get a verdict it cannot misread as "all clear":
             # an explicit FAULT, with the cell treated as not verified.
             evaluation = SafetyEvaluation(SafetyState.INHIBITED, f"internal error: {type(e).__name__}", fault=True)
+            self._remember_refusal(evaluation.reason, fault=True)
             try:
                 _write_json(
                     self,
@@ -403,6 +406,17 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
         monitor.record_heartbeat(observation, self.server.clock())
         _write_json(self, 200, {"accepted": True, "validForSeconds": monitor.settings.heartbeat_ttl_s})
 
+    def _remember_refusal(self, reason: str, *, fault: bool = False) -> None:
+        """A check that reached no verdict leaves INHIBITED behind: GET /state must not keep serving the earlier READY."""
+        evaluation = SafetyEvaluation(SafetyState.INHIBITED, reason[:300], fault=fault)
+        self.server.log_decision(
+            {"state": evaluation.state.value, "reason": evaluation.reason, "breaches": [], "estopRequests": [], "sdkSafetyState": to_sdk_safety_state(evaluation)}
+        )
+
+    def _refuse_check(self, message: str) -> None:
+        self._remember_refusal(f"a check was refused: {message}")
+        _write_error(self, 400, message)
+
     def _handle_check(self, body: dict) -> None:
         monitor = self.server.monitor
         try:
@@ -411,7 +425,7 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
                 # server's own. A request that brings its own is refused,
                 # not silently ignored, so nobody believes they were used.
                 if "zones" in body:
-                    _write_error(self, 400, "this server holds its own zones (--zones-file): a request must not send zones")
+                    self._refuse_check("this server holds its own zones (--zones-file): a request must not send zones")
                     return
                 zone_set = self.server.zone_set
             else:
@@ -425,7 +439,7 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
             observation_raw = body.get("observation")
             if monitor is not None and observation_raw is not None:
                 # The observer must not vouch for its own freshness: in the stateful mode the evidence is its heartbeats.
-                _write_error(self, 400, "this server is stateful: the observation comes from POST /heartbeat, a request must not send one")
+                self._refuse_check("this server is stateful: the observation comes from POST /heartbeat, a request must not send one")
                 return
             observation = parse_observation_status(observation_raw) if observation_raw is not None else None
             if monitor is not None:
@@ -438,10 +452,10 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
             velocity_raw = body.get("toolVelocityMps")
             tool_velocity_mps = parse_tool_velocity(velocity_raw) if velocity_raw is not None else None
         except KeyError as e:
-            _write_error(self, 400, f"missing required field: {e}")
+            self._refuse_check(f"missing required field: {e}")
             return
         except (ConfigError, ObservationError, TypeError, ValueError) as e:
-            _write_error(self, 400, f"invalid safety configuration: {e}")
+            self._refuse_check(f"invalid safety configuration: {e}")
             return
 
         robot_body: RobotBody | None = None
@@ -452,6 +466,7 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
             except RobotBodyError as e:
                 # Never ignored and never read as a smaller body: the request is refused and the answer says the cell is not verified.
                 evaluation = SafetyEvaluation(SafetyState.INHIBITED, f"robot body refused: {e}")
+                self._remember_refusal(evaluation.reason)
                 _write_json(
                     self,
                     400,
@@ -468,7 +483,7 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
 
         limit_error = self._limit_violation(zone_set, observation)
         if limit_error:
-            _write_error(self, 400, limit_error)
+            self._refuse_check(limit_error)
             return
 
         today = datetime.now(timezone.utc).date()
@@ -540,6 +555,9 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
             # which configuration this verdict was reached with
             response["configSha256"] = self.server.config_sha256
 
+        if armor_stop or droid_stop:
+            self.server.request_gate_stops(response, armor, droid)
+
         if armor_stop or droid_stop or evaluation.state in (SafetyState.INHIBITED, SafetyState.READY):
             self.server.log_decision(response)
             _write_json(self, 200, response)
@@ -586,10 +604,14 @@ class Handler(HealthRouteMixin, MetricsHandlerMixin, BaseHTTPRequestHandler):
 # The most breaches GET /state lists (the count is always given), so the answer stays small when many objects are inside.
 _STATE_BREACHES_MAX = 20
 
+# Seconds GET /state serves a verdict that no check renewed (the stateful mode uses its own state_ttl_s).
+DEFAULT_STATE_MAX_AGE_S = 5.0
+
 
 class SafetyZonesServer(ThreadingHTTPServer):
 
     health_open: bool = False  # GET /health answers only when the operator opens it (health_route.py)
+    state_max_age_s: float = DEFAULT_STATE_MAX_AGE_S  # how long GET /state serves a verdict that nothing renews; 0 keeps it for ever
     observer_token: str | None = None  # when set, only it (or an administrator of the server) may use POST /check and /heartbeat
     holds: HoldRegistry | None = None  # POST /hold and GET /holds exist only when the operator started the service with --hold (hold.py)
     tool_arms: ToolArmRegistry | None = None  # POST /tool-arms and GET /tool-arms exist only when the operator started the service with --tool-arms (tool_arms.py)
@@ -636,6 +658,8 @@ class SafetyZonesServer(ThreadingHTTPServer):
         self._decision_log = decision_log or None
         self._decision_lock = threading.Lock()
         self._last_verdict: dict | None = None
+        self._last_verdict_at: float | None = None
+        self.gate_stop_error: str | None = None
         self._verdict_lock = threading.Lock()
         # Off unless a key was given: then every verdict carries a signature (see signing.py).
         self.signer = signer
@@ -655,15 +679,64 @@ class SafetyZonesServer(ThreadingHTTPServer):
         # Off unless the zones file switches cellState.enabled on: writes the file the bridges read as the state of the cell (see cell_state_file.py).
         self.cell_state_writer: CellStateWriter | None = None
 
+    def _gates_that_request(self) -> list[tuple[str, str, ArmorAlarmGate | DroidEstopGate]]:
+        gates: list[tuple[str, str, ArmorAlarmGate | DroidEstopGate]] = []
+        if self.armor_gate is not None and self.armor_gate.settings.request_stop:
+            gates.append(("armor-alarm", "armor alarm", self.armor_gate))
+        if self.droid_gate is not None and self.droid_gate.settings.request_stop:
+            gates.append(("droid-estop", "droid emergency stop", self.droid_gate))
+        return gates
+
+    def _send_gate_stop(self, source: str, what: str, detail: str) -> EStopRequest:
+        request = EStopRequest(object_id=source, zone_id=source, reason=f"{what} safe stop: {detail}"[:300], zone_ids=(source,))
+        (self.estop_requester or NullEStopRequester()).send(request)
+        return request
+
+    def request_gate_stops(self, response: dict, armor: object, droid: object) -> None:
+        """The safe stop of the alarm or of a droid, with `requestStop` on, asks for the stop frame with a reason of its own."""
+        statuses = {"armor-alarm": armor, "droid-estop": droid}
+        for source, what, _gate in self._gates_that_request():
+            status = statuses[source]
+            if status is None or not getattr(status, "safe_stop", False):
+                continue
+            try:
+                request = self._send_gate_stop(source, what, str(getattr(status, "reason", "")))
+            except Exception as exc:  # noqa: BLE001 - a transport that fails must not hide the verdict
+                response["estopTransportError"] = f"{type(exc).__name__}: {exc}"
+            else:
+                response["estopRequests"] = [*response["estopRequests"], asdict(request)]
+
+    def watch_once(self) -> None:
+        """One turn of the watcher: ask again for the stop of a gate that holds a safe stop (even if nobody calls /check), and hold an expired verdict."""
+        now = self.clock()
+        for source, what, gate in self._gates_that_request():
+            status = gate.status(now)
+            if status.safe_stop:
+                try:
+                    self._send_gate_stop(source, what, status.reason)
+                    self.gate_stop_error = None
+                except Exception as exc:  # noqa: BLE001 - tried again on the next turn
+                    if self.gate_stop_error is None:
+                        print(f"[safety-zones] the stop of the {what} could not be requested: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
+                    self.gate_stop_error = type(exc).__name__
+        if self.monitor is not None:
+            expired = self.monitor.tick(now)
+            if expired is not None:
+                response = {**expired, "breaches": [], "estopRequests": []}
+                self._sign(response)
+                self._remember_verdict(response)
+
     def start_watcher(self, interval_s: float = 0.25) -> None:
-        """Starts the thread that publishes INHIBITED when a verdict or the heartbeat expires (stateful mode only)."""
-        monitor = self.monitor
-        if monitor is None or self._watcher is not None:
+        """Starts the thread of watch_once(): needed in stateful mode and when a gate requests its stop on the bus."""
+        if self._watcher is not None or (self.monitor is None and not self._gates_that_request()):
             return
 
         def run() -> None:
             while not self.stopping.wait(interval_s):
-                monitor.tick(self.clock())
+                try:
+                    self.watch_once()
+                except Exception as exc:  # noqa: BLE001 - the watcher must outlive one bad turn
+                    print(f"[safety-zones] the watcher failed once: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
 
         self._watcher = threading.Thread(target=run, name="safety-zones-expiry", daemon=True)
         self._watcher.start()
@@ -673,9 +746,27 @@ class SafetyZonesServer(ThreadingHTTPServer):
         super().server_close()
 
     def last_verdict(self) -> dict | None:
-        """The most recent verdict of /check as the SDK SafetyState with the time it was reached, or None before the first one."""
+        """The most recent verdict of /check as the SDK SafetyState with the time it was reached, or None before the first one.
+
+        A verdict that nothing renewed for longer than its time to live is answered as INHIBITED (and signed as such when the service signs).
+        """
         with self._verdict_lock:
-            return None if self._last_verdict is None else dict(self._last_verdict)
+            record = None if self._last_verdict is None else dict(self._last_verdict)
+            reached = self._last_verdict_at
+        if record is None:
+            return None
+        limit = self.monitor.settings.state_ttl_s if self.monitor is not None else self.state_max_age_s
+        if not limit or self.state_max_age_s == 0 or reached is None:
+            return record
+        age = self.clock() - reached
+        if 0 <= age <= limit:
+            return record
+        evaluation = SafetyEvaluation(SafetyState.INHIBITED, f"the last verdict is more than {limit:g}s old and nothing renewed it - the state is not confirmed")
+        expired: dict = {"sdkSafetyState": to_sdk_safety_state(evaluation), "reason": evaluation.reason}
+        self._sign(expired)
+        if record.get("configSha256"):
+            expired["configSha256"] = record["configSha256"]
+        return expired
 
     def _sign(self, response: dict) -> None:
         """Adds `sdkSafetyStateSignature` to a verdict when the service signs; a signing that fails leaves the verdict unsigned, which a consumer reads as INHIBITED."""
@@ -719,6 +810,7 @@ class SafetyZonesServer(ThreadingHTTPServer):
             record["estopRequestCount"] = len(estops)
         with self._verdict_lock:
             self._last_verdict = record
+            self._last_verdict_at = self.clock()
 
     def log_decision(self, response: dict) -> None:
         """Remember the verdict for GET /state and, when a destination is set, append one JSON line (state, reason, configuration hash, counts); never raises."""

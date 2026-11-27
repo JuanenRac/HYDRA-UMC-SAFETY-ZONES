@@ -160,18 +160,23 @@ class StatefulMonitor:
             if changed or renew or self._published_expired:
                 self._publish_locked(self._verdict, mono_now)
 
-    def tick(self, mono_now: float) -> None:
-        """Called every fraction of a second by the service: when the verdict or the heartbeat has expired, publish INHIBITED once."""
+    def tick(self, mono_now: float) -> dict | None:
+        """Called every fraction of a second by the service: when the verdict or the heartbeat has expired, publish INHIBITED once.
+
+        Returns that INHIBITED verdict the one time it is published, so the service can hold it for GET /state too.
+        """
         with self._lock:
             if self._verdict is None or self._verdict_at is None or self._published_expired:
-                return
+                return None
             if mono_now - self._verdict_at > self.settings.state_ttl_s:
                 reason = f"the last verdict is more than {self.settings.state_ttl_s}s old and nothing renewed it - the state is not confirmed"
             elif self._heartbeat_at is not None and mono_now - self._heartbeat_at > self.settings.heartbeat_ttl_s:
                 reason = f"no heartbeat from the observer for more than {self.settings.heartbeat_ttl_s}s - the state is not confirmed"
             else:
-                return
-            self._publish_locked(self._verdict_of(SafetyEvaluation(SafetyState.INHIBITED, reason)), mono_now, expired=True)
+                return None
+            verdict = self._verdict_of(SafetyEvaluation(SafetyState.INHIBITED, reason))
+            self._publish_locked(verdict, mono_now, expired=True)
+            return verdict
 
     @staticmethod
     def _verdict_of(evaluation: SafetyEvaluation) -> dict:

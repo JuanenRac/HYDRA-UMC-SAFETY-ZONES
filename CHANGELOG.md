@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- **`GET /state` no longer serves an old verdict:** a verdict that no check renewed for `--state-max-age-seconds` (default 5, `0` keeps the old behaviour; the stateful mode uses its `state_ttl_s`) is answered as INHIBITED, and a check that is refused or fails leaves INHIBITED behind instead of the earlier READY.
+- **The safe stop of the house alarm and of a droid can be requested on the bus, off by default:** `armorAlarm.requestStop` and `droidEstop.requestStop` (both need `safeStop`) send the E-STOP request with a reason of its own, also while nobody calls `/check`. Not tried on a real bus.
 - **Token and password files saved with a byte order mark are read:** a file written by an editor of Windows as "UTF-8 with BOM" kept the mark in front of the secret, so the credential was refused or could not be sent in a header. The mark is dropped now; a file in another encoding (UTF-16) is refused with a clear message. The same holds for the identity key file of the server (shared module of the SDK).
 
 ## [0.2.7] - Observer tokens, holds ended by who made them and an occupancy that never claims what it did not look at

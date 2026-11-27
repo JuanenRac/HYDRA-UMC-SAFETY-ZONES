@@ -61,7 +61,7 @@ DEFAULT_TOPIC_FILTER = "armor/alarm/+/state"
 MAX_MESSAGE_BYTES = 65536
 _NODE_ID = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")
 _FIELDS = {
-    "enabled", "topic", "nodes", "phaseTable", "maxAgeS", "hysteresisS", "unknownInhibits", "safeStop", "auditLog", "broker",
+    "enabled", "topic", "nodes", "phaseTable", "maxAgeS", "hysteresisS", "unknownInhibits", "safeStop", "requestStop", "auditLog", "broker",
     "requireSignature", "signatureKeyFile", "signatureMaxSkewS",
 }
 _TOKEN = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")
@@ -124,6 +124,7 @@ class ArmorAlarmSettings:
     hysteresis_s: float = 10.0
     unknown_inhibits: bool = True
     safe_stop: bool = False
+    request_stop: bool = False
     audit_log: str = ""
     broker: BrokerSettings = field(default_factory=BrokerSettings)
     require_signature: bool = True
@@ -140,7 +141,7 @@ def parse_settings(data: object) -> ArmorAlarmSettings:
     unknown = sorted(set(data) - _FIELDS)
     if unknown:
         raise ArmorAlarmConfigError(f"armorAlarm has unknown field(s): {unknown}")
-    for key in ("enabled", "unknownInhibits", "safeStop", "requireSignature"):
+    for key in ("enabled", "unknownInhibits", "safeStop", "requestStop", "requireSignature"):
         if key in data and not isinstance(data[key], bool):
             raise ArmorAlarmConfigError(f"armorAlarm.{key} must be true or false, got {data[key]!r}")
     topic = data.get("topic", DEFAULT_TOPIC_FILTER)
@@ -158,6 +159,8 @@ def parse_settings(data: object) -> ArmorAlarmSettings:
     audit = data.get("auditLog", "")
     if not isinstance(audit, str):
         raise ArmorAlarmConfigError("armorAlarm.auditLog must be a text")
+    if data.get("requestStop", False) and not data.get("safeStop", False):
+        raise ArmorAlarmConfigError("armorAlarm.requestStop needs armorAlarm.safeStop: only a safe stop is requested on the bus")
     require_signature = data.get("requireSignature", True)
     key_file = data.get("signatureKeyFile", "")
     if not isinstance(key_file, str):
@@ -176,6 +179,7 @@ def parse_settings(data: object) -> ArmorAlarmSettings:
         hysteresis_s=_number(data.get("hysteresisS", 10.0), "hysteresisS", 0.0, 3600.0),
         unknown_inhibits=data.get("unknownInhibits", True),
         safe_stop=data.get("safeStop", False),
+        request_stop=data.get("requestStop", False),
         audit_log=audit,
         broker=broker,
         require_signature=require_signature,
